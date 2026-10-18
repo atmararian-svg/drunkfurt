@@ -1,10 +1,10 @@
-import { CatmullRomCurve3, Vector3 } from 'three';
+import { Vector3 } from 'three';
+import { CameraTrack } from './cameraTrack';
 import { clamp, easeInOutCubic } from './math';
 
 /**
- * Scripted camera shots. A shot is a list of keyframes sampled over time; the
- * first-person rig hands camera control to the active shot and takes it back
- * when the shot finishes. Scenes define their own shots (see scenes/<id>/shots.ts).
+ * Camera keyframes and time-driven shots. Scroll-driven episode tracks use the
+ * same keys through CameraTrack; ShotPlayer plays them over time instead.
  */
 export interface CameraKey {
   /** Normalised time 0..1 within the shot. */
@@ -13,6 +13,8 @@ export interface CameraKey {
   yaw: number;
   pitch: number;
   roll?: number;
+  /** Vertical field of view in degrees (default 54). */
+  fov?: number;
 }
 
 export interface CameraShot {
@@ -28,17 +30,13 @@ export interface CameraPose {
   yaw: number;
   pitch: number;
   roll: number;
+  fov?: number;
 }
 
-function catmullRom(p0: number, p1: number, p2: number, p3: number, t: number) {
-  const t2 = t * t;
-  const t3 = t2 * t;
-  return 0.5 * (2 * p1 + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
-}
-
+/** Time-driven shots (for later scripted beats such as the slow-motion sequence). */
 export class ShotPlayer {
   private shot: CameraShot | null = null;
-  private curve: CatmullRomCurve3 | null = null;
+  private track: CameraTrack | null = null;
   private elapsed = 0;
   private onDone: (() => void) | null = null;
 
@@ -49,11 +47,7 @@ export class ShotPlayer {
   play(shot: CameraShot, onDone?: () => void) {
     if (this.shot) return false; // never overlap shots
     this.shot = shot;
-    this.curve = new CatmullRomCurve3(
-      shot.keys.map((k) => new Vector3(...k.pos)),
-      false,
-      'centripetal',
-    );
+    this.track = new CameraTrack(shot.keys);
     this.elapsed = 0;
     this.onDone = onDone ?? null;
     return true;
@@ -62,31 +56,14 @@ export class ShotPlayer {
   /** Advances the shot and writes the sampled pose. Returns false when inactive. */
   update(dt: number, out: CameraPose) {
     const shot = this.shot;
-    if (!shot || !this.curve) return false;
+    if (!shot || !this.track) return false;
     this.elapsed += dt;
     const raw = clamp(this.elapsed / shot.duration, 0, 1);
-    const t = (shot.ease ?? easeInOutCubic)(raw);
-
-    // Locate the segment, then sample position and angles with Catmull-Rom so
-    // velocity stays continuous through every key.
-    const keys = shot.keys;
-    let i = 0;
-    while (i < keys.length - 2 && t > keys[i + 1].t) i++;
-    const a = keys[i];
-    const b = keys[i + 1];
-    const local = clamp((t - a.t) / Math.max(1e-6, b.t - a.t), 0, 1);
-    this.curve.getPoint((i + local) / (keys.length - 1), out.position);
-    const k = (j: number) => keys[clamp(j, 0, keys.length - 1)];
-    const angle = (get: (c: CameraKey) => number) =>
-      catmullRom(get(k(i - 1)), get(a), get(b), get(k(i + 2)), local);
-    out.yaw = angle((c) => c.yaw);
-    out.pitch = angle((c) => c.pitch);
-    out.roll = angle((c) => c.roll ?? 0);
-
+    this.track.sample((shot.ease ?? easeInOutCubic)(raw), out);
     if (raw >= 1) {
       const done = this.onDone;
       this.shot = null;
-      this.curve = null;
+      this.track = null;
       this.onDone = null;
       done?.();
     }

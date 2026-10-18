@@ -162,6 +162,9 @@ function closedDoor(b: GeoBatch, side: 1 | -1, dz: number, lit: boolean) {
   b.box(lit ? 'buttonLit' : 'trim', [0.012, 0.07, 0.07], [x + side * 0.008, FLOOR + 1.12, dz - (w / 2 + 0.16)]);
 }
 
+/** How far the open leaf travels to close: along the car, then into the body line. */
+export const LEAF_TRAVEL = { z: -(CAR.doorWidth + 0.03), x: -0.088 };
+
 /** Open plug door with a real vestibule behind it. */
 function vestibule(b: GeoBatch, d0: number, d1: number, side: 1 | -1) {
   const x = side * CAR.halfWidth;
@@ -195,10 +198,11 @@ function vestibule(b: GeoBatch, d0: number, d1: number, side: 1 | -1) {
   b.box('rubber', [0.06, CAR.doorHeight, 0.035], [x - side * 0.02, FLOOR + CAR.doorHeight / 2, d1 - 0.015]);
   b.box('rubber', [0.06, 0.035, w], [x - side * 0.02, DOOR_TOP - 0.015, mid]);
   // the door leaf itself, slid outwards and towards the car end
+  // (separate 'leaf*' keys so the scene can animate the door closing)
   const lz = d1 + w / 2 + 0.03;
-  b.box('rubber', [0.012, CAR.doorHeight + 0.03, w + 0.03], [x + side * 0.085, FLOOR + CAR.doorHeight / 2, lz]);
-  b.box('body', [0.03, CAR.doorHeight - 0.02, w - 0.02], [x + side * 0.1, FLOOR + CAR.doorHeight / 2, lz]);
-  b.box('trim', [0.012, 0.78, w * 0.62], [x + side * 0.118, FLOOR + 1.52, lz]);
+  b.box('leafRubber', [0.012, CAR.doorHeight + 0.03, w + 0.03], [x + side * 0.085, FLOOR + CAR.doorHeight / 2, lz]);
+  b.box('leafBody', [0.03, CAR.doorHeight - 0.02, w - 0.02], [x + side * 0.1, FLOOR + CAR.doorHeight / 2, lz]);
+  b.box('leafTrim', [0.012, 0.78, w * 0.62], [x + side * 0.118, FLOOR + 1.52, lz]);
   // open-door indicator: lit yellow ring beside the opening
   b.box('buttonLit', [0.014, 0.08, 0.08], [x + side * 0.004, FLOOR + 1.12, d0 - 0.16]);
   // step light

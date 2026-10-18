@@ -1,7 +1,7 @@
 # Drunkfurt
 
-A first-person, cinematic interactive experience set in Frankfurt am Main at night.
-This repository currently contains **Scene 1 — Arrival**: Frankfurt (Main) Hbf, Gleis 7, a few minutes before midnight.
+A scroll-driven, first-person 3D comic set in Frankfurt am Main at night.
+Episode 1, **Ankunft**, is built: Frankfurt (Main) Hbf, Gleis 7, a few minutes before midnight.
 
 ![Arrival](docs/screens/01-arrival.png)
 
@@ -17,11 +17,36 @@ npm run preview    # serve the production build
 npm run typecheck
 ```
 
-Controls: **click** (or Enter/Space) to step out of the train. After that, click to capture
-the mouse, **mouse** to look, **W A S D** / arrows to walk, **Shift** to hurry. Esc releases the
-mouse. If the browser refuses pointer lock, hold the left button and drag to look.
+**Scroll** to move through the story (wheel, trackpad, touch, keyboard). **Click** or **Enter**
+jumps to the next composed beat. Moving the mouse lets you look around a few degrees; the
+camera always returns to the composed frame.
 
-## What is in Scene 1
+## Interaction model
+
+There is no walking. The camera is on rails: each episode owns a span of the page's scroll
+and a camera track (keyframes with position, yaw, pitch, roll and field of view, sampled with
+Catmull-Rom). Scroll position → global progress → episode + local progress → camera pose.
+Progress is damped so scrolling feels like moving a dolly. Footstep bob appears only while
+the camera is travelling. Scroll also drives events: in Episode 1 a traveller crosses in
+front of you and the train door slides shut behind you, both scrubbing backwards when you
+scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) runs on time.
+
+## Rendering: printed comic, real 3D underneath
+
+- **Tonal bands** (`src/render/comic.ts`): every lit material keeps three's lighting and
+  shadows. Its final colour is quantised into five printed tones: ink, charcoal, mid, light
+  and paper. Band edges resolve as screen-space halftone dots on floors and diagonal hatching
+  on walls. Hue is kept, so yellow stays yellow in every band. Materials opt out with
+  `material.userData.comic = false`.
+- **Selective ink** (`src/render/ink.ts`, `Stylizer.tsx`): every opaque mesh is drawn once
+  into a normal/depth buffer, either as *ink* geometry or as a line-free *occluder*. Lines come
+  only from ink geometry. Silhouettes are heavy, creases are lighter, and both thin and fade
+  with distance. Glows, displays, light spill, dust and sky never get outlines. Objects opt out
+  with `userData.ink = false`.
+- **Grade**: no filmic tone mapping (paper white stays white), a little bloom on light sources
+  only, a vignette and fine paper grain. Textures were flattened so they print as flat fills.
+
+## What is in Episode 1
 
 - **Station**: a barrel-vaulted train shed modelled on the Hbf's 19th-century halls: lattice arch
   ribs on masonry piers, purlins, glazed vault, glazed gable apron at the open end, three halls
@@ -43,44 +68,50 @@ mouse. If the browser refuses pointer lock, hold the left button and drag to loo
   flickering tube far down the platform, scrolling tickers, the clock's second hand.
 - **Light**: one spotlight per mast (three near the door cast shadows), a cold skylight, a
   faint bounce light so the trusses stay readable, the concourse lights, the vestibule light,
-  and light spilling from train windows onto the platform. Post-processing is restrained: HDR
-  bloom only above 1.0 luminance, ACES tone mapping, vignette and fine grain.
-- **Interaction**: one prompt, *CLICK TO STEP OUT*. The click is a one-way state change
-  (`arrival → stepping-out → platform`). A scripted Catmull-Rom shot leans you out, glances down
-  at the gap, steps down 40 cm with a small landing dip and lifts the gaze down the platform.
-  Free look is enabled only when the shot ends. The shot player refuses overlapping shots.
+  and light spilling from train windows onto the platform. These become the graphic pools of
+  light once printed.
+- **Shots, by scroll**: title in the doorway; lean out and glance at the gap; step down 40 cm;
+  a few paces while a traveller crosses; look up at the display ("Zug endet hier"); a low angle
+  under the name sign, clock and vault; a long lens down the platform to the concourse; then an
+  ink wipe to the Episode 2 card. Comic caption boxes carry the narration.
 
 ## Structure
 
 ```
 src/
-  App.tsx                 Canvas, post FX, UI overlay
-  config/palette.ts       colour palette (red reserved for narrative beats)
+  App.tsx                 fixed canvas + tall scroll track, episode mounting
   core/
-    store.ts              narrative state (scene + phase), no per-frame React updates
-    sequence.ts           ShotPlayer: scripted camera shots (keyframes, Catmull-Rom)
-    geometry.ts           profile sweeps, clipping, GeoBatch (merge static parts per material)
-    math.ts               damping, easing, seeded RNG
+    timeline.ts           scroll → progress → episode/local progress; episode spans
+    cameraTrack.ts        keyframed camera path (scroll- or time-driven)
+    sequence.ts           camera key types, ShotPlayer for time-driven beats
+    store.ts              coarse UI state (loading/ready, active episode)
+    geometry.ts, math.ts  sweeps, batching, damping, easing, RNG
+  episodes/
+    types.ts              EpisodeDef: World, track, captions, beats
+    index.ts              registry + planned episode list
   player/
-    FirstPersonRig.tsx    camera modes: anchored (parallax) / free (look + walk) / locked;
-                          scripted shots take over via `cameraDirector`
-    input.ts              keyboard, pointer lock, drag fallback
-    playerState.ts        read-only visitor position for NPCs
-  audio/AudioDirector.ts  audio graph and cue registry (no assets yet, see below)
-  materials/
-    materials.ts          shared material library
-    textures.ts           all textures, generated procedurally on canvas
-  effects/PostFX.tsx
-  ui/Overlay.tsx          fade, letterbox, title card, prompt, hints
-  scenes/station/         Scene 1: layout constants, hall, platform, tracks, train,
-                          furniture, concourse, outside, passengers, pigeon, dust,
-                          lighting, shots
+    ScrollCameraRig.tsx   camera on the active track + subtle look-around + footstep bob
+    input.ts              pointer position for look-around
+  render/
+    comic.ts              tonal bands, halftone, hatching (material patch)
+    ink.ts                ink buffer material + ink line effect
+    Stylizer.tsx          classifies meshes, renders the ink buffer, composer
+  ui/Overlay.tsx          title panel, captions, episode rail, wipe, outro
+  scenes/station/         Episode 1: episode.ts (track, captions, beats) + the world
 ```
 
-To add a scene, create `scenes/<id>/` with its own layout, a scene component and its shots,
-then extend `SceneId` and the phases in `core/store.ts`. Scripted beats (the confrontation,
-time dilation, the car) should run on `cameraDirector`, so the rig's free mode never has to
-handle them.
+### Adding an episode
+
+1. Build the world in `src/scenes/<id>/` and write `episode.ts`. It exports an `EpisodeDef`
+   with the world component, a `CameraTrack`, captions and beats.
+2. Register it in `src/episodes/index.ts` and give it a span in `EPISODE_SPANS`
+   (`src/core/timeline.ts`).
+3. Read `localProgress('<id>')` inside the world for scroll-driven events. Use
+   `cameraDirector` (a `ShotPlayer`) for beats that must play in real time, such as the
+   slow-motion sequence.
+
+The host mounts the active episode and the next one, so the next world is ready before the
+wipe opens.
 
 ## Assets and placeholders
 
@@ -99,7 +130,6 @@ handle them.
 
 ## Dev inspection hook
 
-In dev builds `window.__drunkfurt` exposes `{ story, rigPose, input, requestTeleport, scene }`
-so you can drive the camera from automated screenshots, for example
-`__drunkfurt.story.setState({phase:'platform'}); __drunkfurt.requestTeleport(x, z, yaw, pitch)`.
-It is not present in production builds.
+In dev builds `window.__drunkfurt.setProgress(p)` jumps to a global progress value (0..1)
+without smoothing, for automated screenshots. `window.__ink.uniforms.get('uDebug').value = 1`
+shows the ink buffer. Neither exists in production builds.

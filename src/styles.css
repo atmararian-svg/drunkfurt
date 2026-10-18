@@ -1,138 +1,231 @@
 :root {
-  --near-black: #101010;
-  --off-white: #f1f0e9;
-  --grey: #777777;
+  --ink: #101010;
+  --charcoal: #1b1b1b;
+  --paper: #f1f0e9;
+  --grey: #8a8984;
   --yellow: #f5d21a;
+  --display: 'Anton', 'Impact', 'Haettenschweiler', 'Arial Narrow Bold', sans-serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
-  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  color-scheme: dark;
 }
 
 * { box-sizing: border-box; }
 
-html, body, #root {
+html, body {
   margin: 0;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  background: var(--near-black);
-  color: var(--off-white);
+  background: var(--ink);
+  color: var(--paper);
+  overscroll-behavior: none;
 }
+#root { min-height: 100%; }
 
-canvas { display: block; }
+.stage {
+  position: fixed;
+  inset: 0;
+}
+.stage canvas { display: block; }
+.scroll-track { width: 1px; }
 
 .overlay {
   position: fixed;
   inset: 0;
-  cursor: pointer;
-  user-select: none;
+  pointer-events: none;
 }
-.overlay.is-locked { cursor: none; }
+body { cursor: pointer; }
 
 .veil {
   position: absolute;
   inset: 0;
   background: #000;
   opacity: 0;
-  transition: opacity 2.8s var(--ease);
-  pointer-events: none;
+  transition: opacity 2.4s var(--ease);
 }
 .veil.is-on { opacity: 1; transition: none; }
 
-.letterbox {
+/* --- episode title panel ------------------------------------------------ */
+.title {
   position: absolute;
-  left: 0;
-  right: 0;
-  height: 0;
-  background: #000;
-  transition: height 1.6s var(--ease);
-  pointer-events: none;
+  left: max(28px, env(safe-area-inset-left, 0px));
+  bottom: max(13vh, 80px);
+  display: grid;
+  gap: 6px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
 }
-.letterbox.top { top: 0; }
-.letterbox.bottom { bottom: 0; }
-.letterbox.is-on { height: 7vh; }
+.title.is-on { opacity: 1; transform: none; transition-delay: 0.6s; }
+.title-kicker {
+  font: 500 11px/1 var(--mono);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--yellow);
+}
+.title-name {
+  margin: 0;
+  font: 400 clamp(64px, 11vw, 168px)/0.86 var(--display);
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+  color: var(--paper);
+  text-shadow: 4px 4px 0 var(--ink);
+}
+.title-sub {
+  font: 400 12px/1.4 var(--mono);
+  letter-spacing: 0.08em;
+  color: var(--paper);
+}
 
-.titlecard {
+/* --- comic caption boxes ------------------------------------------------ */
+.caption {
   position: absolute;
-  top: calc(7vh + 28px);
-  left: 40px;
+  max-width: min(360px, calc(100vw - 40px));
+  padding: 12px 14px 13px;
+  border: 2px solid var(--ink);
+  box-shadow: 5px 5px 0 var(--ink);
+  background: var(--paper);
+  color: var(--ink);
+  opacity: 0;
+  transform: translateY(6px) rotate(-0.6deg);
+  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+}
+.caption.is-on { opacity: 1; transform: rotate(-0.6deg); }
+.caption--yellow { background: var(--yellow); }
+.caption p {
+  margin: 0;
+  font: 500 15px/1.38 var(--mono);
+  text-wrap: balance;
+}
+.caption-kicker {
+  display: block;
+  margin-bottom: 6px;
+  font: 600 10px/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+.caption--tl { top: max(9vh, 56px); left: max(28px, env(safe-area-inset-left, 0px)); }
+.caption--tr { top: max(9vh, 56px); right: max(72px, calc(env(safe-area-inset-right, 0px) + 56px)); }
+.caption--bl { bottom: max(11vh, 64px); left: max(28px, env(safe-area-inset-left, 0px)); }
+.caption--br { bottom: max(11vh, 64px); right: max(72px, calc(env(safe-area-inset-right, 0px) + 56px)); }
+
+/* --- scroll cue --------------------------------------------------------- */
+.cue {
+  position: absolute;
+  left: 50%;
+  bottom: 28px;
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  transform: translateX(-50%);
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  opacity: 0;
+  transition: opacity 0.6s var(--ease);
+}
+.cue.is-on { opacity: 0.85; transition-delay: 2.2s; }
+.cue i {
+  display: block;
+  width: 2px;
+  height: 34px;
+  background: linear-gradient(var(--yellow) 0 50%, transparent 50% 100%);
+  background-size: 2px 68px;
+  animation: cue 1.8s var(--ease) infinite;
+}
+@keyframes cue {
+  from { background-position: 0 -34px; }
+  to { background-position: 0 34px; }
+}
+
+/* --- episode rail ------------------------------------------------------- */
+.rail {
+  position: absolute;
+  top: 50%;
+  right: max(22px, env(safe-area-inset-right, 0px));
+  display: flex;
+  gap: 10px;
+  transform: translateY(-50%);
+}
+.rail-line {
+  width: 2px;
+  height: 180px;
+  background: rgba(241, 240, 233, 0.18);
+  overflow: hidden;
+}
+.rail-fill {
+  width: 100%;
+  height: 100%;
+  background: var(--yellow);
+  transform-origin: top;
+  transform: scaleY(0);
+}
+.rail ol {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  justify-content: space-between;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font: 500 9px/1 var(--mono);
+  letter-spacing: 0.1em;
+  color: rgba(241, 240, 233, 0.32);
+}
+.rail li.is-built { color: var(--paper); }
+
+/* --- ink wipe and outro ------------------------------------------------- */
+.wipe {
+  --w: 0;
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+/* solid ink, led by a halftone fringe like the edge of a printed panel */
+.wipe::before,
+.wipe::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+.wipe::before {
+  left: 0;
+  width: calc(var(--w) * 100%);
+  background: var(--ink);
+}
+.wipe::after {
+  left: calc(var(--w) * 100% - 1px);
+  width: 22vw;
+  background: radial-gradient(circle, var(--ink) 46%, transparent 49%) 0 0 / 10px 10px;
+  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.55) 40%, transparent 100%);
+  mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.55) 40%, transparent 100%);
+  opacity: min(1, calc(var(--w) * 20));
+}
+.outro {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  text-align: center;
   opacity: 0;
-  transform: translateY(6px);
-  transition: opacity 1.4s var(--ease), transform 1.4s var(--ease);
-  pointer-events: none;
+  transition: opacity 0.8s var(--ease);
 }
-.titlecard.is-on { opacity: 1; transform: none; transition-delay: 1.2s; }
-.wordmark {
-  font-weight: 700;
-  font-size: 13px;
-  letter-spacing: 0.42em;
-}
-.where {
-  font-size: 11px;
+.outro.is-on { opacity: 1; }
+.outro p {
+  margin: 0;
+  font: 400 13px/1 var(--mono);
   letter-spacing: 0.18em;
-  color: rgba(241, 240, 233, 0.55);
   text-transform: uppercase;
+  color: var(--grey);
 }
 
-.prompt {
-  position: absolute;
-  left: 50%;
-  bottom: calc(7vh + 44px);
-  transform: translate(-50%, 6px);
-  padding: 10px 2px 9px;
-  border: 0;
-  border-bottom: 1px solid var(--yellow);
-  background: none;
-  color: var(--off-white);
-  font: inherit;
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.38em;
-  text-transform: uppercase;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
-}
-.prompt.is-on {
-  opacity: 1;
-  transform: translate(-50%, 0);
-  pointer-events: auto;
-  cursor: pointer;
-  transition-delay: 2s;
-  animation: breathe 3.6s ease-in-out 3s infinite;
-}
-.prompt:focus-visible { outline: 1px dashed var(--yellow); outline-offset: 6px; }
-@keyframes breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.55; }
+@media (max-width: 640px) {
+  .rail { display: none; }
+  .caption--tr, .caption--br { right: 20px; }
+  .caption--tl, .caption--bl { left: 20px; }
+  .caption p { font-size: 14px; }
 }
 
-.hint {
-  position: absolute;
-  left: 50%;
-  bottom: 40px;
-  transform: translateX(-50%);
-  font-size: 11px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: rgba(241, 240, 233, 0.7);
-  white-space: pre;
-  opacity: 0;
-  transition: opacity 1.2s var(--ease);
-  pointer-events: none;
-}
-.hint.is-on { opacity: 1; transition-delay: 0.4s; }
-
-.reticle {
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 3px;
-  height: 3px;
-  margin: -1.5px 0 0 -1.5px;
-  border-radius: 50%;
-  background: rgba(241, 240, 233, 0.45);
-  pointer-events: none;
+@media (prefers-reduced-motion: reduce) {
+  .cue i { animation: none; }
 }

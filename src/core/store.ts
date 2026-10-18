@@ -1,21 +1,13 @@
 import { useSyncExternalStore } from 'react';
+import type { EpisodeId } from './timeline';
 
 /**
- * Narrative state. Scenes are independent chapters; each has its own phases.
- * Only coarse state lives here (it drives UI). Per-frame values never go through React.
+ * Coarse story state for the UI. Scroll progress itself lives in core/timeline
+ * and is read per frame; only changes worth a re-render go through here.
  */
-export type SceneId = 'station'; // later: 'city' | 'confrontation' | 'car' | 'home'
-
-export type StationPhase =
-  | 'loading' // shaders compiling, nothing interactive yet
-  | 'arrival' // standing in the train doorway, prompt visible
-  | 'stepping-out' // scripted camera move, input ignored
-  | 'platform'; // free first-person exploration
-
 export interface StoryState {
-  scene: SceneId;
-  phase: StationPhase;
-  pointerLocked: boolean;
+  phase: 'loading' | 'ready';
+  episode: EpisodeId | 'outro';
 }
 
 type Listener = () => void;
@@ -40,11 +32,7 @@ function createStore<T extends object>(initial: T) {
   };
 }
 
-export const story = createStore<StoryState>({
-  scene: 'station',
-  phase: 'loading',
-  pointerLocked: false,
-});
+export const story = createStore<StoryState>({ phase: 'loading', episode: 'station' });
 
 export function useStory<S>(selector: (s: StoryState) => S): S {
   return useSyncExternalStore(story.subscribe, () => selector(story.getState()));

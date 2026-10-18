@@ -90,12 +90,12 @@ export const platformPaving = () =>
     const s = w / n;
     for (let i = 0; i < n; i++)
       for (let j = 0; j < n; j++) {
-        const v = 86 + Math.floor(rnd() * 14);
+        const v = 92 + Math.floor(rnd() * 5);
         ctx.fillStyle = `rgb(${v},${v},${v - 2})`;
         ctx.fillRect(i * s + 3, j * s + 3, s - 6, s - 6);
       }
-    blotches(ctx, w, h, 40, 'rgba(30,30,30,0.18)', 120, 11);
-    blotches(ctx, w, h, 25, 'rgba(160,160,155,0.08)', 80, 12);
+    // comic print: flat fills, so wear is kept to a few faint marks
+    blotches(ctx, w, h, 8, 'rgba(30,30,30,0.06)', 120, 11);
     // gum spots, the most honest detail of any German platform
     for (let i = 0; i < 26; i++) {
       ctx.fillStyle = `rgba(${40 + rnd() * 30},${40 + rnd() * 30},${40 + rnd() * 30},0.55)`;
@@ -103,8 +103,8 @@ export const platformPaving = () =>
       ctx.arc(rnd() * w, rnd() * h, 2 + rnd() * 5, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.strokeStyle = 'rgba(25,25,25,0.85)';
-    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(20,20,20,0.95)';
+    ctx.lineWidth = 6;
     for (let i = 0; i <= n; i++) {
       ctx.beginPath();
       ctx.moveTo(i * s, 0);
@@ -113,7 +113,7 @@ export const platformPaving = () =>
       ctx.lineTo(w, i * s);
       ctx.stroke();
     }
-    grain(ctx, w, h, 26, 13);
+    grain(ctx, w, h, 6, 13);
   });
 
 /** Roughness for the paving: joints rough, slab centres slightly polished by feet. */
@@ -146,9 +146,8 @@ export const concrete = () =>
   canvasTexture('concrete', 512, 512, (ctx, w, h) => {
     ctx.fillStyle = '#7a7a78';
     ctx.fillRect(0, 0, w, h);
-    blotches(ctx, w, h, 60, 'rgba(40,40,40,0.18)', 90, 31);
-    blotches(ctx, w, h, 30, 'rgba(200,200,195,0.06)', 60, 32);
-    grain(ctx, w, h, 30, 33);
+    blotches(ctx, w, h, 12, 'rgba(40,40,40,0.07)', 90, 31);
+    grain(ctx, w, h, 6, 33);
   });
 
 export const ballast = () =>
@@ -201,7 +200,7 @@ export const roofGlazing = () =>
     g.addColorStop(1, '#1a1c21');
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, h);
-    blotches(ctx, w, h, 10, 'rgba(0,0,0,0.14)', 110, 51); // soot
+    blotches(ctx, w, h, 4, 'rgba(0,0,0,0.06)', 110, 51); // soot
     ctx.fillStyle = '#0d0d0e';
     ctx.fillRect(0, 0, w, 10); // transverse bar
     ctx.fillRect(0, 0, 6, h);

@@ -1,77 +1,129 @@
-import { useEffect, useState } from 'react';
-import { audio } from '../audio/AudioDirector';
-import { story, useStory } from '../core/store';
-import { input } from '../player/input';
-
-const canvas = () => document.querySelector('canvas');
+import { useEffect, useRef } from 'react';
+import { clamp } from '../core/math';
+import { useStory } from '../core/store';
+import { EPISODE_SPANS, episodeRange, locate, scrollToProgress, timeline } from '../core/timeline';
+import { PLANNED, builtEpisodes } from '../episodes';
 
 /**
- * The only interface: a fade from black, a quiet title card, one prompt, and
- * after the step a short-lived control hint. Everything else is in the world.
+ * Everything on top of the canvas is printed matter: a title panel, caption
+ * boxes, a thin episode rail, and the "to be continued" card. All of it is
+ * driven by the same scroll progress as the camera, updated per frame through
+ * refs rather than React state.
  */
 export function Overlay() {
   const phase = useStory((s) => s.phase);
-  const locked = useStory((s) => s.pointerLocked);
-  const [hint, setHint] = useState(false);
-
-  useEffect(() => input.onLockChange((l) => story.setState({ pointerLocked: l })), []);
+  const root = useRef<HTMLDivElement>(null);
+  const episodes = builtEpisodes();
 
   useEffect(() => {
-    if (phase !== 'platform') return;
-    setHint(true);
-    const id = setTimeout(() => setHint(false), 6000);
-    return () => clearTimeout(id);
-  }, [phase]);
-
-  const engage = () => {
-    const s = story.getState();
-    const el = canvas();
-    if (s.phase === 'arrival') {
-      audio.unlock();
-      if (el) input.requestLock(el);
-      story.setState({ phase: 'stepping-out' });
-    } else if (s.phase === 'platform' && !s.pointerLocked && el) {
-      input.requestLock(el);
-    }
-  };
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.code === 'Enter' || e.code === 'Space') && story.getState().phase === 'arrival') {
-        e.preventDefault();
-        engage();
+    let raf = 0;
+    const el = root.current!;
+    const captions = Array.from(el.querySelectorAll<HTMLElement>('[data-caption]'));
+    const titles = Array.from(el.querySelectorAll<HTMLElement>('[data-title]'));
+    const fill = el.querySelector<HTMLElement>('.rail-fill')!;
+    const cue = el.querySelector<HTMLElement>('.cue')!;
+    const wipe = el.querySelector<HTMLElement>('.wipe')!;
+    const outro = el.querySelector<HTMLElement>('.outro')!;
+    const loop = () => {
+      const p = timeline.progress;
+      const { id, local } = locate(p);
+      for (const c of captions) {
+        const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to);
+        c.classList.toggle('is-on', on);
       }
+      for (const t of titles) t.classList.toggle('is-on', t.dataset.ep === id && local < 0.09);
+      fill.style.transform = `scaleY(${p})`;
+      cue.classList.toggle('is-on', p < 0.004);
+      // ink wipe closes over the last stretch of an episode and opens on the next
+      const edge = id === 'outro' ? 1 : clamp((local - 0.955) / 0.045, 0, 1);
+      wipe.style.setProperty('--w', String(edge));
+      outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
+      raf = requestAnimationFrame(loop);
     };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
+    raf = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(raf);
   }, []);
 
-  const cinematic = phase === 'loading' || phase === 'arrival' || phase === 'stepping-out';
+  /** Click or Enter: travel to the next composed beat. */
+  useEffect(() => {
+    const next = () => {
+      const { id, local } = locate(timeline.target);
+      const ep = episodes.find((e) => e.id === id);
+      if (!ep) return;
+      const r = episodeRange(ep.id);
+      const beat = ep.beats.find((b) => b > local + 0.01);
+      scrollToProgress(beat === undefined ? r.end + 0.001 : r.start + beat * (r.end - r.start));
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.code === 'Enter') next();
+    };
+    const onClick = (e: MouseEvent) => {
+      if ((e.target as HTMLElement).closest('a,button')) return;
+      next();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('click', onClick);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('click', onClick);
+    };
+  }, [episodes]);
 
   return (
-    <div className={`overlay ${locked ? 'is-locked' : ''}`} onClick={engage}>
+    <div className="overlay" ref={root}>
       <div className={`veil ${phase === 'loading' ? 'is-on' : ''}`} />
-      <div className={`letterbox top ${cinematic ? 'is-on' : ''}`} />
-      <div className={`letterbox bottom ${cinematic ? 'is-on' : ''}`} />
 
-      <header className={`titlecard ${phase === 'arrival' ? 'is-on' : ''}`}>
-        <span className="wordmark">DRUNKFURT</span>
-        <span className="where">Frankfurt (Main) Hbf · Gleis 7 · 23:47</span>
-      </header>
+      {episodes.map((ep) => (
+        <header key={ep.id} className="title" data-title data-ep={ep.id}>
+          <span className="title-kicker">Drunkfurt · Episode {ep.number}</span>
+          <h1 className="title-name">{ep.title}</h1>
+          <span className="title-sub">{ep.subtitle}</span>
+        </header>
+      ))}
 
-      <button
-        type="button"
-        className={`prompt ${phase === 'arrival' ? 'is-on' : ''}`}
-        tabIndex={phase === 'arrival' ? 0 : -1}
-        aria-hidden={phase !== 'arrival'}
-      >
-        Click to step out
-      </button>
+      {episodes.flatMap((ep) =>
+        ep.captions.map((c, i) => (
+          <aside
+            key={`${ep.id}-${i}`}
+            className={`caption caption--${c.place} caption--${c.tone ?? 'paper'}`}
+            data-caption
+            data-ep={ep.id}
+            data-from={c.from}
+            data-to={c.to}
+          >
+            {c.kicker && <span className="caption-kicker">{c.kicker}</span>}
+            <p>{c.text}</p>
+          </aside>
+        )),
+      )}
 
-      <div className={`hint ${phase === 'platform' && (hint || !locked) ? 'is-on' : ''}`}>
-        {locked ? 'W A S D  walk   ·   Shift  hurry   ·   Mouse  look' : 'Click to look around'}
+      <div className="cue">
+        <span>Scroll</span>
+        <i />
       </div>
-      {phase === 'platform' && locked && <div className="reticle" />}
+
+      <nav className="rail" aria-label="Episodes">
+        <div className="rail-line">
+          <div className="rail-fill" />
+        </div>
+        <ol>
+          {PLANNED.map((p) => {
+            const built = EPISODE_SPANS.find((_, i) => i === p.number - 1);
+            return (
+              <li key={p.number} className={built ? 'is-built' : ''} title={p.title}>
+                <span>{String(p.number).padStart(2, '0')}</span>
+              </li>
+            );
+          })}
+        </ol>
+      </nav>
+
+      <div className="wipe" />
+      <section className="outro">
+        <span className="title-kicker">Episode 2</span>
+        <h2 className="title-name">Die Stadt</h2>
+        <p>Fortsetzung folgt.</p>
+      </section>
     </div>
   );
 }

@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { Color, Material, MeshStandardMaterial } from 'three';
+import { Ref, useMemo } from 'react';
+import { Color, Group, Material, MeshStandardMaterial } from 'three';
 import { palette } from '../../config/palette';
 import { materials } from '../../materials/materials';
 import { trainWindowBay } from '../../materials/textures';
@@ -12,11 +12,13 @@ interface Props {
   /** Texture variant so neighbouring trains don't share the same passengers. */
   variant?: number;
   headlights?: boolean;
+  /** Group holding the open door leaf, so a scene can animate it. */
+  leafRef?: Ref<Group>;
 }
 
 const NO_SHADOW = new Set(['spill', 'winLit', 'winDark', 'interiorLight', 'buttonLit', 'partition']);
 
-export function Train({ trackX, spec, variant = 0, headlights = true }: Props) {
+export function Train({ trackX, spec, variant = 0, headlights = true, leafRef }: Props) {
   const parts = useMemo(() => buildTrain(spec), [spec]);
 
   const mats = useMemo(() => {
@@ -39,6 +41,9 @@ export function Train({ trackX, spec, variant = 0, headlights = true }: Props) {
       floor: m.trainFloor,
       interiorLight: m.whiteGlow,
       pantograph: m.steel,
+      leafBody: m.trainBody,
+      leafRubber: m.trainRubber,
+      leafTrim: m.trainTrim,
       spill: m.windowSpill,
       winLit: new MeshStandardMaterial({
         map: lit,
@@ -64,7 +69,14 @@ export function Train({ trackX, spec, variant = 0, headlights = true }: Props) {
 
   return (
     <group position={[trackX, RAIL_TOP, 0]}>
-      {parts.map(({ key, geometry }) => (
+      <group ref={leafRef}>
+        {parts
+          .filter((p) => p.key.startsWith('leaf'))
+          .map(({ key, geometry }) => (
+            <mesh key={key} geometry={geometry} material={mats[key]} castShadow receiveShadow />
+          ))}
+      </group>
+      {parts.filter((p) => !p.key.startsWith('leaf')).map(({ key, geometry }) => (
         <mesh
           key={key}
           geometry={geometry}

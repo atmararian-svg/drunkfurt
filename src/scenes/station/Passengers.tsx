@@ -1,7 +1,8 @@
 import { useFrame } from '@react-three/fiber';
 import { useMemo, useRef } from 'react';
 import { CapsuleGeometry, Color, CylinderGeometry, Group, MeshBasicMaterial, MeshStandardMaterial, SphereGeometry, BoxGeometry } from 'three';
-import { damp, mulberry32 } from '../../core/math';
+import { clamp, damp, mulberry32 } from '../../core/math';
+import { localProgress } from '../../core/timeline';
 import { playerState } from '../../player/playerState';
 import { BENCH_Z } from './props';
 import { MAST_X } from './layout';
@@ -15,7 +16,9 @@ type Behaviour =
   | { kind: 'walk'; x: number; z0: number; z1: number; speed: number; pause: number; suitcase?: boolean }
   | { kind: 'cross'; z: number; x0: number; x1: number; speed: number; offset: number }
   | { kind: 'stand'; x: number; z: number; yaw: number; phone?: boolean; smoke?: boolean }
-  | { kind: 'sit'; x: number; z: number; yaw: number };
+  | { kind: 'sit'; x: number; z: number; yaw: number }
+  /** Moved by the scroll: a straight line between two points over a span of episode progress. */
+  | { kind: 'scroll'; from: [number, number]; to: [number, number]; t0: number; t1: number };
 
 interface Person {
   b: Behaviour;
@@ -26,8 +29,10 @@ interface Person {
 
 const PEOPLE: Person[] = [
   { b: { kind: 'walk', x: 7.7, z0: -31, z1: -96, speed: 1.05, pause: 3, suitcase: true }, height: 1.78, coat: true, shade: 0 },
-  { b: { kind: 'walk', x: 2.7, z0: -86, z1: -44, speed: 1.25, pause: 5 }, height: 1.84, coat: false, shade: 1 },
-  { b: { kind: 'walk', x: 3.5, z0: -72, z1: -18, speed: 1.35, pause: 7 }, height: 1.7, coat: true, shade: 2 },
+  { b: { kind: 'walk', x: 1.9, z0: -86, z1: -44, speed: 1.25, pause: 5 }, height: 1.84, coat: false, shade: 1 },
+  { b: { kind: 'walk', x: 2.1, z0: -72, z1: -24, speed: 1.35, pause: 7 }, height: 1.7, coat: true, shade: 2 },
+  // the traveller who cuts across in front of you as you set off
+  { b: { kind: 'scroll', from: [8.8, -9.4], to: [1.3, -8.0], t0: 0.4, t1: 0.56 }, height: 1.86, coat: true, shade: 0 },
   { b: { kind: 'walk', x: 6.6, z0: 24, z1: 78, speed: 1.2, pause: 4 }, height: 1.76, coat: false, shade: 0 },
   { b: { kind: 'stand', x: 8.6, z: -42, yaw: Math.PI / 2, phone: true }, height: 1.72, coat: true, shade: 3 },
   { b: { kind: 'stand', x: 8.2, z: -25.6, yaw: Math.PI * 0.8, smoke: true }, height: 1.81, coat: true, shade: 0 },
@@ -161,6 +166,22 @@ export function Passengers() {
         sim.yaw = sim.pauseLeft > 0 && sim.speed < 0.1 ? damp(sim.yaw, yawTarget + Math.PI, 2, dt) : damp(sim.yaw, yawTarget, 3, dt);
         r.root.position.set(b.x, 0, sim.z);
         r.root.rotation.y = sim.yaw;
+      } else if (b.kind === 'scroll') {
+        const u = clamp((localProgress('station') - b.t0) / (b.t1 - b.t0), 0, 1);
+        const x = b.from[0] + (b.to[0] - b.from[0]) * u;
+        const z = b.from[1] + (b.to[1] - b.from[1]) * u;
+        const travelled = Math.hypot(x - r.root.position.x, z - r.root.position.z);
+        r.root.position.set(x, 0, z);
+        r.root.rotation.y = Math.atan2(b.to[0] - b.from[0], b.to[1] - b.from[1]);
+        // the walk cycle advances with distance covered, so it stops when scrolling stops
+        sim.phase += (travelled / 0.72) * Math.PI;
+        sim.speed = damp(sim.speed, travelled / Math.max(dt, 1e-4), 10, dt);
+        const k = Math.min(1, sim.speed / 0.6);
+        const sw = Math.sin(sim.phase) * 0.42 * k;
+        r.legL.rotation.x = sw;
+        r.legR.rotation.x = -sw;
+        r.armL.rotation.x = -sw * 0.7;
+        r.armR.rotation.x = sw * 0.7;
       } else if (b.kind === 'cross') {
         const span = b.x1 - b.x0;
         const x = b.x0 + ((t * b.speed + b.offset * span) % span);

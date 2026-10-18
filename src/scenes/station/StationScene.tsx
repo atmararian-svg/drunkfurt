@@ -1,8 +1,9 @@
-import { useThree } from '@react-three/fiber';
-import { useEffect } from 'react';
-import { story, useStory } from '../../core/store';
-import { FirstPersonRig, RigMode, cameraDirector, requestTeleport, rigPose } from '../../player/FirstPersonRig';
-import { input } from '../../player/input';
+import { useFrame, useThree } from '@react-three/fiber';
+import { useEffect, useRef } from 'react';
+import { Group } from 'three';
+import { clamp, smoothstep } from '../../core/math';
+import { story } from '../../core/store';
+import { localProgress } from '../../core/timeline';
 import { Concourse } from './Concourse';
 import { Dust } from './Dust';
 import { DistantMasts, Furniture } from './Furniture';
@@ -14,10 +15,8 @@ import { Pigeon } from './Pigeon';
 import { Platform } from './Platform';
 import { Tracks } from './Tracks';
 import { Train } from './Train';
-import { EYE_HEIGHT, MAST_Z, PLATFORM, PLATFORM_2, TRACKS, WALK_BOUNDS } from './layout';
-import { stationColliders } from './props';
-import { ARRIVAL_ANCHOR, stepOutShot } from './shots';
-import { TrainSpec } from './trainGeometry';
+import { MAST_Z, PLATFORM, PLATFORM_2, TRACKS } from './layout';
+import { LEAF_TRAVEL, TrainSpec } from './trainGeometry';
 
 /** Our train on Gleis 7: arrived, terminating, door open. */
 const TRAIN_A: TrainSpec = {
@@ -44,13 +43,15 @@ const TRAIN_B: TrainSpec = {
 const DUST_LAMPS = MAST_Z.filter((z) => z > -35 && z < 20);
 
 /**
- * Scene 1 — Arrival at Frankfurt (Main) Hbf, Gleis 7, a few minutes before midnight.
+ * Episode 1 world — Frankfurt (Main) Hbf, Gleis 7, a few minutes before midnight.
+ * The camera belongs to the episode track; this component only builds the
+ * world and runs the scroll-driven events inside it.
  */
 export function StationScene() {
-  const phase = useStory((s) => s.phase);
   const { gl, scene, camera } = useThree();
+  const leaf = useRef<Group>(null);
 
-  // Compile shaders up front, then let the visitor in.
+  // Compile shaders up front, then fade in.
   useEffect(() => {
     let cancelled = false;
     gl.compile(scene, camera);
@@ -58,7 +59,7 @@ export function StationScene() {
     const tick = () => {
       if (cancelled) return;
       if (++frames < 3) requestAnimationFrame(tick);
-      else if (story.getState().phase === 'loading') story.setState({ phase: 'arrival' });
+      else story.setState({ phase: 'ready' });
     };
     requestAnimationFrame(tick);
     return () => {
@@ -66,35 +67,25 @@ export function StationScene() {
     };
   }, [gl, scene, camera]);
 
-  // The step-out is a one-way state change; the director refuses overlapping shots.
-  useEffect(() => {
-    if (phase !== 'stepping-out') return;
-    cameraDirector.play(stepOutShot(rigPose), () => story.setState({ phase: 'platform' }));
-  }, [phase]);
-
-  // Dev-only inspection handle (used for automated screenshots).
-  useEffect(() => {
-    if (!import.meta.env.DEV) return;
-    (window as unknown as Record<string, unknown>).__drunkfurt = { story, rigPose, input, requestTeleport, scene };
-  }, []);
-
-  const mode: RigMode = phase === 'arrival' ? 'anchored' : phase === 'platform' ? 'free' : 'locked';
+  // Scroll event: once we're off the train, its door slides shut behind us.
+  useFrame(() => {
+    const t = localProgress('station');
+    const g = leaf.current;
+    if (!g) return;
+    const close = clamp((t - 0.4) / 0.08, 0, 1);
+    const slide = smoothstep(clamp(close / 0.8, 0, 1));
+    const plug = smoothstep(clamp((close - 0.75) / 0.25, 0, 1));
+    g.position.set(LEAF_TRAVEL.x * plug, 0, LEAF_TRAVEL.z * slide);
+  });
 
   return (
     <>
-      <FirstPersonRig
-        mode={mode}
-        anchor={ARRIVAL_ANCHOR}
-        eyeHeight={EYE_HEIGHT}
-        bounds={WALK_BOUNDS}
-        colliders={stationColliders}
-      />
       <Lighting />
       <Hall />
       <Platform {...PLATFORM} />
       <Platform {...PLATFORM_2} />
       <Tracks xs={[TRACKS.a, TRACKS.b, TRACKS.c]} buffered />
-      <Train trackX={TRACKS.a} spec={TRAIN_A} variant={0} />
+      <Train trackX={TRACKS.a} spec={TRAIN_A} variant={0} leafRef={leaf} />
       <Train trackX={TRACKS.b} spec={TRAIN_B} variant={1} />
       <Furniture />
       <DistantMasts x={(PLATFORM_2.x0 + PLATFORM_2.x1) / 2} zs={MAST_Z} />

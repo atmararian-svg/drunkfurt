@@ -62,6 +62,3 @@ export const MAST_X = 5;
 export const MAST_Z: number[] = Array.from({ length: 13 }, (_, i) => -91 + i * 15);
 
 export const EYE_HEIGHT = 1.68;
-
-/** Walkable area after stepping out, with a margin from the platform edges. */
-export const WALK_BOUNDS = { x0: 0.55, x1: 9.45, z0: -98, z1: 88 } as const;

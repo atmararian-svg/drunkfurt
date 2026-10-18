@@ -17,7 +17,6 @@ function build() {
   const std = (p: ConstructorParameters<typeof MeshStandardMaterial>[0]) => new MeshStandardMaterial(p);
 
   const paving = tex.platformPaving();
-  const pavingRough = tex.platformRoughness();
   const concrete = tex.concrete();
   const ballast = tex.ballast();
   const tactile = tex.tactileBump();
@@ -26,7 +25,6 @@ function build() {
     // --- station surfaces
     platform: std({
       map: paving,
-      roughnessMap: pavingRough,
       roughness: 0.82,
       metalness: 0,
       color: '#ffffff',
