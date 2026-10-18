@@ -1,0 +1,138 @@
+:root {
+  --near-black: #101010;
+  --off-white: #f1f0e9;
+  --grey: #777777;
+  --yellow: #f5d21a;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--near-black);
+  color: var(--off-white);
+}
+
+canvas { display: block; }
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  cursor: pointer;
+  user-select: none;
+}
+.overlay.is-locked { cursor: none; }
+
+.veil {
+  position: absolute;
+  inset: 0;
+  background: #000;
+  opacity: 0;
+  transition: opacity 2.8s var(--ease);
+  pointer-events: none;
+}
+.veil.is-on { opacity: 1; transition: none; }
+
+.letterbox {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 0;
+  background: #000;
+  transition: height 1.6s var(--ease);
+  pointer-events: none;
+}
+.letterbox.top { top: 0; }
+.letterbox.bottom { bottom: 0; }
+.letterbox.is-on { height: 7vh; }
+
+.titlecard {
+  position: absolute;
+  top: calc(7vh + 28px);
+  left: 40px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 1.4s var(--ease), transform 1.4s var(--ease);
+  pointer-events: none;
+}
+.titlecard.is-on { opacity: 1; transform: none; transition-delay: 1.2s; }
+.wordmark {
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.42em;
+}
+.where {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  color: rgba(241, 240, 233, 0.55);
+  text-transform: uppercase;
+}
+
+.prompt {
+  position: absolute;
+  left: 50%;
+  bottom: calc(7vh + 44px);
+  transform: translate(-50%, 6px);
+  padding: 10px 2px 9px;
+  border: 0;
+  border-bottom: 1px solid var(--yellow);
+  background: none;
+  color: var(--off-white);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.6s var(--ease), transform 0.6s var(--ease);
+}
+.prompt.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+  pointer-events: auto;
+  cursor: pointer;
+  transition-delay: 2s;
+  animation: breathe 3.6s ease-in-out 3s infinite;
+}
+.prompt:focus-visible { outline: 1px dashed var(--yellow); outline-offset: 6px; }
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.hint {
+  position: absolute;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: rgba(241, 240, 233, 0.7);
+  white-space: pre;
+  opacity: 0;
+  transition: opacity 1.2s var(--ease);
+  pointer-events: none;
+}
+.hint.is-on { opacity: 1; transition-delay: 0.4s; }
+
+.reticle {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 3px;
+  height: 3px;
+  margin: -1.5px 0 0 -1.5px;
+  border-radius: 50%;
+  background: rgba(241, 240, 233, 0.45);
+  pointer-events: none;
+}
