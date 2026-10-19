@@ -15,6 +15,6 @@ export const stationEpisode: EpisodeDef = {
     { from: 0.4, to: 0.53, place: 'br', text: 'Frankfurt. Bankers, pigeons, and people who stopped asking why the train is late.' },
     { from: 0.57, to: 0.7, place: 'bl', tone: 'yellow', kicker: 'This train ends here', text: 'Most plans do too.' },
     { from: 0.74, to: 0.84, place: 'tr', kicker: '1888', text: 'Steel, glass, and a hundred and thirty years of soot.' },
-    { from: 0.88, to: 0.99, place: 'br', tone: 'yellow', text: 'The city is waiting outside. It is not waiting politely.' },
+    { from: 0.88, to: 0.955, place: 'br', tone: 'yellow', text: 'The city is waiting outside. It is not waiting politely.' },
   ],
 };

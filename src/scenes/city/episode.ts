@@ -43,6 +43,6 @@ export const cityEpisode: EpisodeDef = {
     { from: 0.3, to: 0.41, place: 'br', text: 'Banks at the end of the street. Everyone else down here.' },
     { from: 0.46, to: 0.58, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet.' },
     { from: 0.64, to: 0.76, place: 'bl', tone: 'yellow', text: 'Some people walk somewhere. He was walking at me.' },
-    { from: 0.94, to: 0.995, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.' },
+    { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.' },
   ],
 };
