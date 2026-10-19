@@ -1,6 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useMemo } from 'react';
-import { Color, Group, Mesh, MeshStandardMaterial } from 'three';
+import { Color, Group, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
 import { ellipsoid, fist, limb, merge, paint, place } from '../../characters/anatomy';
 import { clamp, smoothstep } from '../../core/math';
 import { BLOCK, blockTime, encounter } from './encounter';
@@ -8,6 +8,18 @@ import { BLOCK, blockTime, encounter } from './encounter';
 const grey = (v: number) => new Color().setStyle(`rgb(${v},${v},${v})`);
 const ramp = (x: number, a: number, b: number) => clamp((x - a) / (b - a), 0, 1);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+const DOWN = new Vector3(0, -1, 0);
+const D = new Vector3();
+const Q = new Quaternion();
+
+/** Places a forearm with its elbow at `elbow` and its knuckles towards `fist` (camera space). */
+function pose(g: Group, elbow: [number, number, number], fist: [number, number, number], roll = 0) {
+  g.position.set(...elbow);
+  D.set(fist[0] - elbow[0], fist[1] - elbow[1], fist[2] - elbow[2]).normalize();
+  g.quaternion.setFromUnitVectors(DOWN, D);
+  if (roll) g.quaternion.multiply(Q.setFromAxisAngle(DOWN, roll));
+}
+const mix3 = (a: [number, number, number], b: [number, number, number], t: number): [number, number, number] => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)];
 
 /** One of your forearms, sleeve and fist, pivot at the elbow, pointing along -y. */
 function forearm(side: -1 | 1, mat: MeshStandardMaterial) {
@@ -53,21 +65,25 @@ export function PlayerArms({ active }: { active: boolean }) {
     rig.position.copy(camera.position);
     rig.quaternion.copy(camera.quaternion);
 
-    // guard: the left forearm swings up from below the frame to stand across your face
+    // guard: the left forearm swings up from below the frame and stands across your face,
+    // knuckles up, so his fist lands on the outside of it
     const up = smoothstep(ramp(bt, 0, BLOCK.guardUp));
-    const absorb = Math.exp(-Math.max(0, bt - BLOCK.contact) * 9) * (bt > BLOCK.contact ? 1 : 0);
+    const absorb = bt > BLOCK.contact ? Math.exp(-(bt - BLOCK.contact) * 9) : 0;
     const down = smoothstep(ramp(bt, BLOCK.counter + 0.1, BLOCK.counter + 0.35));
-    left.position.set(lerp(-0.26, -0.11, up), lerp(-0.62, -0.2, up) - 0.25 * down, lerp(-0.3, -0.36, up) + 0.04 * absorb);
-    // forearm nearly vertical, fist up, angled slightly across
-    left.rotation.set(lerp(-0.4, -0.15, up), 0.1, lerp(0.9, Math.PI - 0.35, up));
+    const push = 0.05 * absorb;
+    const elbowL = mix3([-0.3, -0.75, -0.25], [-0.16, -0.3, -0.34 + push], up);
+    const fistL = mix3([-0.32, -0.5, -0.35], [-0.03, 0.02, -0.38 + push], up);
+    elbowL[1] -= 0.35 * down;
+    fistL[1] -= 0.35 * down;
+    pose(left, elbowL, fistL, 0.6);
 
-    // counter: the right fist drives out, straight, then comes back
+    // counter: the right drives straight out from under the frame, then comes back a little
     const out = smoothstep(ramp(bt, BLOCK.counter, BLOCK.counterLands));
     const back = smoothstep(ramp(bt, BLOCK.counterLands + 0.06, BLOCK.counterLands + 0.35));
-    const reach = out * (1 - back * 0.7);
-    right.position.set(lerp(0.24, 0.08, reach), lerp(-0.55, -0.12, reach), lerp(-0.22, -0.5, reach));
-    // forearm pointing ahead, knuckles first
-    right.rotation.set(lerp(-0.9, -Math.PI / 2 + 0.08, reach), 0, lerp(-0.3, 0.06, reach));
+    const reach = out * (1 - back * 0.5);
+    const elbowR = mix3([0.26, -0.55, -0.12], [0.12, -0.2, -0.42], reach);
+    const fistR = mix3([0.2, -0.4, -0.35], [0.03, -0.04, -0.72], reach);
+    pose(right, elbowR, fistR, -1.4);
     right.visible = bt > BLOCK.counter - 0.05;
   });
 

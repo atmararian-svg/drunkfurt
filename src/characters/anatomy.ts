@@ -244,13 +244,14 @@ export function hand(side: -1 | 1, skin: Color) {
  */
 export function fist(side: -1 | 1, skin: Color) {
   return [
-    place(ellipsoid(0.04, 0.05, 0.045), [0, -0.05, 0.004]),
-    // folded fingers: a rounded roll across the front of the fist
-    place(ellipsoid(0.042, 0.026, 0.03), [0, -0.085, 0.022], [0.3, 0, 0]),
-    // knuckle ridge
-    place(ellipsoid(0.04, 0.016, 0.022), [0, -0.1, 0.0]),
-    // thumb across the fingers
-    place(limb(0.05, 0.012, 0.011, 0, 0.5, 8), [-side * 0.024, -0.05, 0.03], [0.2, 0, side * 1.25]),
+    // back of the hand / palm, a compact block
+    place(ellipsoid(0.036, 0.048, 0.03), [0, -0.05, 0]),
+    // four knuckles in a slight arc at the end of the fist
+    ...[-1.5, -0.5, 0.5, 1.5].map((k) => place(ellipsoid(0.011, 0.013, 0.013), [k * 0.017, -0.094 + Math.abs(k) * 0.003, 0.006])),
+    // curled fingers under the knuckles
+    place(ellipsoid(0.034, 0.018, 0.016), [0, -0.082, 0.022]),
+    // thumb wrapped across the fingers
+    place(ellipsoid(0.01, 0.026, 0.01), [-side * 0.012, -0.066, 0.034], [0, 0, side * 1.1]),
   ].map((p) => paint(p, skin));
 }
 

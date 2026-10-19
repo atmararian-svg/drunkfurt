@@ -245,8 +245,8 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       // in his body frame: x right, y up, z towards you
       const body = (bx: number, by: number, bz: number, out: Vector3) => out.set(bx, by, bz).applyMatrix4(j.root.matrixWorld);
       const cocked = body(0.2, 1.42, -0.08, tmp.a);
-      // the target: your face, minus the guard that will catch it
-      const contact = tmp.b.copy(CAM).addScaledVector(tmp.v.set(CAM.x - x, 0, CAM.z - z).normalize(), -0.27).setY(CAM.y - 0.06);
+      // the target: straight at your face; it stops where your raised guard will be
+      const contact = tmp.b.copy(CAM).addScaledVector(tmp.v.set(CAM.x - x, 0, CAM.z - z).normalize(), -0.42).setY(CAM.y - 0.02);
       // a slight outside arc, like a real cross
       const mid = body(0.32, 1.5, 0.35, tmp.c);
       const u = drive;
@@ -256,7 +256,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       tmp.pole.set(0.7, -1, -0.3);
       aimArm(j, 1, fistAt, tmp.pole);
       // the other fist stays up by his chin, pulling back as the right goes out
-      const guard = body(-0.12, 1.5 + 0.04 * drive, 0.22 - 0.08 * drive, tmp.a);
+      const guard = body(-0.1, 1.56 + 0.03 * drive, 0.14 - 0.08 * drive, tmp.a);
       tmp.lpole.set(-0.7, -1, -0.2);
       aimArm(j, -1, guard, tmp.lpole);
     } else if (fists > 0) {
