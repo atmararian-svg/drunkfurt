@@ -36,7 +36,7 @@ function makeStrokes(seed: number): Stroke[] {
       y: (i + 0.5) / count + (rnd() - 0.5) * 0.04,
       h: 1.9 / count + rnd() * 0.05,
       tilt: (rnd() - 0.5) * 0.09,
-      delay: rnd() * 0.45,
+      delay: rnd() * 0.8,
       top: noise(),
       bottom: noise(),
       bristles: Array.from({ length: 5 }, () => ({ y: rnd(), w: 0.6 + rnd() * 1.6 })),
@@ -77,26 +77,33 @@ export function drawBrushWipe(ctx: CanvasRenderingContext2D, W: number, H: numbe
     ctx.translate(W / 2, cy);
     ctx.rotate(s.tilt);
     ctx.translate(-W / 2, -cy);
+    const lead = mode === 'close' ? x1 : x0;
+    const dir = mode === 'close' ? 1 : -1;
+    // the stroke thins towards its leading end, like a brush running out of ink
+    const taper = (k: number) => {
+      const u = mode === 'close' ? k / (N - 1) : 1 - k / (N - 1);
+      return u < 0.82 ? 1 : 1 - ((u - 0.82) / 0.18) ** 1.6 * 0.75;
+    };
     ctx.beginPath();
     for (let k = 0; k <= N - 1; k++) {
       const x = x0 + ((x1 - x0) * k) / (N - 1);
-      ctx.lineTo(x, cy - half + s.top[k] * half * 0.35);
+      ctx.lineTo(x, cy - half * taper(k) + s.top[k] * half * 0.35);
     }
-    // ragged leading/trailing edge: bristle tips
-    const lead = mode === 'close' ? x1 : x0;
-    const dir = mode === 'close' ? 1 : -1;
     for (let k = N - 1; k >= 0; k--) {
       const x = x0 + ((x1 - x0) * k) / (N - 1);
-      ctx.lineTo(x, cy + half + s.bottom[k] * half * 0.35);
+      ctx.lineTo(x, cy + half * taper(k) + s.bottom[k] * half * 0.35);
     }
     ctx.closePath();
     ctx.fillStyle = '#0c0c0c';
     ctx.fill();
-    // bristle fingers at the leading edge
+    // bristle trails: thin streaks running past the end of the stroke
     for (const b of s.bristles) {
-      const y = cy - half + b.y * half * 2;
+      const y = cy - half * 0.4 + b.y * half * 0.8;
+      const len = 30 + b.w * 70;
       ctx.beginPath();
-      ctx.ellipse(lead + dir * b.w * 18, y, b.w * 26, 3 + b.w * 3, 0, 0, Math.PI * 2);
+      ctx.moveTo(lead - dir * 40, y - 2 - b.w);
+      ctx.quadraticCurveTo(lead + dir * len * 0.5, y + (b.y - 0.5) * 8, lead + dir * len, y + (b.y - 0.5) * 14);
+      ctx.quadraticCurveTo(lead + dir * len * 0.5, y + (b.y - 0.5) * 8 + 1, lead - dir * 40, y + 2 + b.w);
       ctx.fill();
     }
     // dry-brush streaks inside the stroke
