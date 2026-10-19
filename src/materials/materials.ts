@@ -20,7 +20,6 @@ function build() {
   const paving = tex.platformPaving();
   const concrete = tex.concrete();
   const ballast = tex.ballast();
-  const tactile = tex.tactileBump();
 
   return {
     // --- station surfaces
@@ -33,7 +32,7 @@ function build() {
     platformEdge: std({ color: '#a9a8a3', roughness: 0.7, map: concrete }),
     platformSide: std({ color: '#55554f', roughness: 0.95, map: concrete }),
     safetyLine: std({ color: '#e9e8e2', roughness: 0.6 }),
-    tactile: std({ color: '#8f8e8a', roughness: 0.75, bumpMap: tactile, bumpScale: 2.5 }),
+    tactile: std({ color: '#8f8e8a', roughness: 0.75 }),
     concrete: std({ color: '#6c6c69', roughness: 0.92, map: concrete }),
     concourseFloor: std({ color: '#8a8984', roughness: 0.45, map: concrete }),
 

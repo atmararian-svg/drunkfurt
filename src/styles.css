@@ -90,6 +90,21 @@ body { cursor: pointer; }
 }
 .caption.is-on { opacity: 1; transform: rotate(-0.6deg); }
 .caption--yellow { background: var(--yellow); }
+/* captions are cut paper, held down with a strip of yellow tape */
+.caption::before,
+.caption::after {
+  content: '';
+  position: absolute;
+  width: 54px;
+  height: 16px;
+  background: rgba(245, 210, 26, 0.72);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+}
+.caption::before { top: -9px; left: 14px; transform: rotate(-8deg); }
+.caption::after { bottom: -8px; right: 18px; width: 38px; transform: rotate(6deg); }
+.caption--yellow::before,
+.caption--yellow::after { background: rgba(241, 240, 233, 0.75); mix-blend-mode: normal; }
 .caption p {
   margin: 0;
   font: 500 15px/1.38 var(--mono);

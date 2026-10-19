@@ -1,6 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { EffectComposer, Bloom, Noise, Vignette } from '@react-three/postprocessing';
-import { BlendFunction } from 'postprocessing';
+import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
 import { useEffect, useMemo } from 'react';
 import { Color, HalfFloatType, Material, Mesh, MeshBasicMaterial, Object3D } from 'three';
 import { applyComic } from './comic';
@@ -54,7 +53,8 @@ export function Stylizer({ version }: { version: unknown }) {
 
   // Render the ink buffer just before the composer (priority 1) draws the frame.
   const clear = useMemo(() => new Color(0, 0, 0), []);
-  useFrame(() => {
+  useFrame(({ clock }) => {
+    effect.uniforms.get('uTime')!.value = clock.elapsedTime;
     const bg = scene.background;
     const fog = scene.fog;
     const mask = camera.layers.mask;
@@ -90,7 +90,6 @@ export function Stylizer({ version }: { version: unknown }) {
       <primitive object={effect} />
       <Bloom mipmapBlur luminanceThreshold={1.15} luminanceSmoothing={0.1} intensity={0.35} radius={0.55} />
       <Vignette offset={0.32} darkness={0.6} />
-      <Noise premultiply opacity={0.22} blendFunction={BlendFunction.SOFT_LIGHT} />
     </EffectComposer>
   );
 }

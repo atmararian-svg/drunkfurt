@@ -43,6 +43,7 @@ export function App() {
         /** Hold the camera on a fixed frame (inspection only): pos, yaw/pitch in degrees, fov. */
         frame(pos: [number, number, number], yaw: number, pitch: number, fov = 40) {
           const k = { pos, yaw: (yaw * Math.PI) / 180, pitch: (pitch * Math.PI) / 180, fov };
+          cameraDirector.stop();
           cameraDirector.play({ id: 'inspect', duration: 1e6, keys: [{ t: 0, ...k }, { t: 1, ...k }] });
         },
         /** Jump straight to a global progress value, without smoothing. */

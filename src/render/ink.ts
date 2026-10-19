@@ -67,6 +67,7 @@ export class InkEffect extends Effect {
         ['uWidth', new Uniform(1.0)],
         ['uFar', new Uniform(1300)],
         ['uDebug', new Uniform(0)],
+        ['uTime', new Uniform(0)],
       ]),
     });
   }
@@ -82,16 +83,39 @@ uniform vec3 uInk;
 uniform float uWidth;
 uniform float uFar;
 uniform float uDebug;
+uniform float uTime;
+
+float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float n21(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(h21(i), h21(i + vec2(1, 0)), f.x), mix(h21(i + vec2(0, 1)), h21(i + vec2(1, 1)), f.x), f.y);
+}
 
 vec4 S(vec2 uv) { return texture2D(tInk, uv); }
 
-void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor) {
+vec3 paper(vec3 col, vec2 px) {
+  // paper: fibre and tooth, plus a warm tint where the page shows through
+  float fib = n21(px * vec2(0.9, 0.12)) * 0.5 + n21(px * vec2(0.13, 0.8)) * 0.5;
+  float tooth = n21(px * 0.55);
+  float lum = dot(col, vec3(0.2126, 0.7152, 0.0722));
+  col *= 0.955 + fib * 0.06 + tooth * 0.03;
+  return mix(col, col * vec3(1.0, 0.975, 0.92), smoothstep(0.25, 0.9, lum));
+}
+
+void mainImage(const in vec4 inputColor, const in vec2 uv0, out vec4 outputColor) {
+  vec2 px = uv0 / uTexel;
+  // the line "boils": its wobble is redrawn a few times a second, like animated ink
+  float frame = floor(uTime * 4.0);
+  vec2 jitter = (vec2(n21(px / 26.0 + frame * 3.1), n21(px / 26.0 + 40.0 + frame * 1.7)) - 0.5) * 1.6;
+  vec2 uv = uv0 + jitter * uTexel;
   vec4 c = S(uv);
   if (uDebug > 0.5) { outputColor = vec4(c.rg, c.b, 1.0); return; }
   float dm = c.a * uFar;            // metres
   bool empty = c.a >= 0.999 || c.a <= 0.0;
   // line width: heavier close to the eye, hairline in the distance
-  float w = uWidth * mix(2.4, 1.0, smoothstep(3.0, 45.0, dm));
+  // pen pressure: width swells and thins along the line
+  float pressure = 0.7 + n21(px / 18.0 + 11.0) * 0.75;
+  float w = uWidth * mix(2.6, 1.0, smoothstep(3.0, 45.0, dm)) * pressure;
   vec2 o = uTexel * w;
   vec4 s[8];
   s[0] = S(uv + vec2( o.x, 0.0)); s[1] = S(uv + vec2(-o.x, 0.0));
@@ -99,7 +123,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
   s[4] = S(uv + o);               s[5] = S(uv - o);
   s[6] = S(uv + vec2(o.x, -o.y)); s[7] = S(uv + vec2(-o.x, o.y));
 
-  if (empty || c.b < 0.25) { outputColor = inputColor; return; }
+  if (empty || c.b < 0.25) { outputColor = vec4(paper(inputColor.rgb, px), inputColor.a); return; }
   float sil = 0.0;
   float crease = 0.0;
   vec3 n = vec3(c.rg * 2.0 - 1.0, 0.0);
@@ -117,7 +141,9 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
     crease = max(crease, smoothstep(0.3, 0.55, 1.0 - dot(n, m)));
   }
   float fade = 1.0 - smoothstep(55.0, 150.0, dm);
-  float ink = max(sil, crease * 0.8) * fade;
-  outputColor = vec4(mix(inputColor.rgb, uInk, ink), inputColor.a);
+  // dry ink: the odd gap where the pen skipped
+  float dry = smoothstep(0.12, 0.3, n21(px / 9.0 + frame * 0.7));
+  float ink = max(sil, crease * 0.75) * fade * mix(0.55, 1.0, dry);
+  outputColor = vec4(paper(mix(inputColor.rgb, uInk, ink), px), inputColor.a);
 }
 `;

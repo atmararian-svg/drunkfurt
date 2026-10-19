@@ -18,7 +18,7 @@ import { HALL, HALL_CX, HALL_OFFSETS, HALL_SPAN, RAIL_TOP, TRACKS } from './layo
  * vault. Three halls side by side give depth beyond the tracks we use.
  */
 const A = HALL_SPAN / 2;
-const SEGS = 44;
+const SEGS = 36;
 
 /** Point on the outer (or inset) arch at angle θ ∈ [0, π]. */
 function arch(theta: number, inset: number, cx: number): [number, number] {
@@ -50,12 +50,11 @@ function buildTrussMatrices() {
         const [ix, iy] = arch(th, depth(th), cx);
         const o = new Vector3(ox, oy, z);
         const inn = new Vector3(ix, iy, z);
+        // two clean chords per rib: the arch reads as a drawn double line, not a lattice
         if (prevO && prevI) {
-          add(prevO, o, 0.2, 0.32);
-          add(prevI, inn, 0.16, 0.3);
-          add(i % 2 ? prevO : prevI, i % 2 ? inn : o, 0.07, 0.07);
+          add(prevO, o, 0.22, 0.34);
+          add(prevI, inn, 0.13, 0.22);
         }
-        add(o, inn, 0.06, 0.12);
         prevO = o;
         prevI = inn;
       }
@@ -112,8 +111,8 @@ function buildStatic() {
     b.add('roofGlass', arcSurface(glassFrom, Math.PI - glassFrom, 36, HALL.z0, HALL.z1, cx, -0.04));
 
     // purlins
-    for (let k = 1; k < 16; k++) {
-      const th = (k / 16) * Math.PI;
+    for (let k = 1; k < 8; k++) {
+      const th = (k / 8) * Math.PI;
       const [x, y] = arch(th, 0.1, cx);
       b.box('steel', [0.16, 0.34, zLen], [x, y - 0.1, zMid], [0, 0, th - Math.PI / 2]);
     }
@@ -154,11 +153,9 @@ function buildStatic() {
   for (const tx of [TRACKS.a, TRACKS.b, TRACKS.c]) {
     b.box('catenary', [0.014, 0.014, zLen], [tx, wireY, zMid]);
     b.box('catenary', [0.012, 0.012, zLen], [tx, messY, zMid]);
-    for (let z = HALL.z0; z < HALL.z1; z += 4.7)
-      b.box('catenary', [0.006, messY - wireY, 0.006], [tx, (wireY + messY) / 2, z]);
   }
-  for (const z of ribZ) {
-    // cross-span tube carrying the catenary between the piers
+  for (const z of ribZ.filter((_, i) => i % 2 === 0)) {
+    // cross-span tube carrying the catenary between the piers (every other rib)
     b.cylinder('catenary', 0.04, HALL_SPAN, [HALL_CX, messY + 0.9, z], [0, 0, Math.PI / 2], 8);
     for (const tx of [TRACKS.a, TRACKS.b, TRACKS.c])
       b.box('catenary', [0.02, 0.9, 0.02], [tx, messY + 0.45, z]);

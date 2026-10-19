@@ -182,14 +182,15 @@ export function activityPose(p: Pose, a: Activity, t: number, seed: number) {
       p.shRp = 0.05 - g1 * 0.55; p.shRr = 0.1 + g1 * 0.18; p.elR = -0.25 - g1 * 1.15; p.wrRp = -g1 * 0.3; p.wrRr = g1 * 0.5;
       p.shLp = 0.06 - g2 * 0.45; p.shLr = 0.1 + g2 * 0.15; p.elL = -0.25 - g2 * 1.0; p.wrLr = -g2 * 0.4;
       if (!talker) {
-        // arms folded most of the time
+        // arms folded most of the time: forearms cross in front of the chest
         const folded = 1 - g1;
-        p.shLp = -0.25 * folded + p.shLp * (1 - folded); p.elL = -1.85 * folded + p.elL * (1 - folded); p.shLr = 0.1;
-        p.shRp = -0.25 * folded + p.shRp * (1 - folded); p.elR = -1.75 * folded + p.elR * (1 - folded); p.shRr = 0.1;
-        p.shLy = 0.5 * folded; p.shRy = -0.5 * folded;
+        const mix = (a: number, b: number) => a * folded + b * (1 - folded);
+        p.shLp = mix(-0.32, p.shLp); p.shLr = mix(0.02, p.shLr); p.shLy = mix(1.05, p.shLy); p.elL = mix(-1.95, p.elL);
+        p.shRp = mix(-0.3, p.shRp); p.shRr = mix(0.02, p.shRr); p.shRy = mix(-1.0, p.shRy); p.elR = mix(-1.85, p.elR);
       }
       const nod = moment(t, seed + 7, talker ? 5 : 2.6, 0.7, talker ? 0.3 : 0.8);
-      p.headPitch = 0.06 + nod * 0.22 * Math.sin(t * 9);
+      // the talker is taller here, so looks slightly down; the listener slightly up
+      p.headPitch = (talker ? 0.16 : -0.02) + nod * 0.22 * Math.sin(t * 9);
       p.headYaw = drift(t, seed + 3, 6) * 0.15; // mostly looking at the other person
       p.headRoll = drift(t, seed + 8, 7) * 0.08;
       p.spinePitch = 0.03 + g1 * 0.04;

@@ -26,12 +26,30 @@ export interface ComicOptions {
 }
 
 const CHUNK = /* glsl */ `
+float comicHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+float comicHash3(vec3 p) { return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453); }
+float comicNoise3(vec3 p) {
+  vec3 i = floor(p); vec3 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(mix(comicHash3(i), comicHash3(i + vec3(1,0,0)), f.x), mix(comicHash3(i + vec3(0,1,0)), comicHash3(i + vec3(1,1,0)), f.x), f.y),
+             mix(mix(comicHash3(i + vec3(0,0,1)), comicHash3(i + vec3(1,0,1)), f.x), mix(comicHash3(i + vec3(0,1,1)), comicHash3(i + vec3(1,1,1)), f.x), f.y), f.z);
+}
+float comicNoise2(vec2 p) {
+  vec2 i = floor(p); vec2 f = fract(p); f = f * f * (3.0 - 2.0 * f);
+  return mix(mix(comicHash(i), comicHash(i + vec2(1, 0)), f.x), mix(comicHash(i + vec2(0, 1)), comicHash(i + vec2(1, 1)), f.x), f.y);
+}
+
 float comicDot(vec2 frag, float cell) {
-  // 45° rotated dot grid, distance to the nearest dot centre in 0..~0.71
+  // 45° rotated dot grid with slightly irregular dots, like a coarse print screen
   const float c = 0.70710678;
   vec2 p = mat2(c, -c, c, c) * frag / cell;
-  vec2 f = fract(p) - 0.5;
-  return length(f);
+  vec2 id = floor(p);
+  vec2 f = fract(p) - 0.5 + (vec2(comicHash(id), comicHash(id + 7.0)) - 0.5) * 0.12;
+  return length(f) * (0.9 + comicHash(id + 3.0) * 0.2);
+}
+
+// grain of a soft pencil / charcoal: for the lighter transitions
+float comicGrain(vec2 frag) {
+  return comicNoise2(frag / 2.2) * 0.55 + comicNoise2(frag / 7.0) * 0.45;
 }
 
 float comicHatch(vec2 frag, float cell) {
@@ -44,8 +62,9 @@ float comicHatch(vec2 frag, float cell) {
 // Tonal bands in linear luminance. Levels are what the band prints as.
 // 'dark' is the pattern used for the two darkest transitions (hatching on walls,
 // dots on floors); 'dotv' is the halftone used for the lighter ones.
-float comicTone(float lum, float dotv, float dark) {
-  float x = log2(max(lum, 1e-5));
+float comicTone(float lum, float dotv, float dark, float wobble) {
+  // band edges wander a little across surfaces, like a brush rather than a ruler
+  float x = log2(max(lum, 1e-5)) + wobble;
   // thresholds (log2 of linear luminance) and printed levels
   const float T0 = -5.9;  // ink   | charcoal
   const float T1 = -4.1;  // charcoal | mid
@@ -58,8 +77,8 @@ float comicTone(float lum, float dotv, float dark) {
   float t;
   t = clamp((x - (T0 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L1, step(dark, t * 0.72));
   t = clamp((x - (T1 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L2, step(dark, t * 0.72));
-  t = clamp((x - (T2 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L3, step(dotv, t * 0.72));
-  t = clamp((x - (T3 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L4, step(dotv, t * 0.72));
+  t = clamp((x - (T2 - W * 1.4)) / (2.8 * W), 0.0, 1.0); lvl = mix(lvl, L3, step(dotv, t));
+  t = clamp((x - (T3 - W * 1.4)) / (2.8 * W), 0.0, 1.0); lvl = mix(lvl, L4, step(dotv, t));
   // light sources and lamp-lit highlights keep their HDR value so bloom still finds them
   return lum > 1.25 ? lum : lvl;
 }
@@ -68,14 +87,16 @@ float comicTone(float lum, float dotv, float dark) {
 const APPLY = /* glsl */ `
 {
   float lum = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
-  float dotv = comicDot(gl_FragCoord.xy, COMIC_CELL);
-  float dark = dotv;
+  vec3 wp = (inverse(viewMatrix) * vec4(-vViewPosition, 1.0)).xyz;
+  float wobble = (comicNoise3(wp * 0.9) - 0.5) * 0.7 + (comicNoise3(wp * 3.1) - 0.5) * 0.25;
+  float dotv = comicGrain(gl_FragCoord.xy);
+  float dark = comicDot(gl_FragCoord.xy, COMIC_CELL);
   #if COMIC_HATCH
     // chosen materials hatch their shadow transitions on vertical faces
     vec3 wN = inverseTransformDirection(normal, viewMatrix);
     if (abs(wN.y) < 0.6) dark = comicHatch(gl_FragCoord.xy, COMIC_CELL);
   #endif
-  float tone = comicTone(lum, dotv, dark);
+  float tone = comicTone(lum, dotv, dark, wobble);
   // keep hue: scale the lit colour to the printed tone, but flatten texture noise
   vec3 hue = outgoingLight / max(lum, 1e-5);
   float sat = max(max(hue.r, hue.g), hue.b) - min(min(hue.r, hue.g), hue.b);
@@ -93,9 +114,9 @@ export function applyComic(mat: Material, dpr: number) {
   const opts = mat.userData.comic as ComicOptions | false | undefined;
   if (opts === false) return;
   PATCHED.add(mat);
-  const cell = ((opts && opts.cell) || 6) * dpr;
-  // 0.24 stops each side by default: dots stay at band edges instead of filling whole surfaces
-  const w = Math.max(0.001, 0.24 * (opts && opts.halftone !== undefined ? opts.halftone : 1));
+  const cell = ((opts && opts.cell) || 9) * dpr;
+  // 0.28 stops each side by default: dots stay at band edges instead of filling whole surfaces
+  const w = Math.max(0.001, 0.28 * (opts && opts.halftone !== undefined ? opts.halftone : 1));
   const hatch = opts && opts.hatch ? 1 : 0;
   mat.onBeforeCompile = (shader) => {
     shader.defines = { ...(shader.defines ?? {}), COMIC_CELL: cell.toFixed(2), COMIC_W: w.toFixed(3), COMIC_HATCH: hatch };

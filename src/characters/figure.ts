@@ -123,8 +123,8 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
   const pel: Piece[] = [paint(pelvis(b, look.outfit === 'dress' ? 0.006 : 0.004), look.outfit === 'dress' ? top : bottom)];
   const hipR = 0.158 * b.hips;
   if (coat || look.outfit === 'dress') {
-    const len = look.outfit === 'parka' ? 0.3 : look.outfit === 'dress' ? 0.4 : 0.5;
-    const flare = look.outfit === 'dress' ? 0.07 : 0.05;
+    const len = look.outfit === 'parka' ? 0.28 : look.outfit === 'dress' ? 0.38 : 0.42;
+    const flare = look.outfit === 'dress' ? 0.06 : 0.035;
     pel.push(
       paint(
         place(

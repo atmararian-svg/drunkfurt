@@ -53,6 +53,13 @@ export class ShotPlayer {
     return true;
   }
 
+  /** Abandons the current shot without calling its completion callback. */
+  stop() {
+    this.shot = null;
+    this.track = null;
+    this.onDone = null;
+  }
+
   /** Advances the shot and writes the sampled pose. Returns false when inactive. */
   update(dt: number, out: CameraPose) {
     const shot = this.shot;

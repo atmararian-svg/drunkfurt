@@ -86,7 +86,7 @@ export const platformPaving = () =>
     const rnd = mulberry32(7);
     ctx.fillStyle = '#5d5d5b';
     ctx.fillRect(0, 0, w, h);
-    const n = 4;
+    const n = 2;
     const s = w / n;
     for (let i = 0; i < n; i++)
       for (let j = 0; j < n; j++) {
@@ -103,8 +103,9 @@ export const platformPaving = () =>
       ctx.arc(rnd() * w, rnd() * h, 2 + rnd() * 5, 0, Math.PI * 2);
       ctx.fill();
     }
-    ctx.strokeStyle = 'rgba(20,20,20,0.95)';
-    ctx.lineWidth = 6;
+    // soft joints: the floor is a surface, not a grid
+    ctx.strokeStyle = 'rgba(30,30,30,0.45)';
+    ctx.lineWidth = 5;
     for (let i = 0; i <= n; i++) {
       ctx.beginPath();
       ctx.moveTo(i * s, 0);
@@ -168,29 +169,6 @@ export const ballast = () =>
     blotches(ctx, w, h, 20, 'rgba(10,10,10,0.35)', 90, 42);
     grain(ctx, w, h, 20, 43);
   });
-
-/** Tactile guidance strip (ribs along the platform). Used as a bump map. */
-export const tactileBump = () =>
-  canvasTexture(
-    'tactile',
-    64,
-    256,
-    (ctx, w, h) => {
-      ctx.fillStyle = '#000';
-      ctx.fillRect(0, 0, w, h);
-      const g = ctx.createLinearGradient(0, 0, w, 0);
-      for (let i = 0; i < 4; i++) {
-        const a = i / 4;
-        g.addColorStop(a, '#000');
-        g.addColorStop(a + 0.06, '#fff');
-        g.addColorStop(a + 0.18, '#fff');
-        g.addColorStop(a + 0.24, '#000');
-      }
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, w, h);
-    },
-    { color: false },
-  );
 
 /** Roof glazing seen from below: night sky glow broken by glazing bars. */
 export const roofGlazing = () =>
@@ -272,10 +250,8 @@ export const trainWindowBay = (lit: boolean, variant = 0) =>
       ctx.fillStyle = '#fffaf0';
       ctx.fillRect(0, top + 4, w, 9);
       // luggage rack
-      ctx.fillStyle = 'rgba(30,30,30,0.85)';
-      ctx.fillRect(0, top + 40, w, 6);
-      ctx.fillStyle = 'rgba(30,30,30,0.35)';
-      ctx.fillRect(0, top + 46, w, 14);
+      ctx.fillStyle = 'rgba(30,30,30,0.7)';
+      ctx.fillRect(0, top + 40, w, 8);
       // seat backs
       for (let i = 0; i < 3; i++) {
         const x = px + 30 + i * 150;
@@ -283,8 +259,6 @@ export const trainWindowBay = (lit: boolean, variant = 0) =>
         ctx.beginPath();
         ctx.roundRect(x, top + 110, 92, bot - top - 100, 22);
         ctx.fill();
-        ctx.fillStyle = 'rgba(225,225,220,0.2)'; // headrest cover
-        ctx.fillRect(x + 22, top + 118, 48, 10);
         if (rnd() < 0.18) {
           // a lone passenger's head
           ctx.fillStyle = 'rgba(18,18,18,0.95)';
