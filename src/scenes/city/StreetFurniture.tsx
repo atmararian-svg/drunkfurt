@@ -92,7 +92,15 @@ export function StreetFurniture({ active }: { active: boolean }) {
     [],
   );
   const spots = useRef<(SpotLight | null)[]>([]);
-  const targets = useMemo(() => near.map((n) => Object.assign(new Object3D(), { position: new Vector3(n.p[0], 0, n.p[2]) })), [near]);
+  const targets = useMemo(
+    () =>
+      near.map((n) => {
+        const o = new Object3D();
+        o.position.set(n.p[0], 0, n.p[2]);
+        return o;
+      }),
+    [near],
+  );
   useLayoutEffect(() => {
     spots.current.forEach((s, i) => s && (s.target = targets[i]));
   }, [targets]);
