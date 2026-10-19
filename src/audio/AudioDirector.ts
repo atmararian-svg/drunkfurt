@@ -24,6 +24,11 @@ export const cues = {
   trainIdleHum: { src: null, bus: 'ambience', loop: true, gain: 0.35 },
   footstepPlatform: { src: null, bus: 'sfx', gain: 0.5 },
   stepDown: { src: null, bus: 'sfx', gain: 0.7 },
+  // the fight in Episode 02: drop recordings into /public/audio and set src; until then they are synthesised
+  fightExhale1: { src: null, bus: 'body', gain: 0.9 },
+  fightExhale2: { src: null, bus: 'body', gain: 0.9 },
+  fightBlock: { src: null, bus: 'body', gain: 1 },
+  fightPunch: { src: null, bus: 'body', gain: 1 },
 } satisfies Record<string, CueDef>;
 
 export type CueId = keyof typeof cues;
@@ -253,6 +258,72 @@ class AudioDirector {
       osc.connect(g).connect(out);
       osc.start(t);
       osc.stop(t + 0.2);
+    }
+  }
+
+  /**
+   * The fight's four sounds. A recording is used when one is loaded for the cue;
+   * otherwise each is synthesised, and the four are deliberately different:
+   *  - exhale1: a short, sharp boxer's exhale ("tss") as the guard comes up;
+   *  - block:   forearm taking a fist: a dull, bony knock with a cloth slap;
+   *  - exhale2: a heavier, lower exhale ("hhf") behind the counter-punch;
+   *  - punch:   knuckles on a jaw: a hard crack with a deep body thump.
+   */
+  fight(kind: 'exhale1' | 'exhale2' | 'block' | 'punch') {
+    const cue = ({ exhale1: 'fightExhale1', exhale2: 'fightExhale2', block: 'fightBlock', punch: 'fightPunch' } as const)[kind];
+    if (this.play(cue)) return;
+    const ctx = this.ctx;
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    const out = this.buses.get('body')!;
+    const noiseHit = (type: BiquadFilterType, freq: number, q: number, peak: number, attack: number, decay: number, at = 0) => {
+      const n = this.noiseSource();
+      const f = ctx.createBiquadFilter();
+      f.type = type;
+      f.frequency.value = freq;
+      f.Q.value = q;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t + at);
+      g.gain.exponentialRampToValueAtTime(peak, t + at + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + at + attack + decay);
+      n.connect(f).connect(g).connect(out);
+      n.start(t + at);
+      n.stop(t + at + attack + decay + 0.05);
+    };
+    const tone = (type: OscillatorType, f0: number, f1: number, peak: number, attack: number, decay: number, at = 0) => {
+      const o = ctx.createOscillator();
+      o.type = type;
+      o.frequency.setValueAtTime(f0, t + at);
+      o.frequency.exponentialRampToValueAtTime(f1, t + at + attack + decay);
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 900;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t + at);
+      g.gain.exponentialRampToValueAtTime(peak, t + at + attack);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + at + attack + decay);
+      o.connect(lp).connect(g).connect(out);
+      o.start(t + at);
+      o.stop(t + at + attack + decay + 0.05);
+    };
+    if (kind === 'exhale1') {
+      // air forced through the teeth: bright, breathy, very short
+      noiseHit('bandpass', 2600, 1.4, 0.55, 0.008, 0.13);
+      noiseHit('bandpass', 1200, 0.8, 0.25, 0.01, 0.09);
+    } else if (kind === 'exhale2') {
+      // heavier: chest voice under the breath, lower and a little longer
+      noiseHit('bandpass', 1500, 1.0, 0.6, 0.012, 0.17);
+      tone('sawtooth', 150, 105, 0.16, 0.015, 0.16);
+    } else if (kind === 'block') {
+      // bone and sleeve: mid knock, cloth slap, little low end
+      tone('sine', 190, 90, 0.75, 0.004, 0.16);
+      noiseHit('bandpass', 2200, 0.7, 0.5, 0.002, 0.05);
+      noiseHit('lowpass', 500, 0.7, 0.4, 0.003, 0.09);
+    } else {
+      // the counter lands: sharp crack on top, deep thump underneath, a short tail
+      noiseHit('highpass', 2400, 0.7, 0.85, 0.002, 0.06);
+      tone('sine', 120, 42, 1.0, 0.006, 0.38);
+      noiseHit('lowpass', 800, 0.7, 0.55, 0.004, 0.16, 0.01);
     }
   }
 

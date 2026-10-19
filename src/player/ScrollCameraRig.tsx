@@ -16,6 +16,14 @@ export const rigPose: CameraPose = { position: new Vector3(), yaw: 0, pitch: 0, 
 
 const LOOK_YAW = deg(7);
 const LOOK_PITCH = deg(4);
+/**
+ * Looking around also moves your head a little, as if you leaned and craned
+ * within the spot you stand in: sideways towards where you look, a touch up or
+ * down, and slightly forward when you look to the side.
+ */
+const LEAN_SIDE = 0.11;
+const LEAN_UP = 0.045;
+const LEAN_FWD = 0.05;
 
 /**
  * The camera is on rails: the active episode's track, sampled at the scroll
@@ -25,7 +33,7 @@ const LOOK_PITCH = deg(4);
 export function ScrollCameraRig() {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const st = useMemo(
-    () => ({ lookYaw: 0, lookPitch: 0, speed: 0, phase: 0, last: new Vector3(), primed: false, episode: '' }),
+    () => ({ lookYaw: 0, lookPitch: 0, leanX: 0, leanY: 0, speed: 0, phase: 0, last: new Vector3(), primed: false, episode: '' }),
     [],
   );
 
@@ -57,6 +65,9 @@ export function ScrollCameraRig() {
     const p = input.pointer;
     st.lookYaw = damp(st.lookYaw, p.active ? -p.x * LOOK_YAW : 0, 2.4, dt);
     st.lookPitch = damp(st.lookPitch, p.active ? -p.y * LOOK_PITCH : 0, 2.4, dt);
+    // the head follows the eyes a little, a touch slower than the gaze
+    st.leanX = damp(st.leanX, p.active ? p.x : 0, 1.8, dt);
+    st.leanY = damp(st.leanY, p.active ? -p.y : 0, 1.8, dt);
 
     // footsteps from actual travel speed on the ground plane
     const moved = Math.hypot(pose.position.x - st.last.x, pose.position.z - st.last.z);
@@ -71,7 +82,13 @@ export function ScrollCameraRig() {
 
     const sin = Math.sin(pose.yaw);
     const cos = Math.cos(pose.yaw);
-    camera.position.set(pose.position.x + cos * bobX, pose.position.y + bobY, pose.position.z - sin * bobX);
+    const side = bobX + st.leanX * LEAN_SIDE;
+    const fwd = Math.abs(st.leanX) * LEAN_FWD;
+    camera.position.set(
+      pose.position.x + cos * side - sin * fwd,
+      pose.position.y + bobY + st.leanY * LEAN_UP,
+      pose.position.z - sin * side - cos * fwd,
+    );
     camera.rotation.set(pose.pitch + st.lookPitch, pose.yaw + st.lookYaw, pose.roll + Math.sin(st.phase) * 0.003 * k);
     const fov = pose.fov ?? 54;
     if (Math.abs(camera.fov - fov) > 0.01) {

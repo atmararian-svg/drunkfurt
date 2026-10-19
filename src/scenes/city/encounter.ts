@@ -1,7 +1,7 @@
 import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
-import { BEAT } from './beats';
+import { BEAT, BLOCK } from './beats';
 import { Gate, gates, globalProgress, localProgress, scrollToProgress } from '../../core/timeline';
 
 /**
@@ -20,30 +20,43 @@ import { Gate, gates, globalProgress, localProgress, scrollToProgress } from '..
  */
 export type EncounterState = 'approach' | 'armed' | 'impact' | 'resolved';
 
-export { BEAT } from './beats';
+export { BEAT, BLOCK } from './beats';
 
 export const encounter = {
   state: 'approach' as EncounterState,
   /** performance.now() of the strike, for the overlay. */
   impactAt: 0,
-  /** Extra metres the stranger creeps while the story waits at the gate. */
-  creep: 0,
+  /** The punch, 0 (wound up) … 1 (fist at your guard). Advances in slow motion while armed. */
+  punch: 0,
+  /** Camera shake, decays by itself. */
+  shake: 0,
   /** Stranger's position (written by the stranger each frame, read by the camera). */
   stranger: { x: 0, z: 0 },
+  /** His right fist (knuckles), world space, for checks and feedback. */
+  fist: { x: 0, y: 0, z: 0 },
 };
 
 const gate: Gate = { episode: 'city', at: BEAT.gate, open: false };
 gates.push(gate);
 
-/** Time scale of the city: normal, then easing down to 10% as the stranger closes in. */
+/**
+ * Time scale of the city. Normal speed through the approach and the stand-off;
+ * the moment he commits to the punch, everything drops to a tenth.
+ */
 export function cityTimeScale(local: number) {
   if (encounter.state === 'resolved' && local >= BEAT.cut) return 0.35; // the hush afterwards
-  if (encounter.state === 'impact') return 0.1;
-  const s = smoothstep(clamp((local - BEAT.slowFrom) / (BEAT.gate - BEAT.slowFrom), 0, 1));
+  if (encounter.state === 'impact' || encounter.state === 'armed') return 0.1;
+  const s = smoothstep(clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1));
   return 1 - 0.9 * s;
 }
 
-/** Called every frame by the city world. */
+/** Dev inspection: pin the block sequence at a time (seconds) to look at single frames. */
+export const debug = { blockT: -1 };
+
+/** Seconds since the click, or -1. */
+export const blockTime = () => debug.blockT >= 0 ? debug.blockT : (encounter.impactAt > 0 && encounter.state !== 'approach' && encounter.state !== 'armed' ? (performance.now() - encounter.impactAt) / 1000 : -1);
+
+/** Called every frame by the city world. `dt` is already scaled by cityTimeScale. */
 export function updateEncounter(dt: number) {
   const local = localProgress('city');
   if (encounter.state === 'approach' && local >= BEAT.gate - 0.002) {
@@ -54,9 +67,13 @@ export function updateEncounter(dt: number) {
     encounter.state = 'approach';
     story.setState({ prompt: null });
   }
-  if (encounter.state === 'armed') encounter.creep = Math.min(1.1, encounter.creep + dt * 0.13);
-  else if (encounter.state === 'approach') encounter.creep = Math.max(0, encounter.creep - dt * 0.5);
-  if (encounter.state === 'impact' && performance.now() - encounter.impactAt > 1500) resolve();
+  // the punch: the first few percent come with the scroll, then it keeps coming at a tenth of real speed
+  // (a full punch takes ~0.3 s, so ~3 s here), and stops just short of you if you never react
+  const scrolled = 0.12 * clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1);
+  if (encounter.state === 'armed') encounter.punch = Math.min(0.82, Math.max(encounter.punch, scrolled) + dt * 0.1 * 3.2 * (1 - encounter.punch * 0.6));
+  else if (encounter.state === 'approach') encounter.punch = scrolled;
+  encounter.shake = Math.max(0, encounter.shake - dt * 3.5);
+  if (encounter.state === 'impact' && performance.now() - encounter.impactAt > BLOCK.resolve * 1000 + 400) resolve();
 }
 
 /** The visitor's click. Returns whether it did anything. */
@@ -67,9 +84,18 @@ export function defend() {
   gate.open = true;
   story.setState({ prompt: null });
   audio.unlock();
-  audio.impact(1);
-  window.setTimeout(() => audio.impact(2), 230);
-  window.setTimeout(resolve, 1100);
+  // you raise your guard with a grunt; his fist meets your forearm; you answer with a straight right
+  audio.fight('exhale1');
+  window.setTimeout(() => {
+    audio.fight('block');
+    encounter.shake = 1;
+  }, BLOCK.contact * 1000);
+  window.setTimeout(() => audio.fight('exhale2'), (BLOCK.counter - 0.04) * 1000);
+  window.setTimeout(() => {
+    audio.fight('punch');
+    encounter.shake = 0.7;
+  }, BLOCK.counterLands * 1000);
+  window.setTimeout(resolve, BLOCK.resolve * 1000);
   return true;
 }
 

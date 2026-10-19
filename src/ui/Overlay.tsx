@@ -4,7 +4,7 @@ import { clamp } from '../core/math';
 import { story, useStory } from '../core/store';
 import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { PLANNED, builtEpisodes } from '../episodes';
-import { BEAT, defend, encounter } from '../scenes/city/encounter';
+import { BEAT, BLOCK, defend, encounter } from '../scenes/city/encounter';
 import { drawBrushWipe, drawImpact } from './brush';
 
 /** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
@@ -91,7 +91,8 @@ export function Overlay() {
       }
       // the strike, in real time; fades once the scroll has carried the ink over
       if (encounter.impactAt > 0) {
-        const t = (performance.now() - encounter.impactAt) / 1000;
+        // the comic strike frames come in as the counter lands; the block itself is played in 3D
+        const t = (performance.now() - encounter.impactAt) / 1000 - BLOCK.ink;
         if (t < 1.9) {
           drawImpact(hctx, hit.width, hit.height, t);
           hit.style.opacity = String(1 - clamp((t - 1.4) / 0.5, 0, 1));
@@ -210,7 +211,7 @@ export function Overlay() {
         }}
       >
         <span className="act-word">Defend</span>
-        <span className="act-hint">Click to continue</span>
+        <span className="act-hint">Click to block</span>
       </button>
 
       <canvas className="impact" aria-hidden />

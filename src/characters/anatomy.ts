@@ -237,6 +237,49 @@ export function hand(side: -1 | 1, skin: Color) {
   ].map((p) => paint(p, skin));
 }
 
+/**
+ * Closed fist, pivot at the wrist, hanging down: knuckles at the far end, a
+ * row of finger rolls, and the thumb folded across. Knuckles face +z when the
+ * forearm is raised forward.
+ */
+export function fist(side: -1 | 1, skin: Color) {
+  return [
+    place(ellipsoid(0.04, 0.05, 0.045), [0, -0.05, 0.004]),
+    // folded fingers: a rounded roll across the front of the fist
+    place(ellipsoid(0.042, 0.026, 0.03), [0, -0.085, 0.022], [0.3, 0, 0]),
+    // knuckle ridge
+    place(ellipsoid(0.04, 0.016, 0.022), [0, -0.1, 0.0]),
+    // thumb across the fingers
+    place(limb(0.05, 0.012, 0.011, 0, 0.5, 8), [-side * 0.024, -0.05, 0.03], [0.2, 0, side * 1.25]),
+  ].map((p) => paint(p, skin));
+}
+
+/**
+ * Worn cloth: pushes vertices in and out along their normals with a smooth
+ * pseudo-random field, so hems sag, fabric bunches and silhouettes stop being
+ * perfectly turned. `amount` in metres.
+ */
+export function rough(g: Piece, amount: number, seed: number) {
+  const pos = g.getAttribute('position');
+  g.computeVertexNormals();
+  const nor = g.getAttribute('normal');
+  const h = (x: number) => {
+    const s = Math.sin(x * 127.1 + seed * 311.7) * 43758.5453;
+    return s - Math.floor(s);
+  };
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    const n = Math.sin(x * 23 + seed) * Math.cos(y * 17 - seed * 0.7) + Math.sin(z * 29 + y * 11) * 0.6 + (h(Math.round(y * 60) + Math.round(x * 40) * 7) - 0.5) * 0.5;
+    const d = n * amount;
+    pos.setXYZ(i, x + nor.getX(i) * d, y + nor.getY(i) * d, z + nor.getZ(i) * d);
+  }
+  pos.needsUpdate = true;
+  g.computeVertexNormals();
+  return g;
+}
+
 /** Shoe, pivot at the ankle (0.075 m above the ground when flat). */
 export function shoe(shoeC: Color, soleC: Color) {
   return [

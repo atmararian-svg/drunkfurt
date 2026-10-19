@@ -13,6 +13,7 @@ import { cityNav } from './nav';
 import { BEAT, cityTimeScale, encounter, updateEncounter } from './encounter';
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
+import { PlayerArms } from './PlayerArms';
 import { Bag, Stranger } from './Stranger';
 import { Street } from './Street';
 import { StreetFurniture } from './StreetFurniture';
@@ -35,7 +36,7 @@ function Soundscape({ active }: { active: boolean }) {
     audio.startCityAmbience();
     const local = localProgress('city');
     const resolved = encounter.state === 'resolved';
-    const tension = resolved ? 0 : clamp((local - BEAT.slowFrom + 0.05) / (BEAT.gate - BEAT.slowFrom + 0.05), 0, 1);
+    const tension = resolved ? 0 : clamp((local - BEAT.strangerMoves) / (BEAT.gate - BEAT.strangerMoves), 0, 1);
     const after = resolved && local >= BEAT.cut;
     audio.setAmbience(after ? 0.3 : 1 - 0.65 * tension, 0.8);
     const cutoff = after ? 2600 : 20000 * Math.pow(650 / 20000, tension);
@@ -64,7 +65,7 @@ export function CityScene({ active }: { active: boolean }) {
 
   useFrame((_, dt) => {
     if (!active) return;
-    updateEncounter(Math.min(dt, 0.05));
+    updateEncounter(Math.min(dt, 0.05) * timeScale());
   });
 
   // leaving the episode backwards hides any pending prompt
@@ -92,6 +93,7 @@ export function CityScene({ active }: { active: boolean }) {
       <People crowd={crowd} scroll={() => localProgress('city')} timeScale={timeScale} enabled={active} />
       <Stranger active={active} timeScale={timeScale} />
       <Bag active={active} />
+      <PlayerArms active={active} />
       <Soundscape active={active} />
     </>
   );

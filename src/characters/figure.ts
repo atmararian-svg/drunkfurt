@@ -8,6 +8,7 @@ import {
   box,
   deltoids,
   ellipsoid,
+  fist,
   hairPieces,
   hand,
   head,
@@ -18,6 +19,7 @@ import {
   pelvis,
   place,
   rod,
+  rough,
   shell,
   shoe,
   shoulderX,
@@ -38,6 +40,12 @@ export interface Look {
   hairShade?: number;
   hat?: Hat;
   carry?: 'suitcase' | 'backpack' | 'shoulderbag' | 'tote';
+  /** Worn, ill-fitting clothes: irregular cloth, a shirt hanging out, baggy trousers, scuffed shoes. */
+  worn?: boolean;
+  /** Shade of a shirt showing under the top (worn looks). */
+  shirt?: number;
+  /** Shade of the shoes (default near-black). */
+  shoe?: number;
 }
 
 export interface Joints {
@@ -60,6 +68,11 @@ export interface Joints {
   ankleR: Group;
   suitcase?: Group;
   phone: Object3D;
+  /** Open hands and closed fists; toggle visibility to clench. */
+  handL: Object3D;
+  handR: Object3D;
+  fistL: Object3D;
+  fistR: Object3D;
 }
 
 const grey = (v: number) => new Color().setStyle(`rgb(${v},${v},${v})`);
@@ -79,13 +92,13 @@ function seg(parent: Object3D, pos: [number, number, number] = [0, 0, 0]) {
 }
 
 function addMesh(parent: Object3D, pieces: Piece[], mat: Material) {
-  if (!pieces.length) return;
-  const m = new Mesh(merge(pieces), mat);
+  const m = new Mesh(pieces.length ? merge(pieces) : undefined, mat);
   m.castShadow = true;
   m.receiveShadow = true;
   // people print as silhouettes: outer contour and overlaps, no internal crease lines
   m.userData.ink = 'silhouette';
   parent.add(m);
+  return m;
 }
 
 /**
@@ -106,11 +119,14 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
   const bottom = grey(look.bottom);
   const skin = grey(look.skin);
   const hairC = grey(look.hairShade ?? 22);
-  const shoeC = grey(18);
+  const shoeC = grey(look.shoe ?? 18);
   const soleC = grey(40);
   const accent = grey(Math.max(10, look.top - 22));
   const coat = look.outfit === 'coat' || look.outfit === 'parka';
-  const pad = coat ? 0.016 : look.outfit === 'hoodie' ? 0.012 : 0.008;
+  // worn clothes hang loose: a size too big
+  const pad = (coat ? 0.016 : look.outfit === 'hoodie' ? 0.012 : 0.008) + (look.worn ? 0.016 : 0);
+  let seed = 1;
+  const cloth = (p: Piece, amount = 0.006) => (look.worn ? rough(p, amount, seed++) : p);
   const g = b.girth;
 
   const root = new Group();
@@ -141,6 +157,10 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
         top,
       ),
     );
+  } else if (look.worn) {
+    // a long, sagging hoodie hem, with a faded shirt hanging out below it on one side
+    pel.push(paint(cloth(place(shell([[hipR + 0.03, 0.12], [hipR + 0.04, 0.0], [hipR + 0.046, -0.1], [hipR + 0.03, -0.13]], 22), [0, 0, 0], [0, -0.02, 0], [1, 1, 0.8]), 0.008), top));
+    pel.push(paint(cloth(place(shell([[hipR + 0.012, -0.08], [hipR + 0.02, -0.16], [hipR + 0.012, -0.2]], 18), [0.012, 0, 0], [0, 0, 0.06], [1, 1, 0.76]), 0.006), grey(look.shirt ?? 120)));
   } else {
     // jacket / hoodie hem over the belt
     pel.push(paint(place(shell([[hipR + 0.014, 0.12], [hipR + 0.02, 0.02], [hipR + 0.024, -0.04]]), [0, 0, 0], [0, 0, 0], [1, 1, 0.78]), top));
@@ -149,10 +169,22 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
   addMesh(hips, pel, mat);
 
   // --- torso segment: chest, shoulders, neck, collar, backpack
-  const tor: Piece[] = [paint(torso(b, pad), top), ...deltoids(b, pad).map((p) => paint(p, top)), paint(neck(g), skin)];
+  const tor: Piece[] = [paint(cloth(torso(b, pad), 0.007), top), ...deltoids(b, pad).map((p) => paint(cloth(p, 0.004), top)), paint(neck(g), skin)];
   // collar
   tor.push(paint(place(limb(0.05, 0.062 * g + pad, 0.07 * g + pad, 0, 0.5, 14), [0, 0.465, -0.005], [0, 0, 0], [1, 1, 0.92]), top));
-  if (look.outfit === 'hoodie') tor.push(paint(place(ellipsoid(0.1, 0.07, 0.07), [0, 0.44, -0.075], [0.3, 0, 0]), top));
+  if (look.outfit === 'hoodie') {
+    tor.push(paint(cloth(place(ellipsoid(0.1, 0.07, 0.07), [0, 0.44, -0.075], [0.3, 0, 0]), 0.008), top));
+    if (look.worn) {
+      // the hood bunched up behind the neck, and a stretched-out collar of the shirt beneath
+      tor.push(paint(cloth(place(ellipsoid(0.12, 0.085, 0.09), [0, 0.47, -0.1], [0.5, 0, 0.08]), 0.012), top));
+      tor.push(paint(place(limb(0.03, 0.068, 0.072, 0, 0.5, 14), [0, 0.455, 0.01], [0.15, 0, 0], [1, 1, 0.9]), grey(look.shirt ?? 120)));
+      // drawstrings, one longer than the other
+      tor.push(paint(place(rod(0.18, 0.004), [-0.03, 0.36, 0.11], [0.15, 0, 0.05]), grey(look.shirt ?? 120)));
+      tor.push(paint(place(rod(0.11, 0.004), [0.03, 0.39, 0.11], [0.15, 0, -0.08]), grey(look.shirt ?? 120)));
+      // kangaroo pocket
+      tor.push(paint(cloth(place(ellipsoid(0.11, 0.07, 0.03), [0, 0.07, 0.115]), 0.004), grey(Math.max(8, look.top - 8))));
+    }
+  }
   if (look.outfit === 'parka') tor.push(paint(place(ellipsoid(0.1, 0.06, 0.085), [0, 0.46, -0.05]), grey(Math.min(200, look.top + 30))));
   if (look.carry === 'backpack') {
     tor.push(paint(place(ellipsoid(0.14, 0.2, 0.075), [0, 0.22, -0.155]), accent));
@@ -169,15 +201,19 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
   const shX = shoulderX(b);
   const arm = (side: -1 | 1) => {
     const sh = seg(spine, [side * shX, BODY.shoulderY, 0]);
-    addMesh(sh, [paint(limb(BODY.upperArm, 0.052 * g + pad, 0.043 * g + pad, 0.004, 0.3), top)], mat);
+    addMesh(sh, [paint(cloth(limb(BODY.upperArm, 0.052 * g + pad, 0.043 * g + pad, 0.004, 0.3), 0.005), top)], mat);
     const el = seg(sh, [0, -BODY.upperArm, 0]);
-    const fore: Piece[] = [paint(limb(BODY.foreArm, 0.043 * g + pad, 0.034 * g + pad * 0.6, 0.006, 0.22), top)];
+    const fore: Piece[] = [paint(cloth(limb(BODY.foreArm, 0.043 * g + pad, 0.034 * g + pad * 0.6, 0.006, 0.22), 0.005), top)];
+    // a pushed-up, bunched sleeve
+    if (look.worn) fore.push(paint(cloth(place(limb(0.06, 0.046 * g + pad, 0.046 * g + pad, 0, 0.5, 12), [0, -BODY.foreArm + 0.05, 0]), 0.006), top));
     // cuff of skin at the wrist
     fore.push(paint(place(limb(0.03, 0.03, 0.029, 0, 0.5, 8), [0, -BODY.foreArm + 0.012, 0]), skin));
     addMesh(el, fore, mat);
     const wr = seg(el, [0, -BODY.foreArm, 0]);
-    addMesh(wr, hand(side, skin), mat);
-    return { sh, el, wr };
+    const open = addMesh(wr, hand(side, skin), mat);
+    const closed = addMesh(wr, fist(side, skin), mat);
+    closed.visible = false;
+    return { sh, el, wr, open, closed };
   };
   const L = arm(-1);
   const R = arm(1);
@@ -187,11 +223,18 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
     const hip = seg(hips, [side * BODY.hipX * b.hips, 0, 0]);
     const skirted = look.outfit === 'dress';
     const legC = skirted ? grey(28) : bottom;
-    addMesh(hip, [paint(place(limb(BODY.thigh, 0.084 * g, 0.058 * g, 0.006, 0.25), [0, 0, 0], [0, 0, 0], [1, 1, 0.92]), legC)], mat);
+    const baggy = look.worn ? 0.018 : 0;
+    addMesh(hip, [paint(cloth(place(limb(BODY.thigh, 0.084 * g + baggy, 0.058 * g + baggy, 0.006, 0.25), [0, 0, 0], [0, 0, 0], [1, 1, 0.92]), 0.006), legC)], mat);
     const knee = seg(hip, [0, -BODY.thigh, 0]);
-    addMesh(knee, [paint(limb(BODY.shin, 0.056 * g, 0.04, 0.012 * g, 0.28), legC)], mat);
+    const shin: Piece[] = [paint(cloth(limb(BODY.shin, 0.056 * g + baggy, 0.04 + baggy, 0.012 * g, 0.28), 0.006), legC)];
+    // trousers too long: the hem bunches over the shoes
+    if (look.worn) shin.push(paint(cloth(place(ellipsoid(0.07, 0.04, 0.075), [0, -BODY.shin + 0.02, 0.01]), 0.01), legC));
+    addMesh(knee, shin, mat);
     const ankle = seg(knee, [0, -BODY.shin, 0]);
-    addMesh(ankle, shoe(shoeC, soleC), mat);
+    const sh = shoe(shoeC, soleC);
+    // scuffs on old trainers
+    if (look.worn) sh.push(paint(place(ellipsoid(0.03, 0.02, 0.04), [0.012, -0.012, 0.12]), grey(Math.max(10, (look.shoe ?? 18) - 70))));
+    addMesh(ankle, sh, mat);
     return { hip, knee, ankle };
   };
   const LL = leg(-1);
@@ -251,5 +294,9 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
     ankleR: RL.ankle,
     suitcase,
     phone,
+    handL: L.open,
+    handR: R.open,
+    fistL: L.closed,
+    fistR: R.closed,
   };
 }

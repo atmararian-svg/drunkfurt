@@ -5,6 +5,7 @@ import { useStory } from './core/store';
 import { TOTAL_LENGTH, locate, readScroll, scrollToProgress, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
+import { debug as encounterDebug, encounter } from './scenes/city/encounter';
 import { Stylizer } from './render/Stylizer';
 import { Overlay } from './ui/Overlay';
 
@@ -49,6 +50,8 @@ export function App() {
         rigPose,
         locate,
         EPISODES,
+        encounter,
+        encounterDebug,
         /** Hold the camera on a fixed frame (inspection only): pos, yaw/pitch in degrees, fov. */
         frame(pos: [number, number, number], yaw: number, pitch: number, fov = 40) {
           const k = { pos, yaw: (yaw * Math.PI) / 180, pitch: (pitch * Math.PI) / 180, fov };
