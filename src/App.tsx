@@ -4,7 +4,7 @@ import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 import { useStory } from './core/store';
 import { TOTAL_LENGTH, locate, readScroll, scrollToProgress, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
-import { rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
+import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { Stylizer } from './render/Stylizer';
 import { Overlay } from './ui/Overlay';
 
@@ -40,6 +40,11 @@ export function App() {
         rigPose,
         locate,
         EPISODES,
+        /** Hold the camera on a fixed frame (inspection only): pos, yaw/pitch in degrees, fov. */
+        frame(pos: [number, number, number], yaw: number, pitch: number, fov = 40) {
+          const k = { pos, yaw: (yaw * Math.PI) / 180, pitch: (pitch * Math.PI) / 180, fov };
+          cameraDirector.play({ id: 'inspect', duration: 1e6, keys: [{ t: 0, ...k }, { t: 1, ...k }] });
+        },
         /** Jump straight to a global progress value, without smoothing. */
         setProgress(p: number) {
           scrollToProgress(p, false);

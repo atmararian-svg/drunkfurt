@@ -4,7 +4,7 @@ import { BlendFunction } from 'postprocessing';
 import { useEffect, useMemo } from 'react';
 import { Color, HalfFloatType, Material, Mesh, MeshBasicMaterial, Object3D } from 'three';
 import { applyComic } from './comic';
-import { INK_LAYER, InkEffect, OCCLUDER_LAYER, createInkBufferMaterial, createInkTarget } from './ink';
+import { INK_LAYER, INK_SILHOUETTE_LAYER, InkEffect, OCCLUDER_LAYER, createInkBufferMaterial, createInkTarget } from './ink';
 
 /**
  * Turns the lit scene into a printed page:
@@ -21,6 +21,7 @@ export function Stylizer({ version }: { version: unknown }) {
   const target = useMemo(createInkTarget, []);
   const occMat = useMemo(() => createInkBufferMaterial(0), []);
   const inkMat = useMemo(() => createInkBufferMaterial(1), []);
+  const silMat = useMemo(() => createInkBufferMaterial(0.5), []);
   const effect = useMemo(() => new InkEffect(target.texture), [target]);
   useEffect(() => {
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__ink = effect;
@@ -38,7 +39,8 @@ export function Stylizer({ version }: { version: unknown }) {
       if (transparent || o.userData.ink === 'none') return;
       // Each opaque mesh is drawn into the ink buffer exactly once: as ink, or as an occluder.
       const glow = mats.every((m) => m instanceof MeshBasicMaterial);
-      o.layers.enable(!glow && o.userData.ink !== false ? INK_LAYER : OCCLUDER_LAYER);
+      if (!glow && o.userData.ink === 'silhouette') o.layers.enable(INK_SILHOUETTE_LAYER);
+      else o.layers.enable(!glow && o.userData.ink !== false ? INK_LAYER : OCCLUDER_LAYER);
     });
   }, [scene, viewport.dpr, version]);
 
@@ -70,6 +72,9 @@ export function Stylizer({ version }: { version: unknown }) {
     gl.render(scene, camera);
     camera.layers.set(INK_LAYER);
     scene.overrideMaterial = inkMat;
+    gl.render(scene, camera);
+    camera.layers.set(INK_SILHOUETTE_LAYER);
+    scene.overrideMaterial = silMat;
     gl.render(scene, camera);
     scene.overrideMaterial = null;
     camera.layers.mask = mask;

@@ -5,6 +5,8 @@ import { palette } from '../config/palette';
 
 /** Render layer for geometry that gets ink lines. */
 export const INK_LAYER = 5;
+/** Geometry that draws its outer contour and overlaps, but no internal creases (people). */
+export const INK_SILHOUETTE_LAYER = 7;
 /** Opaque geometry that hides lines behind it but never draws its own. */
 export const OCCLUDER_LAYER = 6;
 
@@ -97,7 +99,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
   s[4] = S(uv + o);               s[5] = S(uv - o);
   s[6] = S(uv + vec2(o.x, -o.y)); s[7] = S(uv + vec2(-o.x, o.y));
 
-  if (empty || c.b < 0.5) { outputColor = inputColor; return; }
+  if (empty || c.b < 0.25) { outputColor = inputColor; return; }
   float sil = 0.0;
   float crease = 0.0;
   vec3 n = vec3(c.rg * 2.0 - 1.0, 0.0);
@@ -109,7 +111,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv, out vec4 outputColor)
     // relative depth jump; only the nearer side draws, so lines stay single
     float rel = (d - c.a) / max(c.a, 1e-5);
     sil = max(sil, smoothstep(0.05, 0.12, rel));
-    if (s[i].b < 0.5) continue;                     // no creases against occluders
+    if (s[i].b < 0.75 || c.b < 0.75) continue;      // creases only between full-ink surfaces
     vec3 m = vec3(s[i].rg * 2.0 - 1.0, 0.0);
     m.z = sqrt(max(0.0, 1.0 - dot(m.xy, m.xy)));
     crease = max(crease, smoothstep(0.3, 0.55, 1.0 - dot(n, m)));
