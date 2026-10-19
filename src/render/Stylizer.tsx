@@ -23,8 +23,10 @@ export function Stylizer({ version }: { version: unknown }) {
   const silMat = useMemo(() => createInkBufferMaterial(0.5), []);
   const effect = useMemo(() => new InkEffect(target.texture), [target]);
   useEffect(() => {
-    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__ink = effect;
-  }, [effect]);
+    if (!import.meta.env.DEV) return;
+    (window as unknown as Record<string, unknown>).__ink = effect;
+    (window as unknown as Record<string, unknown>).__scene = scene;
+  }, [effect, scene]);
 
   // Classify the scene once it is mounted (and whenever the episode changes).
   useEffect(() => {

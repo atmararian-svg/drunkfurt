@@ -73,7 +73,7 @@ export function updateEncounter(dt: number) {
   if (encounter.state === 'armed') encounter.punch = Math.min(0.82, Math.max(encounter.punch, scrolled) + dt * 0.1 * 3.2 * (1 - encounter.punch * 0.6));
   else if (encounter.state === 'approach') encounter.punch = scrolled;
   encounter.shake = Math.max(0, encounter.shake - dt * 3.5);
-  if (encounter.state === 'impact' && performance.now() - encounter.impactAt > BLOCK.resolve * 1000 + 400) resolve();
+  if (encounter.state === 'impact' && debug.blockT < 0 && performance.now() - encounter.impactAt > BLOCK.resolve * 1000 + 400) resolve();
 }
 
 /** The visitor's click. Returns whether it did anything. */

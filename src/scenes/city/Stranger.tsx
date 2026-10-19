@@ -159,7 +159,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     // lunge: weight onto the front foot as the fist goes out; knocked back by the counter
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
-    const lunge = 0.36 * drive * (1 - recoil * 0.5) - 0.12 * recoil - 0.55 * hit2;
+    const lunge = 0.52 * drive * (1 - recoil * 0.5) - 0.12 * recoil - 0.55 * hit2;
     const x = pos.x + fx * lunge;
     const z = pos.z + fz * lunge;
     j.root.position.set(x, 0, z);

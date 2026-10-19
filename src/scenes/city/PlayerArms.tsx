@@ -54,6 +54,8 @@ export function PlayerArms({ active }: { active: boolean }) {
     const left = forearm(-1, mat);
     const right = forearm(1, mat);
     rig.add(left, right);
+    left.userData.__arm = 'left';
+    right.userData.__arm = 'right';
     return { rig, left, right };
   }, []);
 
