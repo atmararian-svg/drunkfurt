@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo } from 'react';
-import { CatmullRomCurve3, Color, Group, MeshBasicMaterial, MeshStandardMaterial, TubeGeometry, Vector3 } from 'three';
+import { useMemo, useRef } from 'react';
+import { CatmullRomCurve3, Color, Group, MeshBasicMaterial, MeshStandardMaterial, PointLight, TubeGeometry, Vector3 } from 'three';
 import { buildFigure } from '../../characters/figure';
 import { activityPose, applyPose, dampPose, restPose, walkPose } from '../../characters/pose';
 import { clamp, damp } from '../../core/math';
@@ -159,10 +159,15 @@ export function Bag({ active }: { active: boolean }) {
     return new TubeGeometry(c, 40, 0.018, 6, false);
   }, []);
   const ref = useMemo(() => new Group(), []);
+  const light = useRef<PointLight>(null);
   useFrame(() => {
     ref.visible = active && encounter.state === 'resolved' && localProgress('city') >= BEAT.cut;
+    if (light.current) light.current.visible = ref.visible;
   });
   return (
+    <>
+    {/* light from the laundry window, falling across the man on the pavement */}
+    <pointLight ref={light} position={[9.1, 2.0, -37.2]} color="#f1ece0" intensity={9} distance={7} decay={2} visible={false} />
     <primitive object={ref} position={[BAG_SPOT.x, 0, BAG_SPOT.z]} rotation={[0, BAG_SPOT.yaw, 0]}>
       <mesh material={m.bag} position={[0, 0.07, 0]} rotation={[0, 0, 0.08]} castShadow>
         <boxGeometry args={[0.42, 0.13, 0.32]} />
@@ -172,5 +177,6 @@ export function Bag({ active }: { active: boolean }) {
       </mesh>
       <mesh material={m.bagStrap} geometry={strap} />
     </primitive>
+    </>
   );
 }

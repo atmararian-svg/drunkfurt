@@ -3,7 +3,10 @@
 A scroll-driven, first-person 3D comic set in Frankfurt am Main at night.
 DRUNKFURT is the name of the experience and its fictional world; Frankfurt am Main is the real
 setting, so real places and railway signage keep their real names.
-Episode 1, **Ankunft**, is built: Frankfurt (Main) Hbf, Gleis 7, a few minutes before midnight.
+Two episodes are built:
+
+- **Episode 01, Arrival**: Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
+- **Episode 02, City**: out of the station, down the boulevard towards the towers, and a stranger who wants your bag.
 
 ![Arrival](docs/screens/01-arrival.png)
 
@@ -111,6 +114,63 @@ built from.
   catenary droppers. The floor has large slabs with soft joints. Textures print as flat fills.
 - **Captions** are cut-paper strips held down with yellow tape.
 
+## Episode 02: City
+
+`src/scenes/city/`. The episode's beats, by local scroll progress, are listed in `track.ts`:
+
+| Beat | Local progress |
+| --- | --- |
+| Under the station portal, behind the ink wipe and the EPISODE 02 / CITY title | 0–0.10 |
+| Out onto the square: the boulevard, the houses and the skyline | 0.10–0.22 |
+| A look around: the kiosk, the tram stop | 0.22–0.40 |
+| Across the zebra crossing and down the right sidewalk | 0.40–0.60 |
+| A man leaves a doorway ahead and walks at you | 0.60–0.72 |
+| He closes in; the city slows to a tenth of normal speed | 0.72–0.845 |
+| DEFEND: the story waits here | 0.845 |
+| The strike, under ink | 0.85–0.905 |
+| Aftermath: a new angle on the same spot, him on the pavement and your bag in front of you | 0.905–1 |
+
+- **The world**:
+  - the station's head building with its arched portal;
+  - a square with a kiosk, a tram stop (with a DRUNKFURT poster) and tram tracks, and a zebra
+    crossing;
+  - a long boulevard of 19th-century blocks. Their facades are line drawings (procedural canvas
+    textures with wobbly ink) and they have shopfronts, mansard roofs and chimneys;
+  - bare trees, curved street lamps, blinking amber traffic lights, parked cars, and two moving
+    cars with headlight beams and reflections in the wet road;
+  - the skyline as silhouettes: a triangular tower with a lit crown, a cylinder with an antenna,
+    the twin towers, a feather crown and an inverted pyramid. These shapes evoke Frankfurt's
+    banking district and are not surveyed.
+- **Wet asphalt is selective**: low roughness only in puddles and patches (a roughness map),
+  plus soft light streaks under lamps and headlights.
+- **People**: the same character system as Episode 1, with its own cast and nav (`cast.ts`,
+  `nav.ts`):
+  - two friends at the kiosk, someone on their phone at the tram stop, a traveller just off the
+    train, someone looking up at the towers;
+  - a smoker outside a bar, someone on a call, two people talking further down;
+  - two walkers, each on their own validated strip of sidewalk.
+- **The stranger** (`Stranger.tsx`) waits in a doorway, then walks at you, driven by scroll. He
+  is slightly hunched, with a short arm swing and his eyes on you, and he decelerates as he
+  closes in. The camera turns slightly to keep him in frame.
+- **The encounter** (`encounter.ts`) is a small state machine: approach → armed → impact →
+  resolved.
+  - A *gate* in `core/timeline.ts` holds the scroll at the DEFEND beat until you click. Opening
+    it is permanent, so scrolling back and forth never re-arms or replays it.
+  - The click resolves immediately and doesn't wait on any animation.
+  - The impact plays a paper flash, speed lines, three heavy ink strokes, a small red burst (the
+    only red in the experience) and then black. Two different synthesized hits play.
+  - The page then scrolls itself to the aftermath.
+- **Time**: everything in the city (people, cars, the stranger) runs on a time scale that eases
+  to 10% as he closes in.
+- **Sound**: the audio graph starts on the first click or key press.
+  - There are no recorded assets, so the city uses synthesized sounds: a distant traffic bed,
+    tyre noise from passing cars (panned), two impacts and a slow heartbeat at the climax.
+  - The ambience thins and muffles (a low-pass sweep) as the stranger approaches.
+  - A "Sound on/off" switch sits top right.
+- **Transitions**: brush-stroke wipes are drawn on a canvas (`ui/brush.ts`). They are ragged
+  black strokes with bristle tips, not a fade, and they close an episode, carry its title and
+  open the next one.
+
 ## What is in Episode 1
 
 - **Station**: a barrel-vaulted train shed modelled on the Hbf's 19th-century halls: lattice arch
@@ -166,6 +226,11 @@ src/
 ```
 
 ### Adding an episode
+
+Episode 02 is the worked example: `src/scenes/city/` has its world, `track.ts` (camera),
+`episode.ts` (title, captions, beats, `adjustPose`) and `encounter.ts` (a gated interaction).
+Shared pieces live in `src/characters/` (figures, poses, crowd simulation, nav).
+
 
 1. Build the world in `src/scenes/<id>/` and write `episode.ts`. It exports an `EpisodeDef`
    with the world component, a `CameraTrack`, captions and beats.
