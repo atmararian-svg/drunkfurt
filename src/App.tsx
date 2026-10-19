@@ -56,7 +56,7 @@ export function App() {
 
   return (
     <>
-      <div className="stage">
+      <div className="stage" role="img" aria-label="DRUNKFURT, Episode 1: arriving at Frankfurt (Main) Hbf at night">
         <Canvas
           shadows={{ type: PCFShadowMap }}
           dpr={[1, 1.75]}

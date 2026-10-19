@@ -1,6 +1,8 @@
-# Drunkfurt
+# DRUNKFURT
 
 A scroll-driven, first-person 3D comic set in Frankfurt am Main at night.
+DRUNKFURT is the name of the experience and its fictional world; Frankfurt am Main is the real
+setting, so real places and railway signage keep their real names.
 Episode 1, **Ankunft**, is built: Frankfurt (Main) Hbf, Gleis 7, a few minutes before midnight.
 
 ![Arrival](docs/screens/01-arrival.png)
@@ -31,13 +33,40 @@ the camera is travelling. Scroll also drives events: in Episode 1 a traveller cr
 front of you and the train door slides shut behind you, both scrubbing backwards when you
 scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) runs on time.
 
+## People in the station
+
+`src/scenes/station/crowd.ts` simulates a small, purposeful crowd. `nav.ts` builds the
+walkable areas (platform behind the white lines, the concourse) and obstacle footprints from
+the same placement data the furniture is built from: masts, bins, benches, poster cases, the
+vending machine, the smoking area and the hall piers.
+
+- **Lanes**: people walk fixed routes back and forth, pausing at each end, then turn in place
+  before setting off again, so nobody slides sideways. Each walker has its own strip of floor,
+  and the concourse lanes run between the pier rows.
+- **Scroll routes**: the traveller who crosses in front of you follows a route around the
+  poster case. Their pose is a pure function of scroll position, so scrubbing back replays
+  it exactly.
+- **Giving way**: walkers slow down and wait for anyone in front of them, the visitor
+  included. After a while they step aside to a free spot and drift back once the way is
+  clear.
+- **Validation**: every route is checked at 5 cm steps against the obstacle map in dev
+  builds, with a console warning on any failure.
+- **Walk cycle**: knees, elbows, feet and lean are driven by distance actually walked, so
+  the feet match the ground speed.
+
 ## Rendering: printed comic, real 3D underneath
 
 - **Tonal bands** (`src/render/comic.ts`): every lit material keeps three's lighting and
   shadows. Its final colour is quantised into five printed tones: ink, charcoal, mid, light
-  and paper. Band edges resolve as screen-space halftone dots on floors and diagonal hatching
-  on walls. Hue is kept, so yellow stays yellow in every band. Materials opt out with
-  `material.userData.comic = false`.
+  and paper. Band edges resolve as narrow screen-space halftone transitions, so dots sit where
+  light turns into shadow rather than across whole surfaces. Hue is kept, so yellow stays
+  yellow in every band. Each material chooses how it prints (`PRINT` in
+  `src/materials/materials.ts`, or `material.userData.comic`):
+  - clean band edges (`halftone: 0`) for the roof glazing, window glass, trim, yellow paint
+    and safety lines;
+  - narrower dots (`halftone` < 1) for the train bodies, trusses and passengers;
+  - hatching (`hatch: true`) only on masonry, the platform walls and undercarriage;
+  - `false` for signage, so it stays legible.
 - **Selective ink** (`src/render/ink.ts`, `Stylizer.tsx`): every opaque mesh is drawn once
   into a normal/depth buffer, either as *ink* geometry or as a line-free *occluder*. Lines come
   only from ink geometry. Silhouettes are heavy, creases are lighter, and both thin and fade

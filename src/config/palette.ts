@@ -1,5 +1,5 @@
 /**
- * Drunkfurt palette. Monochrome base with a single yellow accent.
+ * DRUNKFURT palette. Monochrome base with a single yellow accent.
  * Red is reserved for narrative moments and intentionally unused in the station scene.
  */
 export const palette = {

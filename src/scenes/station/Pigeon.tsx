@@ -3,6 +3,10 @@ import { useMemo, useRef } from 'react';
 import { Group, MeshStandardMaterial } from 'three';
 import { damp, mulberry32 } from '../../core/math';
 import { playerState } from '../../player/playerState';
+import { crowdPositions } from './crowd';
+import { isFree } from './nav';
+
+const PIGEON_R = 0.12;
 
 /**
  * The city's oldest resident. Pecks at crumbs, potters about, and walks off
@@ -30,20 +34,43 @@ export function Pigeon({ home }: { home: [number, number] }) {
     const r = root.current;
     const h = head.current;
     if (!r || !h) return;
-    const px = playerState.position.x - st.x;
-    const pz = playerState.position.z - st.z;
+    // the closest person, visitor or passenger, is the one to keep away from
+    let px = playerState.position.x - st.x;
+    let pz = playerState.position.z - st.z;
+    for (const c of crowdPositions) {
+      if (Math.hypot(c.x - st.x, c.z - st.z) < Math.hypot(px, pz)) {
+        px = c.x - st.x;
+        pz = c.z - st.z;
+      }
+    }
     const near = Math.hypot(px, pz) < 2.4;
     st.timer -= dt;
     if (near) {
-      // retreat away from the visitor, staying near home
+      // retreat away from the visitor; if that spot is blocked, veer left or right
       const l = Math.hypot(px, pz) || 1;
-      st.tx = st.x - (px / l) * 1.5;
-      st.tz = st.z - (pz / l) * 1.5;
+      const away = Math.atan2(-px / l, -pz / l);
+      for (const off of [0, 0.7, -0.7, 1.4, -1.4]) {
+        const tx = st.x + Math.sin(away + off) * 1.5;
+        const tz = st.z + Math.cos(away + off) * 1.5;
+        if (isFree(tx, tz, PIGEON_R) && Math.hypot(tx - home[0], tz - home[1]) < 4) {
+          st.tx = tx;
+          st.tz = tz;
+          break;
+        }
+      }
       st.timer = 2;
     } else if (st.timer <= 0) {
       st.timer = 2 + st.rnd() * 4;
-      st.tx = home[0] + (st.rnd() - 0.5) * 1.6;
-      st.tz = home[1] + (st.rnd() - 0.5) * 1.6;
+      // pick a nearby spot that is on the platform and not under furniture
+      for (let k = 0; k < 6; k++) {
+        const tx = home[0] + (st.rnd() - 0.5) * 1.6;
+        const tz = home[1] + (st.rnd() - 0.5) * 1.6;
+        if (isFree(tx, tz, PIGEON_R)) {
+          st.tx = tx;
+          st.tz = tz;
+          break;
+        }
+      }
     }
     const dx = st.tx - st.x;
     const dz = st.tz - st.z;
@@ -51,8 +78,16 @@ export function Pigeon({ home }: { home: [number, number] }) {
     const walking = dist > 0.05;
     if (walking) {
       const v = Math.min(dist, (near ? 0.9 : 0.35) * dt);
-      st.x += (dx / dist) * v;
-      st.z += (dz / dist) * v;
+      const nx = st.x + (dx / dist) * v;
+      const nz = st.z + (dz / dist) * v;
+      // never step into furniture or off the platform edge
+      if (isFree(nx, nz, PIGEON_R)) {
+        st.x = nx;
+        st.z = nz;
+      } else {
+        st.tx = st.x;
+        st.tz = st.z;
+      }
       st.yaw = damp(st.yaw, Math.atan2(dx, dz), 8, dt);
       st.step += dt * (near ? 14 : 9);
     }

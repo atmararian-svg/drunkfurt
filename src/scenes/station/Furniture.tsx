@@ -126,6 +126,8 @@ function Panel({
           }),
     [map, glow, basic, intensity],
   );
+  // signage is printed matter already: keep it out of the tonal banding so it stays legible
+  mat.userData.comic = false;
   return (
     <mesh position={position} rotation={[0, rotationY, 0]} material={mat}>
       <planeGeometry args={size} />

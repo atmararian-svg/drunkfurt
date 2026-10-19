@@ -1,224 +1,239 @@
 import { useFrame } from '@react-three/fiber';
-import { useMemo, useRef } from 'react';
-import { CapsuleGeometry, Color, CylinderGeometry, Group, MeshBasicMaterial, MeshStandardMaterial, SphereGeometry, BoxGeometry } from 'three';
-import { clamp, damp, mulberry32 } from '../../core/math';
+import { useEffect, useMemo, useRef } from 'react';
+import { BoxGeometry, CapsuleGeometry, Color, CylinderGeometry, Group, MeshBasicMaterial, MeshStandardMaterial, SphereGeometry } from 'three';
+import { clamp } from '../../core/math';
 import { localProgress } from '../../core/timeline';
 import { playerState } from '../../player/playerState';
-import { BENCH_Z } from './props';
-import { MAST_X } from './layout';
+import { Look, PEOPLE, PersonDef, createCrowd, stepCrowd, validateCrowd } from './crowd';
 
 /**
- * Fellow travellers, deliberately few and mostly distant. They are read as
- * silhouettes against the light, so they are built from simple volumes and
- * animated with a light procedural walk cycle.
+ * Renders the crowd simulated in crowd.ts. Figures are still built from simple
+ * volumes (they print as silhouettes), but with adult proportions: hips at
+ * ~0.53 of height, shoulders wider than hips, knees and elbows, feet, and a
+ * slight forward lean while walking.
  */
-type Behaviour =
-  | { kind: 'walk'; x: number; z0: number; z1: number; speed: number; pause: number; suitcase?: boolean }
-  | { kind: 'cross'; z: number; x0: number; x1: number; speed: number; offset: number }
-  | { kind: 'stand'; x: number; z: number; yaw: number; phone?: boolean; smoke?: boolean }
-  | { kind: 'sit'; x: number; z: number; yaw: number }
-  /** Moved by the scroll: a straight line between two points over a span of episode progress. */
-  | { kind: 'scroll'; from: [number, number]; to: [number, number]; t0: number; t1: number };
-
-interface Person {
-  b: Behaviour;
-  height: number;
-  coat: boolean;
-  shade: number;
-}
-
-const PEOPLE: Person[] = [
-  { b: { kind: 'walk', x: 7.7, z0: -31, z1: -96, speed: 1.05, pause: 3, suitcase: true }, height: 1.78, coat: true, shade: 0 },
-  { b: { kind: 'walk', x: 1.9, z0: -86, z1: -44, speed: 1.25, pause: 5 }, height: 1.84, coat: false, shade: 1 },
-  { b: { kind: 'walk', x: 2.1, z0: -72, z1: -24, speed: 1.35, pause: 7 }, height: 1.7, coat: true, shade: 2 },
-  // the traveller who cuts across in front of you as you set off
-  { b: { kind: 'scroll', from: [8.8, -9.4], to: [1.3, -8.0], t0: 0.4, t1: 0.56 }, height: 1.86, coat: true, shade: 0 },
-  { b: { kind: 'walk', x: 6.6, z0: 24, z1: 78, speed: 1.2, pause: 4 }, height: 1.76, coat: false, shade: 0 },
-  { b: { kind: 'stand', x: 8.6, z: -42, yaw: Math.PI / 2, phone: true }, height: 1.72, coat: true, shade: 3 },
-  { b: { kind: 'stand', x: 8.2, z: -25.6, yaw: Math.PI * 0.8, smoke: true }, height: 1.81, coat: true, shade: 0 },
-  { b: { kind: 'sit', x: MAST_X - 0.5, z: BENCH_Z[1] + 0.4, yaw: Math.PI / 2 }, height: 1.75, coat: true, shade: 1 },
-  ...[0, 1, 2, 3, 4, 5].map((i) => ({
-    b: { kind: 'cross' as const, z: -106 - i * 3.3, x0: -24, x1: 46, speed: 1.1 + (i % 3) * 0.15, offset: i * 0.37 },
-    height: 1.68 + (i % 4) * 0.05,
-    coat: i % 2 === 0,
-    shade: i % 4,
-  })),
-];
-
-const SHADES = ['#121212', '#1a1a1a', '#262626', '#3b3b3a'];
+const SHADES = ['#1d1d1d', '#2f2f2f', '#454543', '#6a6965'];
 
 function useParts() {
   return useMemo(
     () => ({
-      torso: new CapsuleGeometry(0.17, 0.42, 4, 10),
-      coat: new CylinderGeometry(0.2, 0.27, 0.62, 12, 1, true),
-      head: new SphereGeometry(0.105, 14, 10),
-      leg: new CapsuleGeometry(0.065, 0.74, 4, 8),
-      arm: new CapsuleGeometry(0.05, 0.56, 4, 8),
-      case: new BoxGeometry(0.24, 0.62, 0.42),
+      chest: new CapsuleGeometry(0.15, 0.3, 4, 12),
+      pelvis: new CapsuleGeometry(0.13, 0.08, 4, 10),
+      coat: new CylinderGeometry(0.19, 0.25, 0.66, 14, 1, true),
+      neck: new CylinderGeometry(0.045, 0.05, 0.1, 8),
+      head: new SphereGeometry(0.1, 16, 12),
+      thigh: new CapsuleGeometry(0.068, 0.34, 4, 8),
+      shin: new CapsuleGeometry(0.055, 0.36, 4, 8),
+      foot: new BoxGeometry(0.1, 0.07, 0.25),
+      upper: new CapsuleGeometry(0.052, 0.24, 4, 8),
+      fore: new CapsuleGeometry(0.044, 0.24, 4, 8),
+      hat: new CylinderGeometry(0.105, 0.11, 0.07, 14),
+      brim: new CylinderGeometry(0.16, 0.16, 0.012, 16),
+      suitcase: new BoxGeometry(0.22, 0.6, 0.4),
+      handle: new BoxGeometry(0.02, 0.42, 0.02),
+      backpack: new BoxGeometry(0.3, 0.4, 0.16),
+      bag: new BoxGeometry(0.08, 0.26, 0.34),
       phone: new BoxGeometry(0.07, 0.13, 0.01),
-      mats: SHADES.map((c) => new MeshStandardMaterial({ color: c, roughness: 0.85 })),
-      skin: new MeshStandardMaterial({ color: '#4a4542', roughness: 0.7 }),
+      mats: SHADES.map((c) => {
+        const m = new MeshStandardMaterial({ color: c, roughness: 0.9 });
+        m.userData.comic = { halftone: 0.5 };
+        return m;
+      }),
+      skin: new MeshStandardMaterial({ color: '#5a5450', roughness: 0.8 }),
+      dark: new MeshStandardMaterial({ color: '#141414', roughness: 0.7 }),
       glow: new MeshBasicMaterial({ color: new Color('#dfe6ee').multiplyScalar(1.4) }),
       ember: new MeshBasicMaterial({ color: new Color('#c9c3b8').multiplyScalar(1.8) }),
     }),
     [],
   );
 }
+type Parts = ReturnType<typeof useParts>;
 
-type Rig = {
+interface Rig {
   root: Group;
-  legL: Group;
-  legR: Group;
-  armL: Group;
-  armR: Group;
+  body: Group;
+  chest: Group;
   head: Group;
-};
+  hipL: Group;
+  kneeL: Group;
+  hipR: Group;
+  kneeR: Group;
+  shL: Group;
+  elL: Group;
+  shR: Group;
+  elR: Group;
+}
 
-function Figure({ person, parts, register }: { person: Person; parts: ReturnType<typeof useParts>; register: (r: Rig) => void }) {
-  const refs = useRef<Partial<Rig>>({});
-  const s = person.height / 1.78;
-  const mat = parts.mats[person.shade];
-  const set = (k: keyof Rig) => (g: Group | null) => {
-    if (!g) return;
-    refs.current[k] = g;
-    if (Object.keys(refs.current).length === 6) register(refs.current as Rig);
-  };
-  const b = person.b;
+const HIP = 0.94; // hip height for a 1.78 m figure
+const THIGH = 0.45;
+const SHIN = 0.45;
+
+function Leg({ parts, mat, side, set }: { parts: Parts; mat: MeshStandardMaterial; side: 1 | -1; set: (hip: Group | null, knee: Group | null) => void }) {
+  const hip = useRef<Group>(null);
+  const knee = useRef<Group>(null);
+  useEffect(() => set(hip.current, knee.current), [set]);
   return (
-    <group ref={set('root')}>
-      <group scale={s}>
-        <mesh geometry={parts.torso} material={mat} position={[0, 1.24, 0]} scale={[1, 1, 0.68]} castShadow />
-        {person.coat && <mesh geometry={parts.coat} material={mat} position={[0, 0.86, 0]} scale={[1, 1, 0.72]} castShadow />}
-        <group ref={set('head')} position={[0, 1.6, 0]}>
-          <mesh geometry={parts.head} material={parts.skin} position={[0, 0.07, 0]} castShadow />
-          <mesh geometry={parts.head} material={mat} position={[0, 0.11, -0.012]} scale={[1.04, 0.72, 1.04]} />
-        </group>
-        <group ref={set('legL')} position={[-0.09, 0.92, 0]}>
-          <mesh geometry={parts.leg} material={mat} position={[0, -0.45, 0]} castShadow />
-        </group>
-        <group ref={set('legR')} position={[0.09, 0.92, 0]}>
-          <mesh geometry={parts.leg} material={mat} position={[0, -0.45, 0]} castShadow />
-        </group>
-        <group ref={set('armL')} position={[-0.22, 1.46, 0]}>
-          <mesh geometry={parts.arm} material={mat} position={[0, -0.32, 0]} castShadow />
-          {b.kind === 'stand' && b.phone && <mesh geometry={parts.phone} material={parts.glow} position={[0.02, -0.64, 0.05]} />}
-        </group>
-        <group ref={set('armR')} position={[0.22, 1.46, 0]}>
-          <mesh geometry={parts.arm} material={mat} position={[0, -0.32, 0]} castShadow />
-          {b.kind === 'walk' && b.suitcase && <mesh geometry={parts.case} material={parts.mats[1]} position={[0.08, -0.62, -0.42]} castShadow />}
-          {b.kind === 'stand' && b.smoke && <mesh material={parts.ember} position={[0, -0.66, 0.03]}><sphereGeometry args={[0.008, 6, 4]} /></mesh>}
-        </group>
+    <group ref={hip} position={[side * 0.095, HIP, 0]}>
+      <mesh geometry={parts.thigh} material={mat} position={[0, -THIGH / 2, 0]} castShadow />
+      <group ref={knee} position={[0, -THIGH, 0]}>
+        <mesh geometry={parts.shin} material={mat} position={[0, -SHIN / 2, 0]} castShadow />
+        <mesh geometry={parts.foot} material={parts.dark} position={[0, -SHIN + 0.0, 0.06]} castShadow />
       </group>
     </group>
   );
 }
 
-interface Sim {
-  z: number;
-  dir: number;
-  yaw: number;
-  phase: number;
-  pauseLeft: number;
-  speed: number;
+function Arm({ parts, mat, side, set, children }: { parts: Parts; mat: MeshStandardMaterial; side: 1 | -1; set: (sh: Group | null, el: Group | null) => void; children?: React.ReactNode }) {
+  const sh = useRef<Group>(null);
+  const el = useRef<Group>(null);
+  useEffect(() => set(sh.current, el.current), [set]);
+  return (
+    <group ref={sh} position={[side * 0.21, 0.4, 0]}>
+      <mesh geometry={parts.upper} material={mat} position={[0, -0.15, 0]} castShadow />
+      <group ref={el} position={[0, -0.3, 0]}>
+        <mesh geometry={parts.fore} material={mat} position={[0, -0.14, 0]} castShadow />
+        <mesh geometry={parts.head} material={parts.skin} position={[0, -0.3, 0]} scale={0.38} />
+        {children}
+      </group>
+    </group>
+  );
+}
+
+function Figure({ def, parts, register }: { def: PersonDef; parts: Parts; register: (r: Rig) => void }) {
+  const r = useRef<Partial<Rig>>({});
+  const look: Look = def.look;
+  const mat = parts.mats[look.shade];
+  const s = look.height / 1.78;
+  const done = () => {
+    if (Object.keys(r.current).length === 12) register(r.current as Rig);
+  };
+  const g = (k: keyof Rig) => (o: Group | null) => {
+    if (o) {
+      r.current[k] = o;
+      done();
+    }
+  };
+  const activity = def.b.kind === 'stand' ? def.b.activity : undefined;
+  return (
+    <group ref={g('root')}>
+      <group ref={g('body')} scale={s}>
+        <Leg parts={parts} mat={mat} side={-1} set={(h, k) => { if (h && k) { r.current.hipL = h; r.current.kneeL = k; done(); } }} />
+        <Leg parts={parts} mat={mat} side={1} set={(h, k) => { if (h && k) { r.current.hipR = h; r.current.kneeR = k; done(); } }} />
+        <mesh geometry={parts.pelvis} material={mat} position={[0, HIP + 0.02, 0]} rotation={[0, 0, Math.PI / 2]} scale={[1, 1.05, 0.8]} castShadow />
+        <group ref={g('chest')} position={[0, HIP + 0.08, 0]}>
+          <mesh geometry={parts.chest} material={mat} position={[0, 0.24, 0]} scale={[1.22, 1, 0.72]} castShadow />
+          {look.build === 'coat' && (
+            <mesh geometry={parts.coat} material={mat} position={[0, -0.12, 0]} scale={[1, 1, 0.74]} castShadow />
+          )}
+          {look.carry === 'backpack' && <mesh geometry={parts.backpack} material={parts.mats[(look.shade + 2) % 4]} position={[0, 0.25, -0.17]} castShadow />}
+          <mesh geometry={parts.neck} material={parts.skin} position={[0, 0.5, 0]} />
+          <group ref={g('head')} position={[0, 0.58, 0]}>
+            <mesh geometry={parts.head} material={parts.skin} position={[0, 0.08, 0.005]} scale={[0.92, 1.08, 1]} castShadow />
+            <mesh geometry={parts.head} material={parts.dark} position={[0, 0.12, -0.012]} scale={[0.96, 0.8, 0.98]} />
+            {look.hat && (
+              <>
+                <mesh geometry={parts.hat} material={parts.dark} position={[0, 0.2, 0]} />
+                <mesh geometry={parts.brim} material={parts.dark} position={[0, 0.17, 0]} />
+              </>
+            )}
+          </group>
+          <Arm parts={parts} mat={mat} side={-1} set={(a, b) => { if (a && b) { r.current.shL = a; r.current.elL = b; done(); } }}>
+            {activity === 'phone' && <mesh geometry={parts.phone} material={parts.glow} position={[0.02, -0.3, 0.05]} rotation={[-0.5, 0, 0]} />}
+            {look.carry === 'bag' && <mesh geometry={parts.bag} material={parts.dark} position={[-0.06, -0.36, 0]} castShadow />}
+          </Arm>
+          <Arm parts={parts} mat={mat} side={1} set={(a, b) => { if (a && b) { r.current.shR = a; r.current.elR = b; done(); } }}>
+            {activity === 'smoke' && (
+              <mesh material={parts.ember} position={[0, -0.32, 0.04]}>
+                <sphereGeometry args={[0.008, 6, 4]} />
+              </mesh>
+            )}
+          </Arm>
+        </group>
+      </group>
+      {look.carry === 'suitcase' && (
+        // rolled behind on its wheels, right hand on the handle (positioned per frame)
+        <group name="suitcase" position={[0.3 * s, 0, -0.45 * s]} rotation={[0.25, 0, 0]}>
+          <mesh geometry={parts.suitcase} material={parts.mats[(look.shade + 1) % 4]} position={[0, 0.32, 0]} castShadow />
+          <mesh geometry={parts.handle} material={parts.dark} position={[0, 0.82, 0.12]} />
+        </group>
+      )}
+    </group>
+  );
 }
 
 export function Passengers() {
   const parts = useParts();
+  const crowd = useMemo(() => createCrowd(), []);
   const rigs = useRef<(Rig | null)[]>([]);
-  const sims = useMemo<Sim[]>(() => {
-    const rnd = mulberry32(3);
-    return PEOPLE.map(({ b }) => ({
-      z: b.kind === 'walk' ? b.z0 + (b.z1 - b.z0) * rnd() * 0.3 : 0,
-      dir: 1,
-      yaw: 0,
-      phase: rnd() * 10,
-      pauseLeft: 0,
-      speed: 0,
-    }));
+
+  useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const problems = validateCrowd();
+    if (problems.length) console.warn('[crowd] route problems:\n' + problems.join('\n'));
   }, []);
 
   useFrame(({ clock }, rawDt) => {
     const dt = Math.min(rawDt, 0.05);
     const t = clock.elapsedTime;
-    PEOPLE.forEach((p, i) => {
+    stepCrowd(crowd, dt, localProgress('station'), playerState.position);
+    crowd.state.forEach((st, i) => {
       const r = rigs.current[i];
       if (!r) return;
-      const sim = sims[i];
-      const b = p.b;
-      let moving = false;
-      if (b.kind === 'walk') {
-        const target = sim.dir > 0 ? b.z1 : b.z0;
-        const heading = Math.sign(target - sim.z) || 1;
-        // give way to the visitor
-        const dx = playerState.position.x - b.x;
-        const dz = (playerState.position.z - sim.z) * heading;
-        const blocked = Math.abs(dx) < 0.9 && dz > 0 && dz < 1.6;
-        if (sim.pauseLeft > 0) sim.pauseLeft -= dt;
-        else if (!blocked) moving = true;
-        sim.speed = damp(sim.speed, moving ? b.speed : 0, 4, dt);
-        sim.z += heading * sim.speed * dt;
-        if (Math.abs(target - sim.z) < 0.2) {
-          sim.dir *= -1;
-          sim.pauseLeft = b.pause;
+      const def = crowd.people[i];
+      const b = def.b;
+      r.root.position.set(st.x, 0, st.z);
+      r.root.rotation.y = st.yaw;
+
+      if (b.kind === 'sit') {
+        r.body.position.set(0, -0.44, 0);
+        r.hipL.rotation.x = r.hipR.rotation.x = -1.5;
+        r.kneeL.rotation.x = r.kneeR.rotation.x = 1.45;
+        r.chest.rotation.x = 0.08;
+        r.shL.rotation.x = r.shR.rotation.x = -0.35;
+        r.elL.rotation.x = r.elR.rotation.x = -0.9;
+        r.head.rotation.x = 0.3 + Math.sin(t * 0.17) * 0.05;
+        r.head.rotation.y = Math.sin(t * 0.11 + 2) * 0.25;
+        return;
+      }
+
+      const k = clamp(st.speed / 1.1, 0, 1);
+      const shuffle = clamp(st.turn / 2, 0, 1) * (1 - k);
+      const amp = 0.42 * k + 0.18 * shuffle;
+      const ph = st.phase;
+      // legs: thigh swing, knee flexes during the forward swing
+      r.hipL.rotation.x = Math.sin(ph) * amp;
+      r.hipR.rotation.x = -Math.sin(ph) * amp;
+      r.kneeL.rotation.x = Math.max(0, -Math.cos(ph)) * 0.7 * (k + shuffle * 0.5);
+      r.kneeR.rotation.x = Math.max(0, Math.cos(ph)) * 0.7 * (k + shuffle * 0.5);
+      // body: bob twice per stride, slight lean into the walk, idle weight shift
+      r.body.position.set(Math.sin(t * 0.37 + i) * 0.012 * (1 - k), Math.abs(Math.cos(ph)) * 0.022 * k - 0.012 * k, 0);
+      r.chest.rotation.set(0.06 * k, Math.sin(ph) * 0.06 * k, Math.sin(t * 0.37 + i) * 0.015 * (1 - k));
+      // arms swing opposite to legs; elbows always a little bent
+      r.shL.rotation.set(-Math.sin(ph) * 0.38 * k, 0, 0.05);
+      r.shR.rotation.set(Math.sin(ph) * 0.38 * k, 0, -0.05);
+      r.elL.rotation.x = r.elR.rotation.x = -0.2 - 0.15 * k;
+      r.head.rotation.set(0.02, Math.sin(t * 0.21 + i * 2) * 0.3 * (1 - k), 0);
+
+      if (def.look.carry === 'suitcase') {
+        r.shR.rotation.set(0.42, 0, -0.12);
+        r.elR.rotation.x = -0.05;
+      }
+      if (b.kind === 'stand') {
+        if (b.activity === 'phone') {
+          r.shL.rotation.set(-0.55, 0.2, 0.15);
+          r.elL.rotation.x = -1.35;
+          r.head.rotation.x = 0.5;
+          r.head.rotation.y = 0;
         }
-        const yawTarget = heading < 0 ? Math.PI : 0;
-        sim.yaw = sim.pauseLeft > 0 && sim.speed < 0.1 ? damp(sim.yaw, yawTarget + Math.PI, 2, dt) : damp(sim.yaw, yawTarget, 3, dt);
-        r.root.position.set(b.x, 0, sim.z);
-        r.root.rotation.y = sim.yaw;
-      } else if (b.kind === 'scroll') {
-        const u = clamp((localProgress('station') - b.t0) / (b.t1 - b.t0), 0, 1);
-        const x = b.from[0] + (b.to[0] - b.from[0]) * u;
-        const z = b.from[1] + (b.to[1] - b.from[1]) * u;
-        const travelled = Math.hypot(x - r.root.position.x, z - r.root.position.z);
-        r.root.position.set(x, 0, z);
-        r.root.rotation.y = Math.atan2(b.to[0] - b.from[0], b.to[1] - b.from[1]);
-        // the walk cycle advances with distance covered, so it stops when scrolling stops
-        sim.phase += (travelled / 0.72) * Math.PI;
-        sim.speed = damp(sim.speed, travelled / Math.max(dt, 1e-4), 10, dt);
-        const k = Math.min(1, sim.speed / 0.6);
-        const sw = Math.sin(sim.phase) * 0.42 * k;
-        r.legL.rotation.x = sw;
-        r.legR.rotation.x = -sw;
-        r.armL.rotation.x = -sw * 0.7;
-        r.armR.rotation.x = sw * 0.7;
-      } else if (b.kind === 'cross') {
-        const span = b.x1 - b.x0;
-        const x = b.x0 + ((t * b.speed + b.offset * span) % span);
-        r.root.position.set(x, 0, b.z);
-        r.root.rotation.y = Math.PI / 2;
-        sim.speed = b.speed;
-        moving = true;
-      } else if (b.kind === 'stand') {
-        r.root.position.set(b.x + Math.sin(t * 0.4 + i) * 0.01, 0, b.z);
-        r.root.rotation.y = b.yaw + Math.sin(t * 0.13 + i) * 0.12;
-        r.head.rotation.y = Math.sin(t * 0.21 + i * 2) * 0.35;
-        r.head.rotation.x = b.phone ? 0.45 : 0;
-        if (b.phone) r.armL.rotation.x = -1.1;
-        if (b.smoke) {
-          // slow drag every ~9 s
+        if (b.activity === 'smoke') {
+          // a slow drag roughly every nine seconds
           const cyc = (t + i * 3) % 9;
           const up = cyc < 2.2 ? Math.sin((cyc / 2.2) * Math.PI) : 0;
-          r.armR.rotation.x = -0.3 - up * 1.75;
-          r.armR.rotation.z = up * 0.35;
+          r.shR.rotation.set(-0.25 - up * 0.55, 0, -0.12 - up * 0.25);
+          r.elR.rotation.x = -0.4 - up * 1.45;
+          r.shL.rotation.set(0.05, 0, 0.12);
+          r.elL.rotation.x = -1.4; // arm folded across the body
         }
-      } else {
-        r.root.position.set(b.x, 0, b.z);
-        r.root.rotation.y = b.yaw;
-        r.root.position.y = -0.42;
-        r.legL.rotation.x = r.legR.rotation.x = -1.45;
-        r.head.rotation.x = 0.25 + Math.sin(t * 0.17) * 0.05;
-        r.armL.rotation.x = r.armR.rotation.x = -0.55;
-      }
-      if (b.kind === 'walk' || b.kind === 'cross') {
-        sim.phase += (sim.speed * dt * Math.PI) / 0.72;
-        const k = Math.min(1, sim.speed / 0.8);
-        const sw = Math.sin(sim.phase) * 0.42 * k;
-        r.legL.rotation.x = sw;
-        r.legR.rotation.x = -sw;
-        r.armL.rotation.x = -sw * 0.7;
-        r.armR.rotation.x = b.kind === 'walk' && b.suitcase ? 0.18 : sw * 0.7;
-        r.root.position.y = Math.abs(Math.cos(sim.phase)) * 0.025 * k;
       }
     });
   });
@@ -226,7 +241,7 @@ export function Passengers() {
   return (
     <group>
       {PEOPLE.map((p, i) => (
-        <Figure key={i} person={p} parts={parts} register={(r) => (rigs.current[i] = r)} />
+        <Figure key={p.name} def={p} parts={parts} register={(r) => (rigs.current[i] = r)} />
       ))}
     </group>
   );

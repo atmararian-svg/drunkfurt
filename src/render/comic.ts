@@ -12,13 +12,17 @@ import { Material, MeshPhysicalMaterial, MeshStandardMaterial } from 'three';
  * yellow at every band.
  *
  * Per-material control via `material.userData.comic`:
- *   false                     → leave the material untouched (signs, displays)
- *   { cell?: number }         → halftone cell size in CSS pixels (default 5)
- *   { flat?: number }         → 0..1, pulls texture detail towards the band value
+ *   false                   → leave the material untouched (signs, displays)
+ *   { cell?: number }       → halftone cell size in CSS pixels (default 6)
+ *   { halftone?: number }   → width of the dotted transitions, 0 = clean band edges,
+ *                             1 = default; large smooth surfaces want less
+ *   { hatch?: boolean }     → hatch the two darkest transitions on vertical faces
+ *                             instead of dots (masonry, platform walls, undercarriage)
  */
 export interface ComicOptions {
   cell?: number;
-  flat?: number;
+  halftone?: number;
+  hatch?: boolean;
 }
 
 const CHUNK = /* glsl */ `
@@ -47,7 +51,7 @@ float comicTone(float lum, float dotv, float dark) {
   const float T1 = -4.1;  // charcoal | mid
   const float T2 = -2.6;  // mid | light
   const float T3 = -1.45; // light | paper
-  const float W = 0.4;    // half-width of the halftone transition (in stops)
+  const float W = COMIC_W; // half-width of the halftone transition (in stops)
   float L0 = 0.0035, L1 = 0.022, L2 = 0.085, L3 = 0.3, L4 = 0.86;
   float lvl = L0;
   // each transition: inside the band edge, dots of the brighter level grow with x
@@ -65,9 +69,12 @@ const APPLY = /* glsl */ `
 {
   float lum = dot(outgoingLight, vec3(0.2126, 0.7152, 0.0722));
   float dotv = comicDot(gl_FragCoord.xy, COMIC_CELL);
-  // vertical surfaces take hatching in the shadows, horizontal ones keep dots
-  vec3 wN = inverseTransformDirection(normal, viewMatrix);
-  float dark = abs(wN.y) < 0.6 ? comicHatch(gl_FragCoord.xy, COMIC_CELL) : dotv;
+  float dark = dotv;
+  #if COMIC_HATCH
+    // chosen materials hatch their shadow transitions on vertical faces
+    vec3 wN = inverseTransformDirection(normal, viewMatrix);
+    if (abs(wN.y) < 0.6) dark = comicHatch(gl_FragCoord.xy, COMIC_CELL);
+  #endif
   float tone = comicTone(lum, dotv, dark);
   // keep hue: scale the lit colour to the printed tone, but flatten texture noise
   vec3 hue = outgoingLight / max(lum, 1e-5);
@@ -86,14 +93,17 @@ export function applyComic(mat: Material, dpr: number) {
   const opts = mat.userData.comic as ComicOptions | false | undefined;
   if (opts === false) return;
   PATCHED.add(mat);
-  const cell = ((opts && opts.cell) || 5) * dpr;
+  const cell = ((opts && opts.cell) || 6) * dpr;
+  // 0.24 stops each side by default: dots stay at band edges instead of filling whole surfaces
+  const w = Math.max(0.001, 0.24 * (opts && opts.halftone !== undefined ? opts.halftone : 1));
+  const hatch = opts && opts.hatch ? 1 : 0;
   mat.onBeforeCompile = (shader) => {
-    shader.defines = { ...(shader.defines ?? {}), COMIC_CELL: cell.toFixed(2) };
+    shader.defines = { ...(shader.defines ?? {}), COMIC_CELL: cell.toFixed(2), COMIC_W: w.toFixed(3), COMIC_HATCH: hatch };
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${CHUNK}`)
       .replace('#include <opaque_fragment>', APPLY);
   };
-  mat.customProgramCacheKey = () => `comic-${cell.toFixed(2)}`;
+  mat.customProgramCacheKey = () => `comic-${cell.toFixed(2)}-${w.toFixed(3)}-${hatch}`;
   // Comic surfaces read as printed matter, not polished metal.
   mat.envMapIntensity = 0;
   mat.needsUpdate = true;

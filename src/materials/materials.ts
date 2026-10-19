@@ -8,6 +8,7 @@ import {
 } from 'three';
 import { palette } from '../config/palette';
 import * as tex from './textures';
+import type { ComicOptions } from '../render/comic';
 
 /**
  * Shared material library. Materials are created once and reused across meshes
@@ -123,6 +124,35 @@ function build() {
   };
 }
 
+/**
+ * How each material prints (see render/comic.ts). Big smooth surfaces get clean
+ * band edges, the floor keeps a fine dotted edge round each pool of light, and
+ * only masonry and undercarriage take hatching.
+ */
+const PRINT: Partial<Record<keyof ReturnType<typeof build>, ComicOptions>> = {
+  roofGlass: { halftone: 0.25 },
+  roofSheet: { halftone: 0 },
+  trainBody: { halftone: 0.55 },
+  trainBodyDirty: { halftone: 0.55 },
+  trainInterior: { halftone: 0.5 },
+  trainTrim: { halftone: 0 },
+  trainUnder: { hatch: true },
+  platform: { halftone: 0.8 },
+  platformEdge: { halftone: 0.4 },
+  platformSide: { hatch: true },
+  pier: { hatch: true },
+  concrete: { hatch: true },
+  steel: { halftone: 0.5 },
+  steelLight: { halftone: 0.5 },
+  yellowPaint: { halftone: 0 },
+  safetyLine: { halftone: 0 },
+};
+
 let lib: ReturnType<typeof build> | null = null;
-export const materials = () => (lib ??= build());
+export const materials = () => {
+  if (lib) return lib;
+  lib = build();
+  for (const [k, opts] of Object.entries(PRINT)) lib[k as keyof typeof lib].userData.comic = opts;
+  return lib;
+};
 export type MaterialLib = ReturnType<typeof build>;

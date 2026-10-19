@@ -75,7 +75,7 @@ export function Overlay() {
 
       {episodes.map((ep) => (
         <header key={ep.id} className="title" data-title data-ep={ep.id}>
-          <span className="title-kicker">Drunkfurt · Episode {ep.number}</span>
+          <span className="title-kicker">DRUNKFURT · Episode {ep.number}</span>
           <h1 className="title-name">{ep.title}</h1>
           <span className="title-sub">{ep.subtitle}</span>
         </header>
@@ -102,7 +102,7 @@ export function Overlay() {
         <i />
       </div>
 
-      <nav className="rail" aria-label="Episodes">
+      <nav className="rail" aria-label="DRUNKFURT episodes">
         <div className="rail-line">
           <div className="rail-fill" />
         </div>
@@ -120,7 +120,7 @@ export function Overlay() {
 
       <div className="wipe" />
       <section className="outro">
-        <span className="title-kicker">Episode 2</span>
+        <span className="title-kicker">DRUNKFURT · Episode 2</span>
         <h2 className="title-name">Die Stadt</h2>
         <p>Fortsetzung folgt.</p>
       </section>

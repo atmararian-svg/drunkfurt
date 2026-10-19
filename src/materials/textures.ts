@@ -205,7 +205,6 @@ export const roofGlazing = () =>
     ctx.fillRect(0, 0, w, 10); // transverse bar
     ctx.fillRect(0, 0, 6, h);
     ctx.fillRect(w / 2, 0, 5, h);
-    grain(ctx, w, h, 10, 52);
   });
 
 /** Soft radial falloff for light pools and glows. */
