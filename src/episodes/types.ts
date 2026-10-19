@@ -1,5 +1,6 @@
 import type { ComponentType } from 'react';
 import type { CameraTrack } from '../core/cameraTrack';
+import type { CameraPose } from '../core/sequence';
 import type { EpisodeId } from '../core/timeline';
 
 /** A comic caption box, shown while the episode's local progress is inside [from, to]. */
@@ -20,10 +21,15 @@ export interface EpisodeDef {
   number: number;
   title: string;
   subtitle: string;
-  /** The 3D world. Mounted while the episode is active or about to be. */
-  World: ComponentType;
+  /**
+   * The 3D world. Mounted while the episode is active or about to be; `active`
+   * is false while it is preloading behind the previous episode.
+   */
+  World: ComponentType<{ active: boolean }>;
   /** Scroll-driven camera path over local progress 0..1. */
   track: CameraTrack;
+  /** Optional per-frame adjustment of the sampled camera pose (e.g. keep a subject in frame). */
+  adjustPose?: (local: number, pose: CameraPose) => void;
   captions: Caption[];
   /** Local progress values a click advances between. */
   beats: number[];

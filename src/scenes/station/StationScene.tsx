@@ -47,7 +47,7 @@ const DUST_LAMPS = MAST_Z.filter((z) => z > -35 && z < 20);
  * The camera belongs to the episode track; this component only builds the
  * world and runs the scroll-driven events inside it.
  */
-export function StationScene() {
+export function StationScene({ active = true }: { active?: boolean }) {
   const { gl, scene, camera } = useThree();
   const leaf = useRef<Group>(null);
 
@@ -80,7 +80,7 @@ export function StationScene() {
 
   return (
     <>
-      <Lighting />
+      <Lighting active={active} />
       <Hall />
       <Platform {...PLATFORM} />
       <Platform {...PLATFORM_2} />

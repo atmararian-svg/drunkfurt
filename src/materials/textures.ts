@@ -17,7 +17,7 @@ type Draw = (ctx: CanvasRenderingContext2D, w: number, h: number) => void;
 
 const cache = new Map<string, Texture>();
 
-function canvasTexture(
+export function canvasTexture(
   key: string,
   w: number,
   h: number,
@@ -41,7 +41,7 @@ function canvasTexture(
 }
 
 /** Adds per-pixel grain in-place. */
-function grain(ctx: CanvasRenderingContext2D, w: number, h: number, amount: number, seed: number) {
+export function grain(ctx: CanvasRenderingContext2D, w: number, h: number, amount: number, seed: number) {
   const rnd = mulberry32(seed);
   const img = ctx.getImageData(0, 0, w, h);
   const d = img.data;
@@ -55,7 +55,7 @@ function grain(ctx: CanvasRenderingContext2D, w: number, h: number, amount: numb
 }
 
 /** Soft blotches for dirt/wear. */
-function blotches(
+export function blotches(
   ctx: CanvasRenderingContext2D,
   w: number,
   h: number,

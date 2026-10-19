@@ -8,6 +8,10 @@ import type { EpisodeId } from './timeline';
 export interface StoryState {
   phase: 'loading' | 'ready';
   episode: EpisodeId | 'outro';
+  /** An interaction is waiting for the visitor (e.g. 'defend'). */
+  prompt: string | null;
+  /** Sound preference; audio still only starts after a user gesture. */
+  sound: boolean;
 }
 
 type Listener = () => void;
@@ -32,7 +36,7 @@ function createStore<T extends object>(initial: T) {
   };
 }
 
-export const story = createStore<StoryState>({ phase: 'loading', episode: 'station' });
+export const story = createStore<StoryState>({ phase: 'loading', episode: 'station', prompt: null, sound: true });
 
 export function useStory<S>(selector: (s: StoryState) => S): S {
   return useSyncExternalStore(story.subscribe, () => selector(story.getState()));

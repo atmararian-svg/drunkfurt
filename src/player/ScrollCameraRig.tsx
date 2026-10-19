@@ -47,7 +47,11 @@ export function ScrollCameraRig() {
     }
     const ep = id === 'outro' ? builtEpisodes().slice(-1)[0] : EPISODES[id];
     const pose = rigPose;
-    if (!cameraDirector.update(dt, pose) && ep) ep.track.sample(id === 'outro' ? 1 : local, pose);
+    if (!cameraDirector.update(dt, pose) && ep) {
+      const l = id === 'outro' ? 1 : local;
+      ep.track.sample(l, pose);
+      ep.adjustPose?.(l, pose);
+    }
 
     // subtle look-around, eased back to the composed frame when the pointer leaves
     const p = input.pointer;

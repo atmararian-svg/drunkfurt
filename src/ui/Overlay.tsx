@@ -1,17 +1,39 @@
 import { useEffect, useRef } from 'react';
+import { audio } from '../audio/AudioDirector';
 import { clamp } from '../core/math';
-import { useStory } from '../core/store';
-import { EPISODE_SPANS, episodeRange, locate, scrollToProgress, timeline } from '../core/timeline';
+import { story, useStory } from '../core/store';
+import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { PLANNED, builtEpisodes } from '../episodes';
+import { BEAT, defend, encounter } from '../scenes/city/encounter';
+import { drawBrushWipe, drawImpact } from './brush';
+
+/** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
+function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
+  const { id, local } = locate(p);
+  if (id === 'outro') return { w: 1, mode: 'close' };
+  if (local > 0.955) return { w: (local - 0.955) / 0.045, mode: 'close' };
+  const first = EPISODE_SPANS[0].id === id;
+  if (!first && local < 0.045) return { w: 1, mode: 'open' };
+  if (!first && local < 0.12) return { w: 1 - (local - 0.045) / 0.075, mode: 'open' };
+  if (id === 'city' && encounter.state === 'resolved') {
+    if (local >= BEAT.cut && local < BEAT.aftermath) return { w: 1, mode: 'open' };
+    if (local >= BEAT.aftermath && local < BEAT.aftermath + 0.035) return { w: 1 - (local - BEAT.aftermath) / 0.035, mode: 'open' };
+  }
+  return { w: 0, mode: 'open' };
+}
+
+const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
  * Everything on top of the canvas is printed matter: a title panel, caption
- * boxes, a thin episode rail, and the "to be continued" card. All of it is
- * driven by the same scroll progress as the camera, updated per frame through
- * refs rather than React state.
+ * boxes, brush-stroke wipes between shots, the one prompt the story asks you to
+ * act on, a thin episode rail and a sound switch. All of it follows the same
+ * scroll progress as the camera, updated per frame through refs.
  */
 export function Overlay() {
   const phase = useStory((s) => s.phase);
+  const prompt = useStory((s) => s.prompt);
+  const sound = useStory((s) => s.sound);
   const root = useRef<HTMLDivElement>(null);
   const episodes = builtEpisodes();
 
@@ -22,8 +44,24 @@ export function Overlay() {
     const titles = Array.from(el.querySelectorAll<HTMLElement>('[data-title]'));
     const fill = el.querySelector<HTMLElement>('.rail-fill')!;
     const cue = el.querySelector<HTMLElement>('.cue')!;
-    const wipe = el.querySelector<HTMLElement>('.wipe')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
+    const wipe = el.querySelector<HTMLCanvasElement>('.wipe')!;
+    const hit = el.querySelector<HTMLCanvasElement>('.impact')!;
+    const wctx = wipe.getContext('2d')!;
+    const hctx = hit.getContext('2d')!;
+    let last = '';
+    let lastHit = -1;
+    const size = () => {
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      for (const c of [wipe, hit]) {
+        c.width = Math.round(window.innerWidth * dpr);
+        c.height = Math.round(window.innerHeight * dpr);
+      }
+      last = '';
+    };
+    size();
+    window.addEventListener('resize', size);
+
     const loop = () => {
       const p = timeline.progress;
       const { id, local } = locate(p);
@@ -31,51 +69,113 @@ export function Overlay() {
         const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to);
         c.classList.toggle('is-on', on);
       }
-      for (const t of titles) t.classList.toggle('is-on', t.dataset.ep === id && local < 0.09);
+      // a title shows at the start of its episode; later episodes show it over the ink of the hand-over
+      titles.forEach((t) => {
+        const i = episodes.findIndex((e) => e.id === t.dataset.ep);
+        const own = t.dataset.ep === id && local < (i === 0 ? 0.09 : 0.13);
+        const handover = i > 0 && episodes[i - 1].id === id && local > 0.975;
+        t.classList.toggle('is-on', own || handover);
+        t.classList.toggle('on-ink', i > 0);
+      });
       fill.style.transform = `scaleY(${p})`;
       cue.classList.toggle('is-on', p < 0.004);
-      // ink wipe closes over the last stretch of an episode and opens on the next
-      const edge = id === 'outro' ? 1 : clamp((local - 0.955) / 0.045, 0, 1);
-      wipe.style.setProperty('--w', String(edge));
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
+
+      const ink = inkAt(p);
+      const key = `${ink.w.toFixed(3)}${ink.mode}${wipe.width}`;
+      if (key !== last) {
+        drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, id === 'city' && local > 0.5 ? 13 : 7);
+        last = key;
+      }
+      // the strike, in real time; fades once the scroll has carried the ink over
+      if (encounter.impactAt > 0) {
+        const t = (performance.now() - encounter.impactAt) / 1000;
+        if (t < 1.9) {
+          drawImpact(hctx, hit.width, hit.height, t);
+          hit.style.opacity = String(1 - clamp((t - 1.4) / 0.5, 0, 1));
+          lastHit = t;
+        } else if (lastHit >= 0) {
+          hctx.clearRect(0, 0, hit.width, hit.height);
+          lastHit = -1;
+        }
+      }
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', size);
+    };
+  }, [episodes]);
 
-  /** Click or Enter: travel to the next composed beat. */
+  /** Click / tap / Enter: act on the prompt if one is waiting, otherwise go to the next composed beat. */
   useEffect(() => {
+    const unlock = () => {
+      audio.unlock();
+      audio.setEnabled(story.getState().sound);
+    };
     const next = () => {
+      if (story.getState().prompt === 'defend') {
+        defend();
+        return;
+      }
       const { id, local } = locate(timeline.target);
       const ep = episodes.find((e) => e.id === id);
       if (!ep) return;
       const r = episodeRange(ep.id);
       const beat = ep.beats.find((b) => b > local + 0.01);
-      scrollToProgress(beat === undefined ? r.end + 0.001 : r.start + beat * (r.end - r.start));
+      scrollToProgress(Math.min(gateLimit(), beat === undefined ? r.end + 0.001 : r.start + beat * (r.end - r.start)));
     };
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === 'Enter') next();
+      unlock();
+      if (e.code === 'Enter' || (e.code === 'Space' && story.getState().prompt)) {
+        e.preventDefault();
+        next();
+      }
     };
     const onClick = (e: MouseEvent) => {
+      unlock();
       if ((e.target as HTMLElement).closest('a,button')) return;
       next();
     };
+    // while the story waits at a gate, drift the page back to it so the prompt stays in reach
+    let settle = 0;
+    const onScroll = () => {
+      window.clearTimeout(settle);
+      if (!story.getState().prompt) return;
+      settle = window.setTimeout(() => {
+        const max = document.documentElement.scrollHeight - window.innerHeight;
+        if (window.scrollY / max > gateLimit() + 0.01) scrollToProgress(gateLimit());
+      }, 260);
+    };
     window.addEventListener('keydown', onKey);
     window.addEventListener('click', onClick);
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('scroll', onScroll, { passive: true });
     return () => {
       window.removeEventListener('keydown', onKey);
       window.removeEventListener('click', onClick);
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('scroll', onScroll);
     };
   }, [episodes]);
+
+  const toggleSound = () => {
+    const on = !story.getState().sound;
+    story.setState({ sound: on });
+    audio.unlock();
+    audio.setEnabled(on);
+  };
 
   return (
     <div className="overlay" ref={root}>
       <div className={`veil ${phase === 'loading' ? 'is-on' : ''}`} />
+      <canvas className="wipe" aria-hidden />
 
       {episodes.map((ep) => (
         <header key={ep.id} className="title" data-title data-ep={ep.id}>
-          <span className="title-kicker">DRUNKFURT · Episode {ep.number}</span>
+          <span className="title-brand">DRUNKFURT</span>
+          <span className="title-kicker">Episode {pad(ep.number)}</span>
           <h1 className="title-name">{ep.title}</h1>
           <span className="title-sub">{ep.subtitle}</span>
         </header>
@@ -97,6 +197,22 @@ export function Overlay() {
         )),
       )}
 
+      <button
+        type="button"
+        className={`act ${prompt === 'defend' ? 'is-on' : ''}`}
+        aria-hidden={prompt !== 'defend'}
+        tabIndex={prompt === 'defend' ? 0 : -1}
+        onClick={(e) => {
+          e.stopPropagation();
+          defend();
+        }}
+      >
+        <span className="act-word">Defend</span>
+        <span className="act-hint">Click to continue</span>
+      </button>
+
+      <canvas className="impact" aria-hidden />
+
       <div className="cue">
         <span>Scroll</span>
         <i />
@@ -111,18 +227,20 @@ export function Overlay() {
             const built = EPISODE_SPANS.find((_, i) => i === p.number - 1);
             return (
               <li key={p.number} className={built ? 'is-built' : ''} title={p.title}>
-                <span>{String(p.number).padStart(2, '0')}</span>
+                <span>{pad(p.number)}</span>
               </li>
             );
           })}
         </ol>
       </nav>
 
-      <div className="wipe" />
+      <button type="button" className="sound" onClick={toggleSound} aria-pressed={sound}>
+        Sound {sound ? 'on' : 'off'}
+      </button>
+
       <section className="outro">
-        <span className="title-kicker">DRUNKFURT · Episode 2</span>
-        <h2 className="title-name">Die Stadt</h2>
-        <p>Fortsetzung folgt.</p>
+        <span className="title-brand">DRUNKFURT</span>
+        <h2 className="title-name">To be continued</h2>
       </section>
     </div>
   );

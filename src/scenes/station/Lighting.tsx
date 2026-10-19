@@ -15,7 +15,7 @@ const MAST_INTENSITY = 150;
  * the visitor, a cold skylight through the glazing, a faint bounce from below
  * so the roof trusses stay readable, and the bright concourse at the head.
  */
-export function Lighting() {
+export function Lighting({ active = true }: { active?: boolean }) {
   const spots = useRef<(SpotLight | null)[]>([]);
   const up = useRef<DirectionalLight>(null);
   const flickerColor = useMemo(() => materials().lampLensFlicker.color.clone(), []);
@@ -51,8 +51,9 @@ export function Lighting() {
 
   return (
     <>
-      <color attach="background" args={[palette.sky]} />
-      <fogExp2 attach="fog" args={[palette.fog, 0.0068]} />
+      {/* scene-wide background and fog belong to whichever episode is on screen */}
+      {active && <color attach="background" args={[palette.sky]} />}
+      {active && <fogExp2 attach="fog" args={[palette.fog, 0.0068]} />}
       <hemisphereLight args={['#3a3f47', '#1a1a1a', 0.55]} />
       {/* cold sky through the glazing */}
       <directionalLight position={[-20, 60, 30]} intensity={0.16} color="#9aa6b8" />

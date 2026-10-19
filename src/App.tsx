@@ -8,16 +8,25 @@ import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraR
 import { Stylizer } from './render/Stylizer';
 import { Overlay } from './ui/Overlay';
 
-/** Mounts the active episode's world, plus the next one shortly before the hand-over. */
+/**
+ * Mounts the active episode's world, plus the next one in advance. Only the
+ * active world is drawn; the next one waits hidden, so the hand-over under the
+ * ink wipe is instant and two worlds never overlap on screen.
+ */
 function EpisodeWorlds() {
   const episode = useStory((s) => s.episode);
+  // under the loading veil every mounted world draws once, so all shaders compile up front
+  const loading = useStory((s) => s.phase === 'loading');
   const list = builtEpisodes();
   const i = Math.max(0, list.findIndex((e) => e.id === episode));
-  const mounted = episode === 'outro' ? list.slice(-1) : list.slice(i, i + 2);
+  const mounted = episode === 'outro' ? list.slice(-1) : list.slice(Math.max(0, i - 1), i + 2);
+  const activeId = episode === 'outro' ? list[list.length - 1].id : episode;
   return (
     <>
       {mounted.map((e) => (
-        <e.World key={e.id} />
+        <group key={e.id} visible={loading || e.id === activeId}>
+          <e.World active={e.id === activeId} />
+        </group>
       ))}
     </>
   );

@@ -16,7 +16,10 @@ export interface EpisodeSpan {
 }
 
 /** Built episodes, in order. Add the next ones here as they are made. */
-export const EPISODE_SPANS: EpisodeSpan[] = [{ id: 'station', length: 9 }];
+export const EPISODE_SPANS: EpisodeSpan[] = [
+  { id: 'station', length: 9 },
+  { id: 'city', length: 11 },
+];
 /** Scroll after the last episode, for the "to be continued" card. */
 export const OUTRO_LENGTH = 1.2;
 
@@ -72,7 +75,34 @@ export function scrollToProgress(p: number, smooth = true) {
   window.scrollTo({ top: clamp(p, 0, 1) * max, behavior: smooth ? 'smooth' : 'auto' });
 }
 
+/**
+ * Gates hold the story at a point until something happens there (an
+ * interaction). While a gate is closed, scrolling further does not advance the
+ * progress past it; opening it is permanent, so scrolling back and forth never
+ * re-arms the moment.
+ */
+export interface Gate {
+  episode: EpisodeId;
+  /** Local progress of the episode where the story waits. */
+  at: number;
+  open: boolean;
+}
+export const gates: Gate[] = [];
+
+export function globalProgress(id: EpisodeId, local: number) {
+  const r = episodeRange(id);
+  return r.start + (r.end - r.start) * local;
+}
+
+/** The furthest progress currently allowed by closed gates. */
+export function gateLimit() {
+  let limit = 1;
+  for (const g of gates) if (!g.open) limit = Math.min(limit, globalProgress(g.episode, g.at));
+  return limit;
+}
+
 export function readScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
-  timeline.target = max > 0 ? clamp(window.scrollY / max, 0, 1) : 0;
+  const raw = max > 0 ? clamp(window.scrollY / max, 0, 1) : 0;
+  timeline.target = Math.min(raw, gateLimit());
 }

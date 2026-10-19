@@ -55,6 +55,11 @@ body { cursor: pointer; }
   transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
 }
 .title.is-on { opacity: 1; transform: none; transition-delay: 0.6s; }
+.title-brand {
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.42em;
+  color: var(--paper);
+}
 .title-kicker {
   font: 500 11px/1 var(--mono);
   letter-spacing: 0.22em;
@@ -186,33 +191,14 @@ body { cursor: pointer; }
 }
 .rail li.is-built { color: var(--paper); }
 
-/* --- ink wipe and outro ------------------------------------------------- */
-.wipe {
-  --w: 0;
+/* --- ink wipe (canvas brush strokes) and outro ------------------------- */
+.wipe,
+.impact {
   position: absolute;
   inset: 0;
-  overflow: hidden;
-}
-/* solid ink, led by a halftone fringe like the edge of a printed panel */
-.wipe::before,
-.wipe::after {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-}
-.wipe::before {
-  left: 0;
-  width: calc(var(--w) * 100%);
-  background: var(--ink);
-}
-.wipe::after {
-  left: calc(var(--w) * 100% - 1px);
-  width: 22vw;
-  background: radial-gradient(circle, var(--ink) 46%, transparent 49%) 0 0 / 10px 10px;
-  -webkit-mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.55) 40%, transparent 100%);
-  mask-image: linear-gradient(90deg, #000 0%, rgba(0, 0, 0, 0.55) 40%, transparent 100%);
-  opacity: min(1, calc(var(--w) * 20));
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 .outro {
   position: absolute;
@@ -226,13 +212,80 @@ body { cursor: pointer; }
   transition: opacity 0.8s var(--ease);
 }
 .outro.is-on { opacity: 1; }
-.outro p {
-  margin: 0;
-  font: 400 13px/1 var(--mono);
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--grey);
+.outro .title-name { font-size: clamp(48px, 8vw, 120px); }
+
+/* --- the one action the story asks for ---------------------------------- */
+.act {
+  position: absolute;
+  left: 50%;
+  bottom: max(18vh, 110px);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px 26px 16px;
+  border: 0;
+  background: var(--ink);
+  color: var(--paper);
+  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.55);
+  transform: translate(-50%, 10px) rotate(-1.5deg);
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
 }
+.act.is-on {
+  opacity: 1;
+  transform: translate(-50%, 0) rotate(-1.5deg);
+  pointer-events: auto;
+  transition-delay: 0.6s;
+}
+.act::before {
+  /* a strip of tape holding the panel down */
+  content: '';
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 70px;
+  height: 18px;
+  background: rgba(245, 210, 26, 0.85);
+  transform: translateX(-50%) rotate(4deg);
+}
+.act-word {
+  font: 400 clamp(48px, 9vw, 92px)/0.9 var(--display);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+.act-hint {
+  padding-bottom: 3px;
+  border-bottom: 2px solid var(--yellow);
+  font: 600 11px/1 var(--mono);
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+.act:focus-visible { outline: 2px dashed var(--yellow); outline-offset: 6px; }
+.act.is-on .act-hint { animation: breathe 2.4s ease-in-out 1.4s infinite; }
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.sound {
+  position: absolute;
+  top: max(20px, env(safe-area-inset-top, 0px));
+  right: max(22px, env(safe-area-inset-right, 0px));
+  padding: 6px 0;
+  border: 0;
+  border-bottom: 1px solid rgba(241, 240, 233, 0.35);
+  background: none;
+  color: rgba(241, 240, 233, 0.75);
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  pointer-events: auto;
+  cursor: pointer;
+}
+.sound[aria-pressed='true'] { border-bottom-color: var(--yellow); }
+.sound:focus-visible { outline: 1px dashed var(--yellow); outline-offset: 4px; }
 
 @media (max-width: 640px) {
   .rail { display: none; }
@@ -242,5 +295,6 @@ body { cursor: pointer; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cue i { animation: none; }
+  .cue i,
+  .act.is-on .act-hint { animation: none; }
 }
