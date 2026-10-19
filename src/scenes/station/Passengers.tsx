@@ -53,7 +53,7 @@ export function Passengers() {
         // blend into the gait as they get going; the cycle is locked to distance walked
         const walk = f.target;
         const idle: Pose = { ...walk };
-        walkPose(walk, st.phase, Math.max(k, clamp(st.turn / 3, 0, 0.35)), def.gait ?? { swing: 0.8, lean: 0.03, stride: 1 });
+        walkPose(walk, st.phase, Math.max(k, clamp(st.turn / 3, 0, 0.35)), def.gait ?? { swing: 0.8, lean: 0.03, stride: 1 }, def.look.height / 1.75);
         // keep the head of a walker roughly forward, but let idle glances fade out
         for (const key of Object.keys(walk) as (keyof Pose)[]) walk[key] = idle[key] + (walk[key] - idle[key]) * Math.min(1, k * 3 + 0.4);
         // walking poses follow the phase directly (no lag), idle details ease in

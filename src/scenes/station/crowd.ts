@@ -1,6 +1,6 @@
 import { clamp } from '../../core/math';
 import type { Look } from '../../characters/figure';
-import type { Activity } from '../../characters/pose';
+import { STRIDE_M, type Activity } from '../../characters/pose';
 import { BENCH_Z } from './props';
 import { MAST_X } from './layout';
 import { OBSTACLES, PERSON_RADIUS, clearance, isFree, validatePath } from './nav';
@@ -303,7 +303,7 @@ export function stepCrowd(c: Crowd, dt: number, scrollT: number, visitor: { x: n
     // walk cycle driven by distance actually covered (no foot sliding, stops when they stop)
     const moved = Math.hypot(st.x - prevX, st.z - prevZ);
     if (b.kind === 'scroll') st.speed = moved / Math.max(dt, 1e-4);
-    st.phase += (moved / 0.72) * Math.PI;
+    st.phase += (moved / STRIDE_M) * Math.PI * 2;
     const turned = Math.abs(lerpAngle(prevYaw, st.yaw, 1) - prevYaw);
     st.turn = turned / Math.max(dt, 1e-4);
     if (moved < 1e-4) st.phase += turned * 1.2; // shuffle the feet while turning
