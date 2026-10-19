@@ -49,7 +49,8 @@ float comicDot(vec2 frag, float cell) {
 
 // grain of a soft pencil / charcoal: for the lighter transitions
 float comicGrain(vec2 frag) {
-  return comicNoise2(frag / 2.2) * 0.55 + comicNoise2(frag / 7.0) * 0.45;
+  // smudge scale, not pixel speckle: soft clumps a few pixels across
+  return comicNoise2(frag / 5.0) * 0.5 + comicNoise2(frag / 17.0) * 0.5;
 }
 
 float comicHatch(vec2 frag, float cell) {
@@ -77,8 +78,8 @@ float comicTone(float lum, float dotv, float dark, float wobble) {
   float t;
   t = clamp((x - (T0 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L1, step(dark, t * 0.72));
   t = clamp((x - (T1 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L2, step(dark, t * 0.72));
-  t = clamp((x - (T2 - W * 1.4)) / (2.8 * W), 0.0, 1.0); lvl = mix(lvl, L3, step(dotv, t));
-  t = clamp((x - (T3 - W * 1.4)) / (2.8 * W), 0.0, 1.0); lvl = mix(lvl, L4, step(dotv, t));
+  t = clamp((x - (T2 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L3, step(dotv, t));
+  t = clamp((x - (T3 - W)) / (2.0 * W), 0.0, 1.0); lvl = mix(lvl, L4, step(dotv, t));
   // light sources and lamp-lit highlights keep their HDR value so bloom still finds them
   return lum > 1.25 ? lum : lvl;
 }

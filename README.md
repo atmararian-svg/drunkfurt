@@ -35,26 +35,54 @@ scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) 
 
 ## People in the station
 
-`src/scenes/station/crowd.ts` simulates a small, purposeful crowd. `nav.ts` builds the
-walkable areas (platform behind the white lines, the concourse) and obstacle footprints from
-the same placement data the furniture is built from: masts, bins, benches, poster cases, the
-vending machine, the smoking area and the hall piers.
+**Figures** (`src/characters/`) are illustrated people, not capsule mannequins:
 
-- **Lanes**: people walk fixed routes back and forth, pausing at each end, then turn in place
-  before setting off again, so nobody slides sideways. Each walker has its own strip of floor,
-  and the concourse lanes run between the pier rows.
-- **Scroll routes**: the traveller who crosses in front of you follows a route around the
-  poster case. Their pose is a pure function of scroll position, so scrubbing back replays
-  it exactly.
-- **Giving way**: walkers slow down and wait for anyone in front of them, the visitor
-  included. After a while they step aside to a free spot and drift back once the way is
-  clear.
-- **Validation**: every route is checked at 5 cm steps against the obstacle map in dev
-  builds, with a console warning on any failure.
-- **Walk cycle**: knees, elbows, feet and lean are driven by distance actually walked, so
-  the feet match the ground speed.
+- `anatomy.ts` builds organic body parts:
+  - limbs are turned profiles that taper and swell at calves and forearms;
+  - the torso has a chest, a waist and rounded deltoid shoulders;
+  - the head has a skull, jaw, nose, ears and hair or hats;
+  - hands are mittens with thumbs, and the shoes sit flat on the ground.
+- Outfits change the silhouette: coat, parka, jacket, hoodie, dress. Props include a
+  backpack, shoulder bag, tote, rolling suitcase and phone. Builds vary from slim to broad
+  and soft, and heights from 1.62 m to 1.86 m.
+- `figure.ts` assembles a joint hierarchy (hips → spine → neck/head and shoulders → elbows →
+  wrists, plus hips → knees → ankles). Each segment is a single merged mesh with vertex
+  colours, so one material covers everyone.
+- `pose.ts` poses figures by activity:
+  - waiting, hands in pockets, a phone in hand, a phone at the ear;
+  - talking and listening (arms folded, nodding), looking up at the board;
+  - smoking, adjusting a backpack, sitting, resting a hand on a suitcase.
+- Standing figures shift their weight between legs, breathe, and glance around. Gestures
+  come from a deterministic event scheduler, so two people never move in sync.
+- The walk is built from a gait cycle:
+  - heel strike, a flexed knee in swing, a flat foot in stance and a push-off;
+  - pelvis rotation and drop, with shoulders counter-rotating and arms swinging softly;
+  - the hips are placed so the stance foot stays on the floor, and the cycle advances by
+    distance walked.
+- People draw only silhouette ink lines (contour and overlaps), so figures read as clean
+  shapes.
 
-## Rendering: printed comic, real 3D underneath
+**The cast** (`src/scenes/station/crowd.ts`) is mostly stationary:
+
+- two colleagues talking, someone looking up at the destination display, a smoker, someone
+  on a call, someone on their phone;
+- two people on a bench, a traveller adjusting a backpack, someone waiting with a suitcase;
+- two people under the concourse board;
+- only a few walk: the traveller who crosses in front of you (driven by scroll), one person
+  with a rolling suitcase, a commuter, and two people in the concourse.
+
+**Paths and obstacles**: `nav.ts` builds the walkable areas (the platform behind the white
+lines, the concourse) and obstacle footprints from the same placement data the furniture is
+built from.
+
+- Every spot and route is validated against the obstacle map, with a console warning in dev
+  builds.
+- Walkers keep to their own strip of floor and slow down or wait for anyone in their way.
+  After a while they step aside to a free spot.
+- The scroll-driven traveller's pose is a pure function of scroll position, so scrubbing back
+  replays it exactly.
+
+## Rendering: an illustrated world with real depth
 
 - **Tonal bands** (`src/render/comic.ts`): every lit material keeps three's lighting and
   shadows. Its final colour is quantised into five printed tones: ink, charcoal, mid, light
@@ -72,8 +100,16 @@ vending machine, the smoking area and the hall piers.
   only from ink geometry. Silhouettes are heavy, creases are lighter, and both thin and fade
   with distance. Glows, displays, light spill, dust and sky never get outlines. Objects opt out
   with `userData.ink = false`.
-- **Grade**: no filmic tone mapping (paper white stays white), a little bloom on light sources
-  only, a vignette and fine paper grain. Textures were flattened so they print as flat fills.
+- **Hand-drawn quality**: band edges wander with low-frequency world-space noise, like a brush.
+  Lighter transitions have a soft charcoal grain, and shadow transitions use coarse halftone
+  dots with slight jitter. Ink lines change width like pen pressure, redraw their wobble four
+  times a second, and break now and then like dry ink.
+- **Paper**: fibre and tooth over the whole frame, with highlights tinted towards paper.
+- **Grade**: no filmic tone mapping, so paper white stays white. A little bloom on light
+  sources only, and a vignette.
+- **Simplified world**: roof ribs are two clean chords (no lattice), with fewer purlins and no
+  catenary droppers. The floor has large slabs with soft joints. Textures print as flat fills.
+- **Captions** are cut-paper strips held down with yellow tape.
 
 ## What is in Episode 1
 

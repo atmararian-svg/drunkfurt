@@ -129,14 +129,14 @@ function build() {
  * only masonry and undercarriage take hatching.
  */
 const PRINT: Partial<Record<keyof ReturnType<typeof build>, ComicOptions>> = {
-  roofGlass: { halftone: 0.25 },
+  roofGlass: { halftone: 0 },
   roofSheet: { halftone: 0 },
-  trainBody: { halftone: 0.55 },
-  trainBodyDirty: { halftone: 0.55 },
+  trainBody: { halftone: 0.35 },
+  trainBodyDirty: { halftone: 0.35 },
   trainInterior: { halftone: 0.5 },
   trainTrim: { halftone: 0 },
   trainUnder: { hatch: true },
-  platform: { halftone: 0.8 },
+  platform: { halftone: 0.6 },
   platformEdge: { halftone: 0.4 },
   platformSide: { hatch: true },
   pier: { hatch: true },

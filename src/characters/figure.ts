@@ -210,7 +210,11 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
   R.wr.add(phone);
 
   if (look.carry === 'tote') {
-    addMesh(R.wr, [paint(place(box(0.05, 0.3, 0.28), [0, -0.25, 0]), accent), paint(place(rod(0.18, 0.006), [0, -0.08, 0]), accent)], mat);
+    // carried on the left shoulder: strap over the shoulder, bag against the hip (rests on the lap when sitting)
+    addMesh(spine, [
+      paint(place(ellipsoid(0.045, 0.15, 0.15), [-(shX + 0.03), -0.05, 0.02], [0, 0, 0.08]), accent),
+      paint(place(rod(0.44, 0.007), [-(shX - 0.01), 0.18, 0.05], [0, 0, 0.06]), accent),
+    ], mat);
   }
 
   let suitcase: Group | undefined;

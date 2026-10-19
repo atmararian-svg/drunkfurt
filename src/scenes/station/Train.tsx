@@ -64,7 +64,7 @@ export function Train({ trackX, spec, variant = 0, headlights = true, leafRef }:
     };
     // windows print as clean shapes: no dots across the glass
     for (const k of ['winLit', 'winDark', 'partition']) map[k].userData.comic = { halftone: 0 };
-    nose.userData.comic = { halftone: 0.55 };
+    nose.userData.comic = { halftone: 0.35 };
     return map;
   }, [variant]);
 
