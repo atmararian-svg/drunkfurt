@@ -11,7 +11,9 @@ import { drawBrushWipe, drawImpact } from './brush';
 function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
   const { id, local } = locate(p);
   if (id === 'outro') return { w: 1, mode: 'close' };
-  if (local > 0.955) return { w: (local - 0.955) / 0.045, mode: 'close' };
+  // the city's last shot (the aftermath) holds longer before the page turns
+  const end = id === 'city' ? 0.978 : 0.955;
+  if (local > end) return { w: (local - end) / (1 - end), mode: 'close' };
   const first = EPISODE_SPANS[0].id === id;
   if (!first && local < 0.045) return { w: 1, mode: 'open' };
   if (!first && local < 0.12) return { w: 1 - (local - 0.045) / 0.075, mode: 'open' };

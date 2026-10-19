@@ -26,7 +26,9 @@ function build() {
     rail: std({ color: '#8c8c8c', roughness: 0.3, metalness: 0.8 }, { halftone: 0 }),
     stationStone: std({ color: '#6f6d68', roughness: 0.9 }, { hatch: true }),
     stationFloor: std({ color: '#2b2b2b', roughness: 0.9 }, { halftone: 0 }),
-    facade: [0, 1, 2, 3].map((v) => std({ map: tex.facade(v), roughness: 0.9 }, { halftone: 0.4 })),
+    // facades glow faintly from their own texture so the drawn windows read in the dark,
+    // and the few lit windows stand out
+    facade: [0, 1, 2, 3].map((v) => std({ map: tex.facade(v), emissiveMap: tex.facade(v), emissive: new Color('#ffffff'), emissiveIntensity: 0.16, roughness: 0.9 }, { halftone: 0.4 })),
     shops: [0, 1].map((v) => std({ map: tex.shopfronts(v), emissiveMap: tex.shopfronts(v), emissive: new Color('#ffffff'), emissiveIntensity: 0.22, roughness: 0.8 }, { halftone: 0.3 })),
     plaster: std({ color: '#5a5955', roughness: 0.95 }, { hatch: true }),
     slate: std({ map: tex.slate(), roughness: 0.8 }, { halftone: 0 }),

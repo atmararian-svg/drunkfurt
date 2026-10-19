@@ -54,21 +54,22 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     const p = st.target;
 
     if (resolved && local >= BEAT.cut) {
-      // aftermath: on his back on the pavement, one knee up, head turned away
+      // aftermath: flat on his back on the pavement, one arm flung out, one knee up, head turned away.
+      // The body group pivots at the hips here, so he lies on the ground instead of rotating around his feet.
       j.root.position.set(DOWN.x, 0, DOWN.z);
       j.root.rotation.y = DOWN.yaw;
-      j.body.rotation.x = -Math.PI / 2 + 0.06;
-      j.body.position.set(0, 0.12, 0);
       const q = restPose();
-      Object.assign(q, { shLr: 1.15, shRr: 0.45, shLp: -0.2, elL: -0.5, elR: -1.25, hipLp: -0.42, kneeL: 0.85, hipRp: 0.04, kneeR: 0.08, headYaw: 0.75, headPitch: -0.1, ankleL: 0.2 });
+      Object.assign(q, { shLr: 1.25, shLp: 0, elL: -0.35, shRr: 0.2, shRp: 0.1, elR: -0.6, hipLp: -0.55, kneeL: 1.1, ankleL: 0.35, hipRp: 0.02, kneeR: 0.12, headYaw: 0.8, headPitch: 0 });
       Object.assign(st.pose, q);
       applyPose(j, st.pose);
-      j.hips.position.set(0, 0.95, 0);
+      j.hips.position.set(0, 0, 0);
+      j.body.position.set(0, 0.11, 0);
+      j.body.rotation.set(-Math.PI / 2, 0, 0);
       encounter.stranger.x = DOWN.x;
       encounter.stranger.z = DOWN.z;
       return;
     }
-    j.body.rotation.x = 0;
+    j.body.rotation.set(0, 0, 0);
     j.body.position.set(0, 0, 0);
 
     // how far along his route: scroll-driven, decelerating towards you, then creeping

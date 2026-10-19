@@ -78,7 +78,7 @@ function addBuilding(b: GeoBatch, x0: number, x1: number, z0: number, z1: number
   const upperH = floors * FLOOR;
   // a hair out of true, like a hand-drawn building
   const lean: [number, number, number] = [(rnd() - 0.5) * 0.006, 0, (rnd() - 0.5) * 0.006];
-  b.add(shops ? `shops${variant % 2}` : 'plaster', facadeBox(w, GROUND, d, SHOP_W / 10, GROUND), compose([cx, GROUND / 2, cz], lean));
+  b.add(shops ? `shops${variant % 2}` : 'plaster', facadeBox(w, GROUND, d, SHOP_W, GROUND), compose([cx, GROUND / 2, cz], lean));
   b.add(`facade${variant}`, facadeBox(w, upperH, d, TILE_W, (FLOOR * 5)), compose([cx, GROUND + upperH / 2, cz], lean));
   const top = GROUND + upperH;
   // cornice
