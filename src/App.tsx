@@ -69,7 +69,7 @@ export function App() {
         },
         /** Jump straight to a global progress value, without smoothing. */
         setProgress(p: number) {
-          stopAutoplay();
+          stopAutoplay(true);
           scrollToProgress(p, false);
           readScroll();
           timeline.progress = timeline.target;

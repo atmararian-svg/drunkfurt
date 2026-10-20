@@ -98,7 +98,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     // he leans and steps into it
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
-    const step = 0.22 * reach;
+    const step = 0.4 * reach;
     root.position.set(pos.x + fx * step, 0, pos.z + fz * step);
     root.rotation.y = yaw;
 
@@ -106,6 +106,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     const pace = walkPace(walkU);
     const phase = START_PHASE + (s / rig.stride) * Math.PI * 2;
     rig.stand(phase, pace);
+    rig.lean(0.3 * reach + 0.06 * raise);
     root.updateMatrixWorld(true);
     const body = (bx: number, by: number, bz: number, out: Vector3) => out.set(bx, by, bz).applyMatrix4(root.matrixWorld);
 
@@ -130,9 +131,8 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       const pole = body(-0.9, -0.7, -0.4, new Vector3()).sub(root.position);
       rig.rightHand(rightFK.lerp(handAt, hands), dir, pole);
       // close in on the exact tip position (the grip sits a little off the wrist)
-      if (reach > 0) {
-        const tip = rig.tip(new Vector3());
-        const err = tipAt.clone().sub(tip).multiplyScalar(reach);
+      for (let i = 0; i < 2 && reach > 0; i++) {
+        const err = tipAt.clone().sub(rig.tip(new Vector3())).multiplyScalar(reach);
         rig.rightHand(handAt.add(err), dir, pole);
       }
     }

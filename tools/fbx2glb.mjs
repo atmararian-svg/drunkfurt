@@ -27,6 +27,17 @@ obj.traverse((o) => {
   o.material = mats.length === 1 ? mats[0] : mats;
 });
 remove.forEach((o) => o.parent.remove(o));
+// FBXLoader makes one bone per skin cluster: a joint used by several meshes becomes a chain of
+// same-named bones, each child of the last with an identity transform, and only the outermost is
+// animated. Every mesh is bound to the outermost, and the inner copies are removed.
+const outer = (b) => { while (b.parent?.isBone && b.parent.name === b.name) b = b.parent; return b; };
+obj.traverse((o) => {
+  if (!o.isSkinnedMesh) return;
+  o.bind(new THREE.Skeleton(o.skeleton.bones.map(outer), o.skeleton.boneInverses), o.bindMatrix);
+});
+const inner = [];
+obj.traverse((o) => { if (o.isBone && o.parent?.isBone && o.parent.name === o.name) inner.push(o); });
+inner.forEach((o) => o.parent.remove(o));
 const clip = obj.animations[0];
 clip.name = 'walk';
 const result = await new GLTFExporter().parseAsync(obj, { binary: true, animations: [clip], onlyVisible: false });

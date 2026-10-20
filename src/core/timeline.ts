@@ -68,25 +68,71 @@ export function localProgress(id: EpisodeId, p = timeline.progress) {
  * downstream still reads the one progress value. Wall-clock timed, so a slow
  * frame rate cannot stretch it. Any input from the visitor stops it where it is.
  */
-export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0 };
+export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, locked: false };
 
-export function playProgress(from: number, to: number, seconds: number) {
-  Object.assign(autoplay, { active: true, from, to, seconds, start: performance.now() });
+/** `locked`: the visitor's scrolling does not stop it (a page turn always completes). */
+export function playProgress(from: number, to: number, seconds: number, locked = false) {
+  Object.assign(autoplay, { active: true, from, to, seconds, start: performance.now(), locked });
 }
 
-export function stopAutoplay() {
+/** Stops a scripted move, unless it is a page turn. */
+export function stopAutoplay(force = false) {
+  if (autoplay.locked && !force) return;
   autoplay.active = false;
+  autoplay.locked = false;
+}
+
+/**
+ * Page turns between episodes, in global progress: the ink closes over the end
+ * of one episode, the next title shows, the ink opens on the next. They play by
+ * themselves: once the progress enters one, it is carried through to the far
+ * side in the direction the visitor was going (to the next episode going
+ * forward, back to the last shot going back), and scrolling cannot stop it
+ * halfway.
+ */
+interface PageTurn { from: number; to: number; seconds: number }
+let turns: PageTurn[] | null = null;
+function pageTurns(): PageTurn[] {
+  if (turns) return turns;
+  turns = [];
+  let start = 0;
+  EPISODE_SPANS.forEach((e, i) => {
+    const len = e.length / TOTAL_LENGTH;
+    const next = start + len;
+    const last = i === EPISODE_SPANS.length - 1;
+    // where the ink starts to close (as in the overlay), and where it has opened on the next shot
+    const close = start + len * (e.id === 'city' ? 0.978 : 0.955);
+    const open = last ? next + (1 - next) * 0.2 : next + (EPISODE_SPANS[i + 1].length / TOTAL_LENGTH) * 0.12;
+    turns!.push({ from: close, to: open, seconds: last ? 2.2 : 3.4 });
+    start = next;
+  });
+  return turns;
+}
+
+/** Starts a page turn if the progress has just moved into one. */
+function turnPage() {
+  const p = timeline.progress;
+  for (const z of pageTurns()) {
+    if (p <= z.from || p >= z.to) continue;
+    // the way the visitor is going; standing still inside one (a jump), the nearer side
+    const forward = timeline.target !== p ? timeline.target > p : p - z.from > z.to - p;
+    if (forward && gateLimit() < z.to) return;
+    const edge = forward ? z.to : z.from;
+    playProgress(p, edge, Math.max(0.35, (z.seconds * Math.abs(edge - p)) / (z.to - z.from)), true);
+    return;
+  }
 }
 
 export function stepTimeline(dt: number) {
   const prev = timeline.progress;
+  if (!autoplay.active) turnPage();
   if (autoplay.active) {
     const u = clamp((performance.now() - autoplay.start) / 1000 / autoplay.seconds, 0, 1);
     const p = autoplay.from + (autoplay.to - autoplay.from) * u;
     timeline.target = timeline.progress = p;
     const max = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo({ top: p * max, behavior: 'auto' });
-    if (u >= 1) autoplay.active = false;
+    if (u >= 1) autoplay.active = autoplay.locked = false;
     timeline.velocity = damp(timeline.velocity, (p - prev) / Math.max(dt, 1e-4), 8, dt);
     return;
   }
@@ -130,6 +176,8 @@ export function gateLimit() {
 
 export function readScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
-  const raw = max > 0 ? clamp(window.scrollY / max, 0, 1) : 0;
+  let raw = max > 0 ? clamp(window.scrollY / max, 0, 1) : 0;
+  // a page turn ends exactly on its edge: the scroll position's rounding must not land back inside it
+  for (const z of pageTurns()) for (const edge of [z.from, z.to]) if (Math.abs(raw - edge) < 0.0015) raw = edge;
   timeline.target = Math.min(raw, gateLimit());
 }

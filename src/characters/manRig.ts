@@ -43,6 +43,8 @@ export interface ManRig {
   groundKnife: Object3D;
   /** Pose: the captured walk at `phase` blended over his stance by `walk` (0..1). */
   stand(phase: number, walk: number): void;
+  /** Leans his upper body forward from the hips by `a` radians (into a thrust). */
+  lean(a: number): void;
   /** Turns head and neck towards a world point (weight 0..1, limited like a neck can). */
   look(target: Vector3, w: number): void;
   /** Right hand to a world point with the blade pointing along `dir`; elbow towards `pole`. */
@@ -134,6 +136,9 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   const list = [...bones.values()];
   const rest = list.map((b) => b.quaternion.clone());
   const restHips = bone('Hips').position.clone();
+  const ankles = [bone('LeftFoot'), bone('RightFoot')];
+  root.updateMatrixWorld(true);
+  const restAnkle = Math.min(...ankles.map((b) => b.getWorldPosition(new Vector3()).y));
 
   // --- his walk, sampled at will; and his stance, taken from the walk where both feet are down
   const clip = gltf.animations[0];
@@ -300,8 +305,18 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
         const w = Math.max(0, walk);
         list.forEach((b, i) => b.quaternion.copy(stance.q[i]).slerp(QA.copy(b.quaternion), w));
         bone('Hips').position.lerpVectors(stance.hips, bone('Hips').position.clone(), w);
+        // standing, his legs are straighter than mid-stride: back up onto his feet
+        root.updateMatrixWorld(true);
+        const low = Math.min(...ankles.map((b) => b.getWorldPosition(D).y));
+        model.position.y = (restAnkle - low) * (1 - w);
       }
       root.updateMatrixWorld(true);
+    },
+    lean(a) {
+      if (a === 0) return;
+      root.getWorldQuaternion(QA);
+      const side = C.set(1, 0, 0).applyQuaternion(QA);
+      for (const [n, share] of [['Spine', 0.5], ['Spine1', 0.3], ['Spine2', 0.2]] as const) turnWorld(bone(n), new Quaternion().setFromAxisAngle(side, a * share));
     },
     look(target, w) {
       if (w <= 0) return;
