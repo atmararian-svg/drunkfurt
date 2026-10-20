@@ -156,9 +156,9 @@ built from.
 | Across the zebra crossing and down the right sidewalk | 0.40–0.60 |
 | He notices you, leaves a doorway ahead and walks at you, eyes on you | 0.56–0.735 |
 | He stops square in front of you; his face hardens; he shifts his weight | 0.735–0.80 |
-| He draws a knife and raises it | 0.74–0.822 |
+| He draws a knife and holds it on you: "Your bag. Give it to me. Now." | 0.74–0.83 |
 | He commits: the city drops to a tenth of real speed | 0.822 |
-| DEFEND, CLICK TO DEFEND: the blade keeps coming in slow motion; the story waits here | 0.83 |
+| DEFEND, CLICK TO DEFEND: he stands and threatens in slow motion; the story waits here | 0.83 |
 | Black; BAM! WHAM!; the page opens on him lying on the pavement | real time, ~2 s |
 
 - **The world**:
@@ -199,10 +199,13 @@ built from.
   - He is printed in greys (`mono` in `render/comic.ts`) like everyone in the city, with a
     selective ink silhouette (none on the hair cards).
 - **The knife** (`src/assets/knife.glb`, supplied) sits in his right hand, the fingers closed round
-  the handle. He draws it as he squares up, raises it to his chest as he winds up, and as the
-  city slows he steps and leans in and brings it at you: two-bone IK on his arm puts the hand
-  where the blade's tip ends 24 cm in front of your eyes, inside the frame. If you never defend,
-  he lowers it after the hit.
+  the handle. He draws it as he squares up and raises it in front of his belly, the blade
+  pointing up at your face, and holds it there: two-bone IK on his arm places the hand, and the
+  wrist turns the blade towards you with about 30° of bend, a hold a real wrist takes without
+  strain. He does not strike; a speech balloon (`tone: 'speech'` captions) carries what he
+  says: "Your bag. Give it to me. Now."
+- **His walk blends into his stance** by pace: the captured walk is sampled first and the
+  stance blended over it, so his legs swing at every speed, slowing into the stop.
 - **The encounter** (`encounter.ts`) is drawn as a function of the scroll progress. The
   only thing it remembers is the visitor's decision at the gate. `encounterAt(local)` gives the
   stranger, the camera, the bag, the overlay and the soundscape everything they draw
@@ -212,8 +215,8 @@ built from.
   | --- | --- |
   | 0.60–0.735 | he walks up |
   | 0.735–0.80 | he squares up and holds your eye; the knife comes out |
-  | 0.80–0.822 | he raises it |
-  | 0.822–0.83 | he commits; time slows to a tenth |
+  | 0.80–0.822 | he raises it and holds it on you; he tells you to hand over your bag |
+  | 0.822–0.83 | time slows to a tenth |
   | 0.83 | DEFEND: the story waits for your click ("Click to defend") |
   | 0.83–0.905 | the outcome, spread over this stretch of the scroll |
   | 0.905–1 | the aftermath |
@@ -223,17 +226,17 @@ built from.
     (`drawHits` in `ui/brush.ts`): BAM! and WHAM! burst in on jagged paper stars, each with its
     sound. When the ink opens again he is on his back on the pavement, the knife beside his
     hand, and your bag is still with you.
-  - **Knocked out** (you never click): the blade comes up to your face, a blow lands, the picture snaps, the eyelids close in
-    ragged ink, and the camera falls sideways to the pavement. When you come to, he is gone and
-    the bag lies next to you.
+  - **Knocked out** is switched off for now (`STRIKES` in `encounter.ts`): he never strikes, and
+    the story waits at the gate until you defend. Its sequence is kept: with `STRIKES` on, the
+    blade reaches you 3.7 s after the prompt, a blow lands, the eyelids close in ragged ink, the
+    camera falls to the pavement, and when you come to he is gone and the bag lies next to you.
   - Once you decide, the page plays the outcome by moving the progress itself (`playProgress` in
     `core/timeline.ts`, wall-clock timed). Scrolling yourself takes over at once. Every frame of
     the fight is a position on the scroll, so scrolling back rewinds it: into the middle of the
     fight you see that moment, and before he walks up he is back in his doorway. Scrolling
     forward again replays the same outcome. The prompt does not come back once you have decided.
-  - The only part that runs on real time is the DEFEND window: the blade keeps coming for
-    3.7 s while the story waits. Scroll back before the gate and the window closes; the moment
-    is postponed, not decided.
+  - The DEFEND prompt waits as long as you like. Scroll back before the gate and it closes;
+    the moment is postponed, not decided.
   - Sounds are cues fired as the playback crosses them, forwards only. They never feed back
     into what is drawn, and scrubbing never repeats them.
 - **Time**: everything in the city (people, cars, the stranger) runs on a time scale that eases

@@ -47,8 +47,11 @@ export interface ManRig {
   lean(a: number): void;
   /** Turns head and neck towards a world point (0 not at all … 1 the face square on it). */
   look(target: Vector3, w: number): void;
-  /** Right hand to a world point with the blade pointing along `dir`; elbow towards `pole`. */
-  rightHand(target: Vector3, dir: Vector3, pole: Vector3): void;
+  /**
+   * Right hand to a world point, elbow towards `pole`; the wrist then turns the
+   * blade a share `turn` (0..1) of the way from where the arm holds it towards `dir`.
+   */
+  rightHand(target: Vector3, dir: Vector3, pole: Vector3, turn?: number): void;
   leftHand(target: Vector3, pole: Vector3): void;
   /** Fingers closed round the knife handle (0 open … 1 gripping). */
   grip(w: number): void;
@@ -305,7 +308,11 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       mixer.setTime(((((HEEL_STRIKE + (phase / (Math.PI * 2)) * clip.duration) % clip.duration) + clip.duration) % clip.duration));
       if (walk < 1) {
         const w = Math.max(0, walk);
-        list.forEach((b, i) => b.quaternion.copy(stance.q[i]).slerp(QA.copy(b.quaternion), w));
+        // stance → walk: the walk pose has to be read before the stance is written over it
+        list.forEach((b, i) => {
+          QA.copy(b.quaternion);
+          b.quaternion.copy(stance.q[i]).slerp(QA, w);
+        });
         bone('Hips').position.lerpVectors(stance.hips, bone('Hips').position.clone(), w);
         // standing, his legs are straighter than mid-stride: back up onto his feet
         root.updateMatrixWorld(true);
@@ -330,12 +337,12 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
         turnWorld(b, new Quaternion().slerp(QB, Math.min(1, w) * share));
       }
     },
-    rightHand(target, dir, pole) {
+    rightHand(target, dir, pole, turn = 1) {
       twoBone(bone('RightArm'), bone('RightForeArm'), hand, target, pole);
       // the blade (the hand's +x) along `dir`
       hand.getWorldQuaternion(QA);
       const blade = C.set(1, 0, 0).applyQuaternion(QA).normalize();
-      turnWorld(hand, new Quaternion().setFromUnitVectors(blade, D.copy(dir).normalize()));
+      turnWorld(hand, new Quaternion().slerp(QB.setFromUnitVectors(blade, D.copy(dir).normalize()), turn));
     },
     leftHand(target, pole) {
       twoBone(bone('LeftArm'), bone('LeftForeArm'), bone('LeftHand'), target, pole);

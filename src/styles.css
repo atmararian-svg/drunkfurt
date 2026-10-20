@@ -110,6 +110,41 @@ body { cursor: pointer; }
 .caption::after { bottom: -8px; right: 18px; width: 38px; transform: rotate(6deg); }
 .caption--yellow::before,
 .caption--yellow::after { background: rgba(241, 240, 233, 0.75); mix-blend-mode: normal; }
+/* a speech balloon: his words, with a tail down towards him */
+.caption--speech {
+  padding: 14px 20px 15px;
+  border-radius: 50% / 46%;
+  box-shadow: none;
+  transform: translateY(6px);
+}
+.caption--speech.is-on { transform: none; }
+.caption--speech p { font: 400 clamp(18px, 2.2vw, 24px)/1.15 var(--display); text-transform: uppercase; letter-spacing: 0.02em; text-align: center; }
+.caption--speech::before {
+  top: auto;
+  bottom: -26px;
+  left: 22%;
+  width: 0;
+  height: 0;
+  background: none;
+  border-style: solid;
+  border-width: 28px 26px 0 0;
+  border-color: var(--ink) transparent transparent transparent;
+  mix-blend-mode: normal;
+  transform: skewX(28deg);
+}
+.caption--speech::after {
+  bottom: -20px;
+  left: calc(22% + 4px);
+  right: auto;
+  width: 0;
+  height: 0;
+  background: none;
+  border-style: solid;
+  border-width: 22px 19px 0 0;
+  border-color: var(--paper) transparent transparent transparent;
+  mix-blend-mode: normal;
+  transform: skewX(28deg);
+}
 .caption p {
   margin: 0;
   font: 500 15px/1.38 var(--mono);

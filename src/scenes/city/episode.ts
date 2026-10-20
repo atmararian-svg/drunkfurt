@@ -103,6 +103,8 @@ export const cityEpisode: EpisodeDef = {
     { from: 0.3, to: 0.41, place: 'br', text: 'Banks at the end of the street. Everyone else down here.' },
     { from: 0.46, to: 0.58, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet.' },
     { from: 0.63, to: 0.72, place: 'bl', tone: 'yellow', text: 'Some people walk somewhere. He was walking at me.' },
+    // he says it with the knife on you, and keeps saying it while the story waits for you
+    { from: 0.79, to: 0.9, place: 'tr', tone: 'speech', text: 'Your bag. Give it to me. Now.', when: () => !encounter.outcome },
     { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', when: () => encounter.outcome === 'blocked' },
     { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'When I came to, he was gone. He did not even take the bag.', when: () => encounter.outcome === 'knockedOut' },
   ],

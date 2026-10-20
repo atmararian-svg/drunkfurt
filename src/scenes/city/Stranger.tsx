@@ -20,15 +20,6 @@ const DOWN = { x: 7.0, z: -36.3, yaw: 0.9 };
 export const BAG_SPOT = { x: 6.1, z: -35.3, yaw: 0.7 };
 /** Your eyes when he comes at you (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
-/**
- * Where the blade's tip ends when he holds it on you: this far in front of your
- * eyes (m), a little low and off to the left of the frame's centre, where the
- * DEFEND card does not cover it.
- */
-const TIP_NEAR = 0.3;
-const TIP_LEFT = 0.11;
-const TIP_LOW = 0.035;
-
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -38,11 +29,11 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
  * Everything he does is a function of the scroll position (encounter.ts):
  * he notices you and walks up with his own captured walk, its cycle locked to
  * the distance he covers; stops square in front of you; draws the knife;
- * raises it; and as the city slows to a tenth, brings it at you until the tip
- * is right in front of your eyes. If you defend, the page goes black before
- * anything is shown (the overlay prints the hits); when it opens again he is
- * on the pavement with the knife beside him. If you do not, he is gone when
- * you come to.
+ * raises it and holds it on you, the blade pointing up at your face, while he
+ * tells you to hand over your bag (a speech balloon, episode.ts). He does not
+ * strike. If you defend, the page goes black before anything is shown (the
+ * overlay prints the hits); when it opens again he is on the pavement with the
+ * knife beside him.
  */
 export function Stranger({ active }: { active: boolean; timeScale: () => number }) {
   const gltf = suspend(() => loadGlb(manUrl), ['drunkfurt-man']);
@@ -61,7 +52,6 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     const local = localProgress('city');
     const view = encounterAt(local);
     const t = view.t;
-    const ko = view.outcome === 'knockedOut';
     const root = rig.root;
 
     // after the fight: on the pavement (you defended), or gone (you went down). Only from the moment the
@@ -84,7 +74,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       return;
     }
     rig.groundKnife.visible = false;
-    if (ko && (t >= KO.dark || local >= BEAT.aftermath)) {
+    if (view.outcome === 'knockedOut' && (t >= KO.dark || local >= BEAT.aftermath)) {
       root.visible = false;
       if (key.current) key.current.visible = false;
       return;
@@ -100,24 +90,17 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     const doorway = lerp(-Math.PI / 2 + 0.35, toYou, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * 0.6);
     const yaw = walkU < 1 ? lerpAngle(doorway, pos.yaw, smoothstep(ramp(walkU, 0, 0.08))) : lerpAngle(pos.yaw, toYou, smoothstep(squared));
 
-    // --- the threat: the knife comes out, comes up, comes at you
+    // --- the threat: the knife comes out at his side, then comes up, held on you
     const draw = smoothstep(ramp(local, BEAT.confront, BEAT.confront + 0.03));
     const raise = smoothstep(ramp(local, BEAT.cock, BEAT.commit));
-    let thrust = view.punch; // 0..1: 1 = the tip right in front of your eyes
-    if (t >= 0 && ko) thrust = lerp(1, 0.35, smoothstep(ramp(t, 0.2, 1.0))); // after the hit he lowers it
-    const reach = Math.pow(thrust, 1.4);
-    // he leans and steps into it
-    const fx = Math.sin(yaw);
-    const fz = Math.cos(yaw);
-    const step = 0.4 * reach;
-    root.position.set(pos.x + fx * step, 0, pos.z + fz * step);
+    root.position.set(pos.x, 0, pos.z);
     root.rotation.y = yaw;
 
     // --- body: his walk (phase locked to the distance walked), easing into his stance as he stops
     const pace = walkPace(walkU);
     const phase = START_PHASE + (s / rig.stride) * Math.PI * 2;
     rig.stand(phase, pace);
-    rig.lean(0.22 * reach + 0.06 * raise);
+    rig.lean(0.06 * raise);
     root.updateMatrixWorld(true);
     const body = (bx: number, by: number, bz: number, out: Vector3) => out.set(bx, by, bz).applyMatrix4(root.matrixWorld);
 
@@ -125,38 +108,22 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     const hands = smoothstep(ramp(local, BEAT.stop, BEAT.confront + 0.02));
     if (hands > 0) {
       const leftFK = rig.bone('LeftHand').getWorldPosition(tmp.a);
-      const left = body(0.24, 0.98 + 0.12 * raise, 0.16 + 0.08 * raise, tmp.b);
+      const left = body(0.24, 0.98 + 0.08 * raise, 0.16 + 0.06 * raise, tmp.b);
       rig.leftHand(leftFK.lerp(left, hands), body(0.9, -0.6, -0.3, tmp.c).sub(root.position));
       const rightFK = rig.bone('RightHand').getWorldPosition(tmp.a);
-      // low at his side, blade forward; up at his chest; then out at you
-      const low = body(-0.24, 0.96, 0.2, tmp.b);
-      const chest = body(-0.12, 1.28, 0.36, tmp.c);
-      const held = low.lerp(chest, raise);
-      // where the hand must be for the tip to sit TIP_NEAR in front of your eyes
-      const toHim = tmp.d.set(root.position.x - CAM.x, 0, root.position.z - CAM.z).normalize();
-      const tipAt = tmp.e
-        .copy(CAM)
-        .addScaledVector(toHim, lerp(0.9, TIP_NEAR, reach))
-        .add(new Vector3(toHim.z, 0, -toHim.x).multiplyScalar(TIP_LEFT * reach))
-        .setY(CAM.y - lerp(0.06, TIP_LOW, reach));
-      // the blade turns towards your eyes as it arrives, not quite end-on, so you see its length
-      const bladeDir = new Vector3().subVectors(tipAt, held).normalize().lerp(new Vector3().subVectors(CAM, tipAt).normalize(), 0.55 * reach).normalize();
-      const atYou = tipAt.clone().addScaledVector(bladeDir, -0.24);
-      const handAt = held.clone().lerp(atYou, reach);
-      const dir = new Vector3().copy(raise > 0 || reach > 0 ? bladeDir : new Vector3(fx, -0.3, fz)).lerp(new Vector3(fx, -0.35, fz), 1 - Math.max(raise, reach)).normalize();
+      // low at his side, blade forward and down; then up in front of his belly, the blade
+      // pointing up at your face (a hold the wrist takes without strain: about 30° of bend)
+      const held = body(-0.24, 0.96, 0.2, tmp.b).lerp(body(-0.18, 1.15, 0.4, tmp.c), raise);
+      const fx = Math.sin(yaw);
+      const fz = Math.cos(yaw);
+      const dir = tmp.d.set(fx, -0.35, fz).normalize().lerp(tmp.e.subVectors(CAM, held).normalize(), raise).normalize();
       const pole = body(-0.9, -0.7, -0.4, new Vector3()).sub(root.position);
-      rig.rightHand(rightFK.lerp(handAt, hands), dir, pole);
-      // close in on the exact tip position (the grip sits a little off the wrist)
-      for (let i = 0; i < 2 && reach > 0; i++) {
-        const err = tipAt.clone().sub(rig.tip(new Vector3())).multiplyScalar(reach);
-        rig.rightHand(handAt.add(err), dir, pole);
-      }
+      rig.rightHand(rightFK.lerp(held, hands), dir, pole, lerp(0.4, 1, raise));
     }
     rig.knife.visible = draw > 0.5;
     rig.grip(draw);
     // his eyes on you from the moment he notices you
-    // (leaning into the thrust, he keeps his face up at you)
-    rig.look(CAM, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * lerp(0.6, 0.95, reach));
+    rig.look(CAM, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * lerp(0.6, 0.8, raise));
 
     // --- a key light on his face from the shop windows on your right, so you see who it is
     if (key.current) {

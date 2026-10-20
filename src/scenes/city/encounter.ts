@@ -14,9 +14,8 @@ import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, tim
  *   strangerMoves → stop    he walks up
  *   stop → cock             he squares up, holds your eye, draws a knife
  *   cock → commit           he raises it
- *   commit → gate           he brings it at you; time slows to a tenth
- *   gate                    DEFEND: the story waits for your click (the only
- *                           real-time part: the blade keeps coming while you wait)
+ *   commit → gate           he holds it on you: "Your bag."; time slows to a tenth
+ *   gate                    DEFEND: the story waits for your click
  *   gate → aftermath        the outcome, mapped onto progress: defended (black,
  *                           two hits, he is down) or knocked out (hit, fall, darkness)
  *   aftermath → 1           afterwards: he is on the pavement, or gone
@@ -47,7 +46,13 @@ export const encounter = {
 const gate: Gate = { episode: 'city', at: BEAT.gate, open: false };
 gates.push(gate);
 
-/** Seconds of real time between the DEFEND prompt and the blade reaching you. */
+/**
+ * Whether he strikes when you do not act: off for now. He stands and threatens,
+ * and the story waits at the gate until you defend. With it on, the blade
+ * reaches you PUNCH_WINDOW seconds after the prompt and you are knocked out.
+ */
+const STRIKES = false;
+/** Seconds of real time between the DEFEND prompt and the blade reaching you (when he strikes). */
 const PUNCH_WINDOW = 3.7;
 /** How far the blade comes with the scroll alone, before the gate. */
 const SCROLLED_PUNCH = 0.12;
@@ -79,7 +84,7 @@ export function encounterAt(local: number): EncounterView {
   const t = sequenceTime(local);
   const u = clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1);
   let punch = (o ? encounter.punchAtDecision : SCROLLED_PUNCH) * u;
-  if (!o && encounter.armed) punch = Math.min(1, SCROLLED_PUNCH + (performance.now() - encounter.armedAt) / 1000 / PUNCH_WINDOW);
+  if (!o && encounter.armed && STRIKES) punch = Math.min(1, SCROLLED_PUNCH + (performance.now() - encounter.armedAt) / 1000 / PUNCH_WINDOW);
   if (t >= 0) punch = local < BEAT.aftermath ? encounter.punchAtDecision : 0;
   let shake = 0;
   if (t >= 0 && o === 'knockedOut') shake = pulse(t, 0.03, 1.4);
@@ -127,7 +132,7 @@ export function updateEncounter() {
       // the visitor scrolled back before acting: the moment is not over, just postponed
       disarm();
     }
-    if (encounter.armed && encounterAt(local).punch >= 1) decide('knockedOut');
+    if (STRIKES && encounter.armed && encounterAt(local).punch >= 1) decide('knockedOut');
   }
   // sound follows the playback forwards only, and only while the page plays it
   const t = sequenceTime(local);

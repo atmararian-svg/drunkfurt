@@ -12,8 +12,8 @@ export interface Caption {
   kicker?: string;
   /** Screen corner, like a caption box placed on a comic panel. */
   place: 'tl' | 'tr' | 'bl' | 'br';
-  /** Yellow box for narration that matters, white for everything else. */
-  tone?: 'yellow' | 'paper';
+  /** Yellow box for narration that matters, white for everything else, a balloon for someone speaking. */
+  tone?: 'yellow' | 'paper' | 'speech';
   /** Only shown when this holds (e.g. one caption per outcome of an interaction). */
   when?: () => boolean;
 }
