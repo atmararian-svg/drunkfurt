@@ -124,11 +124,12 @@ built from.
 | Out onto the square: the boulevard, the houses and the skyline | 0.10–0.22 |
 | A look around: the kiosk, the tram stop | 0.22–0.40 |
 | Across the zebra crossing and down the right sidewalk | 0.40–0.60 |
-| A man leaves a doorway ahead and walks at you | 0.60–0.72 |
-| He closes in; the city slows to a tenth of normal speed | 0.72–0.845 |
-| DEFEND: the story waits here | 0.845 |
-| The strike, under ink | 0.85–0.905 |
-| Aftermath: a new angle on the same spot, him on the pavement and your bag in front of you | 0.905–1 |
+| He notices you, leaves a doorway ahead and walks at you, eyes on you | 0.56–0.735 |
+| He stops square in front of you; his face hardens; he shifts his weight | 0.735–0.80 |
+| He winds up: right shoulder back, weight on the back foot | 0.80–0.822 |
+| He commits: the city drops to a tenth of real speed | 0.822 |
+| DEFEND, CLICK TO BLOCK: the punch keeps coming in slow motion; the story waits here | 0.83 |
+| Your guard takes the fist, your counter lands, ink | real time, ~2 s |
 
 - **The world**:
   - the station's head building with its arched portal;
@@ -149,9 +150,28 @@ built from.
     train, someone looking up at the towers;
   - a smoker outside a bar, someone on a call, two people talking further down;
   - two walkers, each on their own validated strip of sidewalk.
-- **The stranger** (`Stranger.tsx`) waits in a doorway, then walks at you, driven by scroll. He
-  is slightly hunched, with a short arm swing and his eyes on you, and he decelerates as he
-  closes in. The camera turns slightly to keep him in frame.
+- **The stranger** (`Stranger.tsx`) is a specific person: late thirties, with a grey hoodie a
+  size too big over a faded shirt, baggy trousers bunched over scuffed trainers, stubble, a
+  crooked nose and a plaster over one eyebrow.
+  - The worn clothes (`worn` in `characters/figure.ts`) have irregular cloth surfaces, a
+    sagging hem, the hood bunched behind the neck, drawstrings and pushed-up sleeves. A
+    fabric texture adds creases and stains.
+  - His face (`characters/face.ts`) is inked on a canvas mapped onto the front of the head, with
+    a sculpted nose. Brows, lids, eyes, mouth, creases and teeth are redrawn as his expression
+    changes: wary when he notices you, hard when he stops, a sneer as he winds up, a shout as he
+    swings, shock when he is blocked.
+  - A key light from the shop windows lights his face from the moment he notices you.
+- **The punch** uses two-bone IK (`characters/ik.ts`), so the arm never stretches.
+  - The fist follows a curved path from the cocked position to your face.
+  - The punch accelerates, so most of its distance is covered late.
+  - His torso and hips rotate into it and his weight drives onto the front foot.
+  - If he is out of reach, he steps further in.
+  - Slow motion starts only when he commits. The punch then keeps coming at a tenth of real
+    speed and stops just short of you if you never react.
+- **The block** (`PlayerArms.tsx`) runs in real time after the click:
+  - your left forearm comes up and takes his fist;
+  - he recoils, and your right counter lands;
+  - the camera leans back from the incoming fist and jolts briefly at each contact.
 - **The encounter** (`encounter.ts`) is a small state machine: approach → armed → impact →
   resolved.
   - A *gate* in `core/timeline.ts` holds the scroll at the DEFEND beat until you click. Opening
@@ -162,6 +182,16 @@ built from.
   - The page then scrolls itself to the aftermath.
 - **Time**: everything in the city (people, cars, the stranger) runs on a time scale that eases
   to 10% as he closes in.
+- **Fight sounds** are four distinct sounds, each timed to its contact:
+  - a short, sharp boxer's exhale as your guard comes up;
+  - a dull, bony knock when his fist meets your forearm;
+  - a heavier, lower exhale behind your counter;
+  - a hard crack with a deep thump when it lands.
+
+  Each is synthesised unless a recording is supplied: add files to `public/audio/` and set
+  `src` on the `fight*` cues in `src/audio/AudioDirector.ts`.
+- **Looking around** with the mouse now also moves your head a few centimetres, sideways and
+  up or down, so nearby objects shift against the background.
 - **Sound**: the audio graph starts on the first click or key press.
   - There are no recorded assets, so the city uses synthesized sounds: a distant traffic bed,
     tyre noise from passing cars (panned), two impacts and a slow heartbeat at the climax.
