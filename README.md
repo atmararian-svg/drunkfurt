@@ -199,13 +199,17 @@ built from.
   - He is printed in greys (`mono` in `render/comic.ts`) like everyone in the city, with a
     selective ink silhouette (none on the hair cards).
 - **The knife** (`src/assets/knife.glb`, supplied) sits in his right hand, the fingers closed round
-  the handle. He draws it as he squares up and raises it in front of his belly, the blade
-  pointing up at your face, and holds it there: two-bone IK on his arm places the hand, and the
-  wrist turns the blade towards you with about 30° of bend, a hold a real wrist takes without
-  strain. He does not strike; a speech balloon (`tone: 'speech'` captions) carries what he
+  the handle. He draws it as he squares up, then holds it out at chest height, forearm level,
+  the blade up and leaning towards you so it reads along its length: two-bone IK on his arm
+  places the hand and the wrist turns the blade with about 20° of bend, a hold a real wrist
+  takes without strain. As he raises it your eyes drop to it (the camera pitches down and
+  widens), and the DEFEND card sits off-centre so his face and the knife stay in view. He does not strike; a speech balloon (`tone: 'speech'` captions) carries what he
   says: "Your bag. Give it to me. Now."
-- **His walk blends into his stance** by pace: the captured walk is sampled first and the
-  stance blended over it, so his legs swing at every speed, slowing into the stop.
+- **His walk** is sampled straight from the clip's keyframe tracks every frame, not through an
+  `AnimationMixer`: the mixer only writes a bone whose value changed since its last write, and
+  since his pose is rebuilt from rest every frame, a still scroll left him in his T-shaped bind
+  pose. The walk is blended into his stance by pace, so his legs swing at every speed and slow
+  into the stop.
 - **The encounter** (`encounter.ts`) is drawn as a function of the scroll progress. The
   only thing it remembers is the visitor's decision at the gate. `encounterAt(local)` gives the
   stranger, the camera, the bag, the overlay and the soundscape everything they draw
