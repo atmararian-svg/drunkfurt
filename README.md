@@ -196,12 +196,15 @@ built from.
     a decal: brows, lids, nose and mouth lines are redrawn as he changes. He is wary when he
     notices you, hard when he stops, sneers as he winds up, shouts as he swings, and shows shock
     when he is blocked.
-  - He walks with the same captured cycle, sized to his own legs, leaning into it a
-    little, with his head kept on you. He keeps the model's own hands. While a foot carries
-    his weight it is pinned to
-    the spot his route puts it on: under his hip at mid-stance, computed from the progress, so
-    the walk-up looks the same from either scroll direction. Measured in the browser, a planted
-    foot moves under 1 cm per step while he covers about 0.8 m (before: about 12 cm).
+  - He walks with the same captured cycle, leaning into it a little, with his head kept on
+    you. He keeps the model's own hands.
+  - At load, `calibrateWalk` measures how the captured walk sits on his rig: where each foot
+    lands relative to his body, and how far he travels per cycle.
+  - While a foot carries his weight, it is pinned where the walk put it at touch-down, at
+    the place his route had him then. This is computed from the progress, so the walk-up
+    looks the same from either scroll direction. The foot is released as the heel lifts.
+  - Measured on his rig: a planted foot moves at most 1.8 cm per step while he covers about
+    0.6 m, and never sinks more than 4 mm into the pavement.
   - A key light from the shop windows lights his face from the moment he notices you.
 - **The punch** uses two-bone IK (`characters/ik.ts`), so the arm never stretches.
   - The fist follows a curved path from the cocked position to your face.
