@@ -66,7 +66,8 @@ const LANDMARKS: Landmarks = {
   knee: [[-0.09, 0.49, -0.035], [0.175, 0.49, 0.07]],
   ankle: [[-0.05, 0.1, -0.03], [0.16, 0.1, 0.0]],
   toe: [[-0.06, 0.04, 0.14], [0.19, 0.04, 0.16]],
-  face: [[-0.205, 1.628, 0], [-0.112, 1.657, 0], [-0.13, 1.585, 0]],
+  face: [[-0.165, 1.632, 0], [-0.098, 1.632, 0], [-0.13, 1.556, 0]],
+  faceTilt: [0.68, 0.28],
 };
 
 /**
@@ -94,10 +95,10 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       }
     });
     const fistMat = new MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
-    fistMat.userData.comic = { mono: true, halftone: 0.4 };
+    fistMat.userData.comic = { mono: true, halftone: 0.55 };
     const rig = rigMesh(gltf, LANDMARKS, monoMaterial(map, normalMap), fistMat);
     // his face, drawn: fitted to the model's eyes and mouth, feathered into his head
-    const face = faceMaterial(150, { beard: true, mask: true });
+    const face = faceMaterial(150, { lines: true, mask: true });
     const sx = rig.face.eyeGap / FACE_WINDOW.eyeGap;
     const sy = rig.face.eyeToMouth / (FACE_WINDOW.eyeY - FACE_WINDOW.mouthY);
     faceDecal(rig, face.material, [FACE_WINDOW.width * sx, FACE_WINDOW.height * sy], (FACE_WINDOW.centerY - FACE_WINDOW.eyeY) * sy);

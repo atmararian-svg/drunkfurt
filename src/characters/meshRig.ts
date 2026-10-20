@@ -58,6 +58,12 @@ export interface Landmarks {
   toe: [V3, V3];
   /** Points on the face (bind pose), for fitting the drawn face: [eye -x side, eye +x side, mouth]. */
   face: [V3, V3, V3];
+  /**
+   * How far the face is bowed (radians, + looks down) and turned (+ towards -x),
+   * read off a side and a top view. Depth sampled through a beard and a beanie
+   * brim underestimates both, so this, when given, sets the face's orientation.
+   */
+  faceTilt?: [number, number];
 }
 
 export interface MeshRig {
@@ -152,6 +158,11 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
   }
   const bones: Bone[] = [hips, spine, head, ...A.flatMap((a) => [a.sh, a.el, a.wr, a.hand]), ...G.flatMap((g) => [g.hip, g.knee, g.ankle])];
   const index = new Map(bones.map((b, i) => [b, i]));
+  const headIndex = index.get(head)!;
+  const smooth = (e0: number, e1: number, x: number) => {
+    const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0)));
+    return t * t * (3 - 2 * t);
+  };
   const pos = geo.getAttribute('position');
   const n = pos.count;
   const si = new Uint16Array(n * 4);
@@ -173,6 +184,14 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
     // a bone may appear in several segments: keep its best score
     const best = new Map<number, number>();
     for (const sc of scored) best.set(sc.i, Math.max(best.get(sc.i) ?? 0, sc.w));
+    // the head turns as one piece above the neck (the face decal is rigid on the head bone)
+    const h = smooth(L.neck[1] - 0.03, L.neck[1] + 0.05, P.y) * (1 - smooth(0.27, 0.33, Math.hypot(P.x - L.neck[0], P.z - L.neck[2])));
+    if (h > 0) {
+      let sum0 = 0;
+      for (const w of best.values()) sum0 += w;
+      for (const [bi, w] of best) best.set(bi, (w / sum0) * (1 - h));
+      best.set(headIndex, (best.get(headIndex) ?? 0) + h);
+    }
     const top = [...best.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4);
     const sum = top.reduce((a, [, w]) => a + w, 0);
     top.forEach(([bi, w], k2) => {
@@ -194,7 +213,7 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
 
   // --- modelled fists, shown in place of the hands when he clenches
   const fistMesh = (side: -1 | 1) => {
-    const m = new Mesh(merge(fist(side, new Color('#8a8a8a')).map((p) => place(p, [0, 0, 0], [0, 0, 0], [1.05, 1.05, 1.05]))), fistMaterial);
+    const m = new Mesh(merge(fist(side, new Color('#625b55')).map((p) => place(p, [0, 0, 0], [0, 0, 0], [0.82, 0.82, 0.82]))), fistMaterial);
     m.userData.ink = 'silhouette';
     m.castShadow = true;
     m.visible = false;
@@ -232,10 +251,12 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
   const eyeToMouth = fy.length();
   fy.addScaledVector(fx, -fy.dot(fx)).normalize();
   const fn = new Vector3().crossVectors(fx, fy).normalize();
+  if (L.faceTilt) {
+    new Matrix4().makeRotationFromEuler(new Euler(L.faceTilt[0], -L.faceTilt[1], 0, 'YXZ')).extractBasis(fx, fy, fn);
+  }
   // the head fix turns that face frame back to (x right, y up, z forward)
   const basis = new Matrix4().makeBasis(fx, fy, fn);
   const headFix = new Quaternion().setFromRotationMatrix(basis).invert();
-  if (import.meta.env?.DEV) console.info('[meshRig] face ' + JSON.stringify({ eL: eL.toArray(), eR: eR.toArray(), mo: mo.toArray(), n: fn.toArray(), y: fy.toArray() }));
 
   const joints = {
     root,

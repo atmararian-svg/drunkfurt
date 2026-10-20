@@ -81,12 +81,20 @@ export interface FaceStyle {
   beard?: boolean;
   /** Feather the edges to transparent (for a decal over a modelled face). */
   mask?: boolean;
+  /** Ink only: eyes, brows, nose and mouth lines over a modelled face, no skin, beard or forehead. */
+  lines?: boolean;
 }
 
 function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression, style: FaceStyle = {}) {
   const a = Math.max(0, e.anger - e.shock * 0.8);
-  const ink = '#141414';
   ctx.clearRect(0, 0, PX, PX);
+  if (!style.lines) drawSkin(ctx, skin, style);
+  if (!style.lines) drawCreases(ctx, a, e);
+  drawFeatures(ctx, skin, e, a, !!style.lines);
+  if (style.mask) feather(ctx);
+}
+
+function drawSkin(ctx: CanvasRenderingContext2D, skin: number, style: FaceStyle) {
   ctx.fillStyle = shade(skin);
   ctx.fillRect(0, 0, PX, PX);
   // cheek and temple shading: drawn planes, darker under the cheekbones
@@ -129,6 +137,9 @@ function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression, st
     ctx.fillRect(X(x), Y(y), 2, 2);
   }
 
+}
+
+function drawCreases(ctx: CanvasRenderingContext2D, a: number, e: Expression) {
   // forehead creases: deeper with anger, raised with shock
   for (let k = 0; k < 3; k++) {
     const y = 0.152 + k * 0.007 + e.shock * 0.004;
@@ -140,12 +151,16 @@ function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression, st
     stroke(ctx, [[-0.004, 0.123], [-0.003, 0.136]], 3, `rgba(20,20,20,${a})`);
     stroke(ctx, [[0.004, 0.123], [0.003, 0.134]], 3, `rgba(20,20,20,${a * 0.8})`);
   }
+}
+
+function drawFeatures(ctx: CanvasRenderingContext2D, skin: number, e: Expression, a: number, linesOnly: boolean) {
+  const ink = '#141414';
 
   for (const s of [-1, 1]) {
     const cx = s * 0.031;
     const cy = 0.111;
     // socket shadow
-    ctx.fillStyle = 'rgba(20,20,20,0.28)';
+    ctx.fillStyle = linesOnly ? 'rgba(20,20,20,0)' : 'rgba(20,20,20,0.28)';
     ctx.beginPath();
     ctx.ellipse(X(cx), Y(cy + 0.002), S(0.021), S(0.014), 0, 0, Math.PI * 2);
     ctx.fill();
@@ -158,13 +173,16 @@ function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression, st
     ctx.quadraticCurveTo(X(cx), Y(cy + h * 2), X(cx + w), Y(cy));
     ctx.quadraticCurveTo(X(cx), Y(cy - h * 1.6), X(cx - w), Y(cy));
     ctx.closePath();
-    ctx.fillStyle = shade(205);
-    ctx.fill();
     ctx.clip();
-    ctx.fillStyle = ink;
-    ctx.beginPath();
-    ctx.arc(X(cx + e.lookX * 0.003), Y(cy - 0.0005 + e.lookY * 0.002), S(0.0048), 0, Math.PI * 2);
-    ctx.fill();
+    if (!linesOnly) {
+      // over a modelled face its own eyes show through; only the lids and brows are drawn
+      ctx.fillStyle = shade(205);
+      ctx.fillRect(0, 0, PX, PX);
+      ctx.fillStyle = ink;
+      ctx.beginPath();
+      ctx.arc(X(cx + e.lookX * 0.003), Y(cy - 0.0005 + e.lookY * 0.002), S(0.0048), 0, Math.PI * 2);
+      ctx.fill();
+    }
     // upper lid comes down with anger, slanted towards the nose
     const lid = 0.0115 * a - 0.004 * e.shock;
     if (lid > 0) {
@@ -228,7 +246,10 @@ function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression, st
   // lower lip shadow and chin crease
   stroke(ctx, [[-0.01, my - 0.007 - open * 0.012], [0.01, my - 0.007 - open * 0.012]], 2.5, 'rgba(20,20,20,0.45)');
   stroke(ctx, [[-0.008, 0.02 - open * 0.006], [0.0, 0.018 - open * 0.006], [0.008, 0.02 - open * 0.006]], 2, 'rgba(20,20,20,0.35)');
-  if (style.mask) {
+}
+
+function feather(ctx: CanvasRenderingContext2D) {
+  {
     // keep an oval over the face (brows to chin), feathered into the modelled head
     ctx.globalCompositeOperation = 'destination-in';
     const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);

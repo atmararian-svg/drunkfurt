@@ -150,16 +150,23 @@ built from.
     train, someone looking up at the towers;
   - a smoker outside a bar, someone on a call, two people talking further down;
   - two walkers, each on their own validated strip of sidewalk.
-- **The stranger** (`Stranger.tsx`) is a specific person: late thirties, with a grey hoodie a
-  size too big over a faded shirt, baggy trousers bunched over scuffed trainers, stubble, a
-  crooked nose and a plaster over one eyebrow.
-  - The worn clothes (`worn` in `characters/figure.ts`) have irregular cloth surfaces, a
-    sagging hem, the hood bunched behind the neck, drawstrings and pushed-up sleeves. A
-    fabric texture adds creases and stains.
-  - His face (`characters/face.ts`) is inked on a canvas mapped onto the front of the head, with
-    a sculpted nose. Brows, lids, eyes, mouth, creases and teeth are redrawn as his expression
-    changes: wary when he notices you, hard when he stops, a sneer as he winds up, a shout as he
-    swings, shock when he is blocked.
+- **The stranger** (`Stranger.tsx`) is built on the supplied 3D model (`src/assets/attacker.glb`,
+  from the "rugged winter traveler" archive): a man in a beanie, a scarf, a worn tan jacket over a
+  green hoodie, torn jeans and trainers, with a full beard.
+  - The model came as a static scan, so `characters/meshRig.ts` rigs it at load. It bakes the
+    mesh to his height, places bones at measured landmarks (same joint names as the procedural
+    figures, so the gait, poses and IK all work on it), and skins it with capsule weights. The
+    whole head above the neck is bound rigidly to the head bone.
+  - The scan stands with his head bowed. A correction measured from side and top views
+    (`faceTilt`) lifts and turns it, so he can look at you.
+  - It is printed in greys (`mono` in `render/comic.ts`): the model's own colour and normal maps
+    drive the tonal bands and halftone, and he gets a selective ink silhouette like everyone
+    else.
+  - His expression (`characters/face.ts`, `lines` style) is drawn as ink over his own face with
+    a decal: brows, lids, nose and mouth lines are redrawn as he changes. He is wary when he
+    notices you, hard when he stops, sneers as he winds up, shouts as he swings, and shows shock
+    when he is blocked.
+  - His fists are modelled and replace the scanned hands when he clenches.
   - A key light from the shop windows lights his face from the moment he notices you.
 - **The punch** uses two-bone IK (`characters/ik.ts`), so the arm never stretches.
   - The fist follows a curved path from the cocked position to your face.
@@ -167,31 +174,36 @@ built from.
   - His torso and hips rotate into it and his weight drives onto the front foot.
   - If he is out of reach, he steps further in.
   - Slow motion starts only when he commits. The punch then keeps coming at a tenth of real
-    speed and stops just short of you if you never react.
-- **The block** (`PlayerArms.tsx`) runs in real time after the click:
-  - your left forearm comes up and takes his fist;
-  - he recoils, and your right counter lands;
-  - the camera leans back from the incoming fist and jolts briefly at each contact.
+    speed.
 - **The encounter** (`encounter.ts`) is a small state machine: approach → armed → impact →
-  resolved.
-  - A *gate* in `core/timeline.ts` holds the scroll at the DEFEND beat until you click. Opening
-    it is permanent, so scrolling back and forth never re-arms or replays it.
-  - The click resolves immediately and doesn't wait on any animation.
-  - The impact plays a paper flash, speed lines, three heavy ink strokes, a small red burst (the
-    only red in the experience) and then black. Two different synthesized hits play.
-  - The page then scrolls itself to the aftermath.
+  resolved, with an outcome that is kept once decided.
+  - A *gate* in `core/timeline.ts` holds the scroll at the DEFEND beat ("Click to block").
+  - **Blocked** (you click in time). In real time, your left forearm comes up and takes his
+    fist, he recoils, and your right counter lands (`PlayerArms.tsx`). There are two exhales
+    and two different impacts, each timed to its contact. Then come a paper flash, speed lines,
+    heavy ink strokes, a small red burst (the only red in the experience), and black. In the
+    aftermath he is on the pavement and your bag is still with you.
+  - **Knocked out** (you never click). The fist lands, the picture snaps, the eyelids close in
+    ragged ink, and the camera falls sideways to the pavement. When you come to, he is gone and
+    the bag lies next to you.
+  - Either way the page then scrolls itself to the aftermath. The result is permanent: scrolling
+    back shows the street as it is after the fight and never re-arms or replays it. Scroll stays
+    free everywhere else.
 - **Time**: everything in the city (people, cars, the stranger) runs on a time scale that eases
   to 10% as he closes in.
-- **Fight sounds** are four distinct sounds, each timed to its contact:
+- **Fight sounds** are distinct sounds, each timed to its contact:
   - a short, sharp boxer's exhale as your guard comes up;
   - a dull, bony knock when his fist meets your forearm;
   - a heavier, lower exhale behind your counter;
-  - a hard crack with a deep thump when it lands.
+  - a hard crack with a deep thump when it lands;
+  - on a knockout: his exhale, a heavy hit, a ringing ear and the body hitting the ground.
 
   Each is synthesised unless a recording is supplied: add files to `public/audio/` and set
   `src` on the `fight*` cues in `src/audio/AudioDirector.ts`.
-- **Looking around** with the mouse now also moves your head a few centimetres, sideways and
-  up or down, so nearby objects shift against the background.
+- **Looking around** with the mouse also moves your head a few centimetres, sideways and up or
+  down, so nearby objects shift against the background. The head stays inside a small invisible
+  ellipsoid, and each episode can clamp it further (`clampHead`), so the camera never clips into
+  walls, people or the attacker.
 - **Sound**: the audio graph starts on the first click or key press.
   - There are no recorded assets, so the city uses synthesized sounds: a distant traffic bed,
     tyre noise from passing cars (panned), two impacts and a slow heartbeat at the climax.
@@ -275,13 +287,17 @@ wipe opens.
 
 ## Assets and placeholders
 
-- **No external assets.** All geometry is procedural and every texture (paving, ballast,
-  glazing, signage, displays, posters, window interiors, shopfronts) is drawn on a canvas at
-  runtime, so there are no licensing questions. Fonts are system sans-serif.
-- **Audio**: no sound is implemented or audible. `AudioDirector` builds the graph after the
-  first click (autoplay-safe) and declares the planned cues (`stationAmbience`, `trainIdleHum`,
-  `footstepPlatform`, `stepDown`) with `src: null`. Add licensed or recorded files to
-  `public/audio/` and set `src`. It already has a world low-pass for the time-dilation scene,
+- **One external asset**: the attacker model, supplied with the project brief. It was
+  reduced with glTF Transform (weld, simplify to 18%), with emissive and metal/roughness maps
+  dropped and the colour and normal maps resized to 1024 px as JPEG (1.9 MB). Everything else
+  is procedural: every texture (paving, ballast, glazing, signage, displays, posters, window
+  interiors, shopfronts) is drawn on a canvas at runtime. Fonts are system sans-serif.
+- Character references named in the brief (three Sketchfab pages and two images) were used
+  for general direction only. No third-party model was downloaded or included.
+- **Audio**: there are no recordings. The city and the fight use synthesised sounds, and the
+  station cues (`stationAmbience`, `trainIdleHum`, `footstepPlatform`, `stepDown`) are declared
+  with `src: null`. `AudioDirector` builds the graph after the first click (autoplay-safe). Add
+  licensed or recorded files to `public/audio/` and set `src`. It already has a world low-pass for the time-dilation scene,
   and a separate "body" bus for breathing and heartbeat that bypasses it.
 - **Placeholders**: passengers are simple volumetric silhouettes. The buildings and road bridge
   beyond the open end are blocks. Train interiors are a painted texture, not geometry (except
