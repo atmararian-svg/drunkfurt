@@ -247,8 +247,19 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       const cocked = body(0.2, 1.42, -0.08, tmp.a);
       // the target: straight at your face; it stops where your raised guard will be
       const contact = tmp.b.copy(CAM).addScaledVector(tmp.v.set(CAM.x - x, 0, CAM.z - z).normalize(), -0.42).setY(CAM.y - 0.02);
+      // if the fist cannot reach, he steps in further: the lunge grows until it can
+      j.shR.getWorldPosition(tmp.c);
+      const reach = 0.6;
+      const short = tmp.c.distanceTo(contact) - reach;
+      if (short > 0) {
+        const extra = Math.min(0.4, short) * drive;
+        j.root.position.x += fx * extra;
+        j.root.position.z += fz * extra;
+        j.root.updateMatrixWorld(true);
+        body(0.2, 1.42, -0.08, cocked);
+      }
       // a slight outside arc, like a real cross
-      const mid = body(0.32, 1.5, 0.35, tmp.c);
+      const mid = body(0.22, 1.55, 0.35, tmp.c);
       const u = drive;
       const fistAt = tmp.v.set(0, 0, 0);
       fistAt.addScaledVector(cocked, (1 - u) * (1 - u)).addScaledVector(mid, 2 * u * (1 - u)).addScaledVector(contact, u * u);
@@ -286,8 +297,8 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       keyTarget.updateMatrixWorld();
       key.current.position.set(CAM.x + 1.6, 2.3, Math.min(CAM.z, keyTarget.position.z + 2.2));
     }
-    encounter.stranger.x = x;
-    encounter.stranger.z = z;
+    encounter.stranger.x = j.root.position.x;
+    encounter.stranger.z = j.root.position.z;
     j.wrR.localToWorld(tmp.v.set(0, -0.1, 0));
     encounter.fist.x = tmp.v.x;
     encounter.fist.y = tmp.v.y;

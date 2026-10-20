@@ -321,9 +321,9 @@ class AudioDirector {
       noiseHit('lowpass', 500, 0.7, 0.4, 0.003, 0.09);
     } else {
       // the counter lands: sharp crack on top, deep thump underneath, a short tail
-      noiseHit('highpass', 2400, 0.7, 0.85, 0.002, 0.06);
-      tone('sine', 120, 42, 1.0, 0.006, 0.38);
-      noiseHit('lowpass', 800, 0.7, 0.55, 0.004, 0.16, 0.01);
+      noiseHit('highpass', 2400, 0.7, 0.55, 0.002, 0.06);
+      tone('sine', 120, 42, 0.62, 0.006, 0.38);
+      noiseHit('lowpass', 800, 0.7, 0.35, 0.004, 0.16, 0.01);
     }
   }
 

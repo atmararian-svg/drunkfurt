@@ -124,7 +124,7 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
   const accent = grey(Math.max(10, look.top - 22));
   const coat = look.outfit === 'coat' || look.outfit === 'parka';
   // worn clothes hang loose: a size too big
-  const pad = (coat ? 0.016 : look.outfit === 'hoodie' ? 0.012 : 0.008) + (look.worn ? 0.016 : 0);
+  const pad = (coat ? 0.016 : look.outfit === 'hoodie' ? 0.012 : 0.008) + (look.worn ? 0.01 : 0);
   let seed = 1;
   const cloth = (p: Piece, amount = 0.006) => (look.worn ? rough(p, amount, seed++) : p);
   const g = b.girth;

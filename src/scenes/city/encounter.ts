@@ -70,7 +70,7 @@ export function updateEncounter(dt: number) {
   // the punch: the first few percent come with the scroll, then it keeps coming at a tenth of real speed
   // (a full punch takes ~0.3 s, so ~3 s here), and stops just short of you if you never react
   const scrolled = 0.12 * clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1);
-  if (encounter.state === 'armed') encounter.punch = Math.min(0.82, Math.max(encounter.punch, scrolled) + dt * 0.1 * 3.2 * (1 - encounter.punch * 0.6));
+  if (encounter.state === 'armed') encounter.punch = Math.min(0.9, Math.max(encounter.punch, scrolled) + dt * 0.1 * 3.2 * (1 - encounter.punch * 0.6));
   else if (encounter.state === 'approach') encounter.punch = scrolled;
   encounter.shake = Math.max(0, encounter.shake - dt * 3.5);
   if (encounter.state === 'impact' && debug.blockT < 0 && performance.now() - encounter.impactAt > BLOCK.resolve * 1000 + 400) resolve();
