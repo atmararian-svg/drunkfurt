@@ -20,7 +20,7 @@ export const BEAT = {
 
 /**
  * Knockout sequence (you did not block), in seconds of the fight's own clock
- * after the fist lands. The whole sequence is spread over gate → aftermath.
+ * after the blow lands. The whole sequence is spread over gate → aftermath.
  */
 export const KO = {
   snap: 0.12,

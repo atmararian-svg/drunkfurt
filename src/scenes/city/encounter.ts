@@ -12,13 +12,13 @@ import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, tim
  *
  * Intervals (Episode 2 local progress, see beats.ts):
  *   strangerMoves → stop    he walks up
- *   stop → cock             he squares up and holds your eye
- *   cock → commit           he winds up
- *   commit → gate           the punch starts; time slows to a tenth
+ *   stop → cock             he squares up, holds your eye, draws a knife
+ *   cock → commit           he raises it
+ *   commit → gate           he brings it at you; time slows to a tenth
  *   gate                    DEFEND: the story waits for your click (the only
- *                           real-time part: his fist keeps coming while you wait)
- *   gate → aftermath        the outcome, mapped onto progress: blocked (guard,
- *                           counter, ink) or knocked out (hit, fall, darkness)
+ *                           real-time part: the blade keeps coming while you wait)
+ *   gate → aftermath        the outcome, mapped onto progress: defended (black,
+ *                           two hits, he is down) or knocked out (hit, fall, darkness)
  *   aftermath → 1           afterwards: he is on the pavement, or gone
  *
  * Once decided, the page plays the outcome by moving the progress itself
@@ -40,16 +40,16 @@ export const encounter = {
   armedAt: 0,
   /** Stranger's position (written by the stranger each frame, read by the camera). */
   stranger: { x: 0, z: 0 },
-  /** His right fist (knuckles), world space, for checks and feedback. */
+  /** The tip of his knife, world space, for checks and feedback. */
   fist: { x: 0, y: 0, z: 0 },
 };
 
 const gate: Gate = { episode: 'city', at: BEAT.gate, open: false };
 gates.push(gate);
 
-/** Seconds of real time between the DEFEND prompt and his fist landing. */
+/** Seconds of real time between the DEFEND prompt and the blade reaching you. */
 const PUNCH_WINDOW = 3.7;
-/** How far the punch comes with the scroll alone, before the gate. */
+/** How far the blade comes with the scroll alone, before the gate. */
 const SCROLLED_PUNCH = 0.12;
 
 /** Length of the outcome, in seconds of playback, spread over gate → aftermath. */
@@ -65,7 +65,7 @@ export interface EncounterView {
   outcome: Outcome;
   /** Seconds into the outcome, or -1. */
   t: number;
-  /** His punch: 0 wound up … 1 at your guard (before the outcome takes over). */
+  /** His thrust: 0 raised … 1 the tip at your eyes (before the outcome takes over). */
   punch: number;
   /** Camera jolt, 0..1.4, from the contacts. */
   shake: number;

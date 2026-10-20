@@ -159,7 +159,7 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   const headFwd = new Vector3(0, 0, 1).applyQuaternion(restWorld(bone('Head')).invert());
   const neckFwd = new Vector3(0, 0, 1).applyQuaternion(restWorld(bone('Neck')).invert());
 
-  // beanie and scarf, fitted to his head and neck in the rest pose (from his skin's own vertices)
+  // beanie and scarf, fitted to his head and neck as he stands now (from his skin's own vertices)
   const head = bone('Head');
   const headW = head.getWorldPosition(new Vector3());
   const box = { minX: 9, maxX: -9, minZ: 9, maxZ: -9, top: 0 };
@@ -169,7 +169,8 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
     if (!m.isSkinnedMesh || !/Body/i.test(m.name + (m.material as MeshStandardMaterial).name)) return;
     const pos = m.geometry.getAttribute('position');
     for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).applyMatrix4(m.matrixWorld);
+      // skinned: where the vertex is in the pose he stands in now, not in the bind pose
+      m.getVertexPosition(i, v).applyMatrix4(m.matrixWorld);
       if (v.y < headW.y + 0.04) continue;
       box.minX = Math.min(box.minX, v.x);
       box.maxX = Math.max(box.maxX, v.x);
@@ -183,11 +184,12 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   const hd = (box.maxZ - box.minZ) / 2;
   const beanieGeo = loft(
     [
-      { at: box.top - 0.115, w: hw * 2 + 0.008, front: hd * 0.9 + 0.016, back: hd * 1.05 + 0.016, cz },
-      { at: box.top - 0.09, w: hw * 2 + 0.01, front: hd * 0.92 + 0.016, back: hd * 1.06 + 0.016, cz },
-      { at: box.top - 0.075, w: hw * 2, front: hd * 0.86 + 0.01, back: hd * 1.02 + 0.012, cz },
-      { at: box.top - 0.03, w: hw * 1.86, front: hd * 0.8 + 0.008, back: hd * 0.98 + 0.01, cz: cz - 0.006 },
-      { at: box.top + 0.006, w: hw * 1.3, front: hd * 0.55, back: hd * 0.72, cz: cz - 0.012 },
+      // a turned-up brim across the brow (above the eyes), then the knit crown, a little slack at the top
+      { at: box.top - 0.088, w: hw * 2 + 0.008, front: hd * 0.9 + 0.016, back: hd * 1.05 + 0.016, cz },
+      { at: box.top - 0.062, w: hw * 2 + 0.01, front: hd * 0.92 + 0.016, back: hd * 1.06 + 0.016, cz },
+      { at: box.top - 0.05, w: hw * 2, front: hd * 0.86 + 0.01, back: hd * 1.02 + 0.012, cz },
+      { at: box.top - 0.02, w: hw * 1.86, front: hd * 0.8 + 0.008, back: hd * 0.98 + 0.01, cz: cz - 0.004 },
+      { at: box.top + 0.008, w: hw * 1.45, front: hd * 0.62, back: hd * 0.76, cz: cz - 0.008 },
     ],
     20,
   );

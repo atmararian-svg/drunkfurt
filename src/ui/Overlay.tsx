@@ -216,7 +216,7 @@ export function Overlay() {
         }}
       >
         <span className="act-word">Defend</span>
-        <span className="act-hint">Click to block</span>
+        <span className="act-hint">Click to defend</span>
       </button>
 
       <canvas className="impact" aria-hidden />

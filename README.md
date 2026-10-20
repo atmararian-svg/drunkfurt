@@ -156,10 +156,10 @@ built from.
 | Across the zebra crossing and down the right sidewalk | 0.40–0.60 |
 | He notices you, leaves a doorway ahead and walks at you, eyes on you | 0.56–0.735 |
 | He stops square in front of you; his face hardens; he shifts his weight | 0.735–0.80 |
-| He winds up: right shoulder back, weight on the back foot | 0.80–0.822 |
+| He draws a knife and raises it | 0.74–0.822 |
 | He commits: the city drops to a tenth of real speed | 0.822 |
-| DEFEND, CLICK TO BLOCK: the punch keeps coming in slow motion; the story waits here | 0.83 |
-| Your guard takes the fist, your counter lands, ink | real time, ~2 s |
+| DEFEND, CLICK TO DEFEND: the blade keeps coming in slow motion; the story waits here | 0.83 |
+| Black; BAM! WHAM!; the page opens on him lying on the pavement | real time, ~2 s |
 
 - **The world**:
   - the station's head building with its arched portal;
@@ -180,59 +180,50 @@ built from.
     train, someone looking up at the towers;
   - a smoker outside a bar, someone on a call, two people talking further down;
   - two walkers, each on their own validated strip of sidewalk.
-- **The stranger** (`Stranger.tsx`) is built on the supplied 3D model (`src/assets/attacker.glb`,
-  from the "rugged winter traveler" archive): a man in a beanie, a scarf, a worn tan jacket over a
-  green hoodie, torn jeans and trainers, with a full beard.
-  - The model came as a static scan, so `characters/meshRig.ts` rigs it at load. It bakes the
-    mesh to his height, places bones at measured landmarks (same joint names as the procedural
-    figures, so the gait, poses and IK all work on it), and skins it with capsule weights. The
-    whole head above the neck is bound rigidly to the head bone.
-  - The scan stands with his head bowed. A correction measured from side and top views
-    (`faceTilt`) lifts and turns it, so he can look at you.
-  - It is printed in greys (`mono` in `render/comic.ts`): the model's own colour and normal maps
-    drive the tonal bands and halftone, and he gets a selective ink silhouette like everyone
-    else.
-  - His expression (`characters/face.ts`, `lines` style) is drawn as ink over his own face with
-    a decal: brows, lids, nose and mouth lines are redrawn as he changes. He is wary when he
-    notices you, hard when he stops, sneers as he winds up, shouts as he swings, and shows shock
-    when he is blocked.
-  - He walks with the same captured cycle, leaning into it a little, with his head kept on
-    you. He keeps the model's own hands.
-  - At load, `calibrateWalk` measures how the captured walk sits on his rig: where each foot
-    lands relative to his body, and how far he travels per cycle.
-  - While a foot carries his weight, it is pinned where the walk put it at touch-down, at
-    the place his route had him then. This is computed from the progress, so the walk-up
-    looks the same from either scroll direction. The foot is released as the heel lifts.
-  - Measured on his rig: a planted foot moves at most 1.8 cm per step while he covers about
-    0.6 m, and never sinks more than 4 mm into the pavement.
-  - A key light from the shop windows lights his face from the moment he notices you.
-- **The punch** uses two-bone IK (`characters/ik.ts`), so the arm never stretches.
-  - The fist follows a curved path from the cocked position to your face.
-  - The punch accelerates, so most of its distance is covered late.
-  - His torso and hips rotate into it and his weight drives onto the front foot.
-  - If he is out of reach, he steps further in.
-  - Slow motion starts only when he commits. The punch then keeps coming at a tenth of real
-    speed.
+- **The stranger** (`Stranger.tsx`, body in `characters/manRig.ts`) is the supplied walking
+  man ("Mr Man Walking", a Mixamo-rigged character with his own captured walk), dressed down as a
+  man who sleeps rough:
+  - his clothes are re-made from the fabric of the first attacker scan (`tools/dress_textures.py`):
+    a filthy tan canvas jacket, washed-out torn jeans with a ripped knee and frayed hems,
+    scuffed shoes, weathered skin, his beard and moustache kept as hair cards;
+  - a knit beanie and a scarf are added at load, fitted to his head and neck from his skin's own
+    vertices;
+  - he walks with his own captured walk (straight legs, an upright gait), its cycle locked to the
+    distance he covers on his route: 1.67 m per cycle at his 1.8 m. Measured in a node test, a
+    planted foot slides 4.6 mm at most per centimetre walked, and no toe goes below the
+    pavement;
+  - his stance at the stop is taken from his walk where both feet are down, with the legs eased
+    towards standing straight;
+  - his head and neck turn to you from the moment he notices you; a key light from the shop
+    windows lights his face.
+  - He is printed in greys (`mono` in `render/comic.ts`) like everyone in the city, with a
+    selective ink silhouette (none on the hair cards).
+- **The knife** (`src/assets/knife.glb`, supplied) sits in his right hand, the fingers closed round
+  the handle. He draws it as he squares up, raises it to his chest as he winds up, and as the
+  city slows he steps and leans in and brings it at you: two-bone IK on his arm puts the hand
+  where the blade's tip ends 24 cm in front of your eyes, inside the frame. If you never defend,
+  he lowers it after the hit.
 - **The encounter** (`encounter.ts`) is drawn as a function of the scroll progress. The
   only thing it remembers is the visitor's decision at the gate. `encounterAt(local)` gives the
-  stranger, the camera, your arms, the bag, the overlay and the soundscape everything they draw
+  stranger, the camera, the bag, the overlay and the soundscape everything they draw
   from. Intervals (local progress, `beats.ts`):
 
   | Interval | What happens |
   | --- | --- |
   | 0.60–0.735 | he walks up |
-  | 0.735–0.80 | he squares up and holds your eye |
-  | 0.80–0.822 | he winds up |
+  | 0.735–0.80 | he squares up and holds your eye; the knife comes out |
+  | 0.80–0.822 | he raises it |
   | 0.822–0.83 | he commits; time slows to a tenth |
-  | 0.83 | DEFEND: the story waits for your click ("Click to block") |
+  | 0.83 | DEFEND: the story waits for your click ("Click to defend") |
   | 0.83–0.905 | the outcome, spread over this stretch of the scroll |
   | 0.905–1 | the aftermath |
 
-  - **Blocked** (you click in time): your left forearm comes up and takes his fist, he recoils,
-    and your right counter lands (`PlayerArms.tsx`). Then come a paper flash, speed lines,
-    heavy ink strokes, a small red burst (the only red in the experience), and black. In the
-    aftermath he is on the pavement and your bag is still with you.
-  - **Knocked out** (you never click): the fist lands, the picture snaps, the eyelids close in
+  - **Defended** (you click in time): the fight is not shown. The page goes black at once,
+    before anyone moves, and the two hits are printed into the dark as comic sound effects
+    (`drawHits` in `ui/brush.ts`): BAM! and WHAM! burst in on jagged paper stars, each with its
+    sound. When the ink opens again he is on his back on the pavement, the knife beside his
+    hand, and your bag is still with you.
+  - **Knocked out** (you never click): the blade comes up to your face, a blow lands, the picture snaps, the eyelids close in
     ragged ink, and the camera falls sideways to the pavement. When you come to, he is gone and
     the bag lies next to you.
   - Once you decide, the page plays the outcome by moving the progress itself (`playProgress` in
@@ -240,7 +231,7 @@ built from.
     the fight is a position on the scroll, so scrolling back rewinds it: into the middle of the
     fight you see that moment, and before he walks up he is back in his doorway. Scrolling
     forward again replays the same outcome. The prompt does not come back once you have decided.
-  - The only part that runs on real time is the DEFEND window: his fist keeps coming for
+  - The only part that runs on real time is the DEFEND window: the blade keeps coming for
     3.7 s while the story waits. Scroll back before the gate and the window closes; the moment
     is postponed, not decided.
   - Sounds are cues fired as the playback crosses them, forwards only. They never feed back
@@ -262,10 +253,8 @@ built from.
   - A third car comes up the boulevard and turns into the cross street, crossing one car's lane
     and merging into another's, so the junction gets real give-way traffic.
 - **Fight sounds** are distinct sounds, each timed to its contact:
-  - a short, sharp boxer's exhale as your guard comes up;
-  - a dull, bony knock when his fist meets your forearm;
-  - a heavier, lower exhale behind your counter;
-  - a hard crack with a deep thump when it lands;
+  - in the dark of a defence, an exhale and a dull, bony knock with BAM!, then a heavier exhale
+    and a hard crack with a deep thump with WHAM!;
   - on a knockout: his exhale, a heavy hit, a ringing ear and the body hitting the ground.
 
   Each is synthesised unless a recording is supplied: add files to `public/audio/` and set
@@ -282,6 +271,10 @@ built from.
 - **Transitions**: brush-stroke wipes are drawn on a canvas (`ui/brush.ts`). They are ragged
   black strokes with bristle tips, not a fade, and they close an episode, carry its title and
   open the next one.
+  - The hand-over between episodes plays by itself (`pageTurns` in `core/timeline.ts`): once
+    the progress enters it, it is carried to the far side in the direction you were scrolling
+    (on to the next episode's first shot, or back to the last shot of the one before) in about
+    3 s, and scrolling cannot stop it halfway. You never have to scroll a wipe open or shut.
 
 ## What is in Episode 1
 
@@ -357,9 +350,17 @@ wipe opens.
 
 ## Assets and placeholders
 
-- **One external asset**: the attacker model, supplied with the project brief. It was
-  reduced with glTF Transform (weld, simplify to 18%), with emissive and metal/roughness maps
-  dropped and the colour and normal maps resized to 1024 px as JPEG (1.9 MB). Everything else
+- **Supplied assets**: the walking man (`src/assets/man.glb`, 1.4 MB) and the knife
+  (`src/assets/knife.glb`, 0.15 MB), both supplied by the project owner.
+  - `tools/fbx2glb.mjs` converts the FBX (FBXLoader + GLTFExporter in node) without his
+    glasses and hair. FBXLoader makes one bone per skin cluster, so a joint shared by several
+    meshes arrives as a chain of same-named bones of which only one is animated; the converter
+    binds every mesh to one bone per joint, so body and clothes follow the walk together.
+  - glTF Transform then welds, simplifies (35%) and prunes it; `tools/dress_textures.py` makes
+    his textures (512 px clothes, 1024 px skin), and `tools/dressAttacker.mjs` puts them on
+    and slims the knife's maps to 512 px.
+  - The first attacker scan (from the "rugged winter traveler" archive) is no longer shipped;
+    only its fabric is reused in his clothes' textures. Everything else
   is procedural: every texture (paving, ballast, glazing, signage, displays, posters, window
   interiors, shopfronts) is drawn on a canvas at runtime. Fonts are system sans-serif.
 - Character references named in the brief (three Sketchfab pages and two images) were used
