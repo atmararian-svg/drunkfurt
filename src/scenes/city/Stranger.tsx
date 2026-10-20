@@ -1,332 +1,167 @@
 import { useFrame } from '@react-three/fiber';
 import { suspend } from 'suspend-react';
-import attackerUrl from '../../assets/attacker.glb?url';
+import manUrl from '../../assets/man.glb?url';
+import knifeUrl from '../../assets/knife.glb?url';
 import { Component, ReactNode, useMemo, useRef } from 'react';
-import {
-  CatmullRomCurve3,
-  Group,
-  MeshStandardMaterial,
-  Object3D,
-  PointLight,
-  Quaternion,
-  SpotLight,
-  TubeGeometry,
-  Vector3,
-} from 'three';
-import { Expression, FACE_WINDOW, calmFace, faceMaterial } from '../../characters/face';
-import { faceDecal, monoMaterial, rigMesh } from '../../characters/meshRig';
-import { LANDMARKS } from './strangerRig';
+import { CatmullRomCurve3, Group, Object3D, PointLight, SpotLight, TubeGeometry, Vector3 } from 'three';
 import { loadGlb } from '../../characters/inlineModel';
-import { aimArm } from '../../characters/ik';
-import { activityPose, applyPose, copyPose, restPose } from '../../characters/pose';
-import { START_PHASE, STANCE_WINDOW, TOUCH, applyWalk, calibrateWalk, stanceProgress } from '../../characters/walkClip';
+import { buildMan } from '../../characters/manRig';
+import { START_PHASE } from '../../characters/walkClip';
 import { lerpAngle } from '../../characters/crowd';
-import { FootTarget, placeFeet } from '../../characters/feet';
-import { clamp, smoothstep } from '../../core/math';
+import { smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
 import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
 import { cityMaterials } from './cityMaterials';
 import { EYE, VISITOR_STOP } from './layout';
-import { ROUTE_LEN, ramp, routeAt, routeS, walkPace } from './strangerRoute';
+import { ramp, routeAt, routeS, walkPace } from './strangerRoute';
 
-/** Where he ends up afterwards: on his back, head towards the house fronts. */
-const DOWN = { x: 7.3, z: -36.8, yaw: -0.64 };
+/** Where he ends up afterwards: on his back on the pavement (his feet here, his head towards the shops). */
+const DOWN = { x: 7.0, z: -36.3, yaw: 0.9 };
 export const BAG_SPOT = { x: 6.1, z: -35.3, yaw: 0.7 };
-/** Your eyes when he swings (the camera at the gate). */
+/** Your eyes when he comes at you (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
+/** How close the blade's tip comes to your eyes when he holds it on you (m). */
+const TIP_NEAR = 0.24;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-
 /**
- * The stranger. Late thirties, a bad night behind him: a grey hoodie a size
- * too big over a faded shirt, baggy trousers bunched over scuffed trainers,
- * stubble, a crooked nose and a plaster over one eyebrow.
+ * The stranger: a man who sleeps rough, in a filthy canvas jacket, torn jeans,
+ * a knit beanie and a scarf (characters/manRig.ts), with a knife.
  *
- * Driven by scroll until the punch: he notices you, comes at you with his eyes
- * on you, stops square in front of you, holds your eye while his face hardens,
- * and winds up. When he commits, the city drops to a tenth of real speed and
- * the punch keeps coming at that speed. Your click starts the block sequence
- * (real time): your guard takes his fist, he recoils, your counter lands, ink.
+ * Everything he does is a function of the scroll position (encounter.ts):
+ * he notices you and walks up with his own captured walk, its cycle locked to
+ * the distance he covers; stops square in front of you; draws the knife;
+ * raises it; and as the city slows to a tenth, brings it at you until the tip
+ * is right in front of your eyes. If you defend, the page goes black before
+ * anything is shown (the overlay prints the hits); when it opens again he is
+ * on the pavement with the knife beside him. If you do not, he is gone when
+ * you come to.
  */
-export function Stranger({ active, timeScale }: { active: boolean; timeScale: () => number }) {
-  const gltf = suspend(() => loadGlb(attackerUrl), ['drunkfurt-attacker']);
-  const { j, face, headFix, gait } = useMemo(() => {
-    // the model's own textures (worn jacket, hoodie, scarf, torn jeans), printed in greys
-    let map: MeshStandardMaterial['map'] = null;
-    let normalMap: MeshStandardMaterial['normalMap'] = null;
-    gltf.scene.traverse((o) => {
-      const m = (o as { material?: MeshStandardMaterial }).material;
-      if (m && m.map) {
-        map = m.map;
-        normalMap = m.normalMap;
-      }
-    });
-    const rig = rigMesh(gltf, LANDMARKS, monoMaterial(map, normalMap));
-    // his face, drawn: fitted to the model's eyes and mouth, feathered into his head
-    const face = faceMaterial(150, { lines: true, mask: true });
-    const sx = rig.face.eyeGap / FACE_WINDOW.eyeGap;
-    const sy = rig.face.eyeToMouth / (FACE_WINDOW.eyeY - FACE_WINDOW.mouthY);
-    faceDecal(rig, face.material, [FACE_WINDOW.width * sx, FACE_WINDOW.height * sy], (FACE_WINDOW.centerY - FACE_WINDOW.eyeY) * sy);
-    // the model stands with his head bowed and tilted; straighten most of that so he can look at you
-    const headFix = new Quaternion().slerp(rig.headFix, 0.85);
-    rig.joints.root.name = 'stranger';
-    // how the captured walk sits on his rig: foot placement at mid-stance, distance per cycle
-    const gait = calibrateWalk(rig.joints);
-    return { j: rig.joints, face, headFix, gait };
-  }, [gltf]);
-  // only ambient time (breathing, a blink) lives here; everything the story does is computed from the progress
-  const st = useMemo(() => ({ pose: restPose(), target: restPose(), idle: restPose(), t: 0, expr: calmFace() }), []);
-  const tmp = useMemo(() => ({ v: new Vector3(), a: new Vector3(), b: new Vector3(), c: new Vector3(), pole: new Vector3(), lpole: new Vector3() }), []);
+export function Stranger({ active }: { active: boolean; timeScale: () => number }) {
+  const gltf = suspend(() => loadGlb(manUrl), ['drunkfurt-man']);
+  const knifeGltf = suspend(() => loadGlb(knifeUrl), ['drunkfurt-knife']);
+  const rig = useMemo(() => {
+    const r = buildMan(gltf, knifeGltf);
+    r.root.name = 'stranger';
+    return r;
+  }, [gltf, knifeGltf]);
+  const tmp = useMemo(() => ({ a: new Vector3(), b: new Vector3(), c: new Vector3(), d: new Vector3(), e: new Vector3() }), []);
   const key = useRef<SpotLight>(null);
   const keyTarget = useMemo(() => new Object3D(), []);
 
-  useFrame((_, rawDt) => {
+  useFrame(() => {
     if (!active) return;
-    st.t += Math.min(rawDt, 0.05) * timeScale();
     const local = localProgress('city');
     const view = encounterAt(local);
-    const bt = view.t;
+    const t = view.t;
     const ko = view.outcome === 'knockedOut';
+    const root = rig.root;
 
-    // after the fight: on the pavement where he fell (you blocked), or gone (you went down);
-    // both only from the moment it happened, under the ink, so scrolling back brings him back
-    if (view.outcome === 'blocked' && (bt >= BLOCK.ink + 0.35 || local >= BEAT.aftermath)) {
-      j.root.visible = true;
-      lieDown();
+    // after the fight: on the pavement (you defended), or gone (you went down). Only from the moment the
+    // page is black, so scrolling back brings him back on his feet.
+    if (view.outcome === 'blocked' && (t >= BLOCK.dark || local >= BEAT.aftermath)) {
+      root.visible = true;
+      root.position.set(DOWN.x, 0, DOWN.z);
+      root.rotation.y = DOWN.yaw;
+      rig.lie();
+      rig.knife.visible = false;
+      rig.groundKnife.visible = true;
+      if (key.current) key.current.visible = false;
+      encounter.stranger.x = DOWN.x;
+      encounter.stranger.z = DOWN.z;
       return;
     }
-    if (ko && (bt >= KO.dark || local >= BEAT.aftermath)) {
-      j.root.visible = false;
+    rig.groundKnife.visible = false;
+    if (ko && (t >= KO.dark || local >= BEAT.aftermath)) {
+      root.visible = false;
       if (key.current) key.current.visible = false;
       return;
     }
-    j.root.visible = true;
-    j.body.rotation.set(0, 0, 0);
-    j.body.position.set(0, 0, 0);
+    root.visible = true;
 
-    // --- where he is: walking the route, then planted, then lunging
+    // --- where he is: walking his route, then planted and facing you
     const walkU = ramp(local, BEAT.strangerMoves, BEAT.stop);
     const s = routeS(walkU);
     const pos = routeAt(s);
     const squared = ramp(local, BEAT.stop, BEAT.confront + 0.02);
     const toYou = Math.atan2(CAM.x - pos.x, CAM.z - pos.z);
-    // in the doorway he turns his head and shoulders to you; walking, he faces his way; planted, he squares up
     const doorway = lerp(-Math.PI / 2 + 0.35, toYou, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * 0.6);
     const yaw = walkU < 1 ? lerpAngle(doorway, pos.yaw, smoothstep(ramp(walkU, 0, 0.08))) : lerpAngle(pos.yaw, toYou, smoothstep(squared));
 
-    // punch progress: wind-up by scroll, the strike itself in (slow) time, the block sequence in real time
-    const cock = smoothstep(ramp(local, BEAT.cock, BEAT.commit));
-    let punch = view.punch; // 0..1, 1 = fist at your guard
-    let recoil = 0;
-    let hit2 = 0;
-    if (bt >= 0 && ko) {
-      // it landed: the arm follows through, then he straightens up and looks down at you
-      punch = lerp(1, 0.25, smoothstep(ramp(bt, 0.15, 0.9)));
-    } else if (bt >= 0) {
-      punch = lerp(view.punch, 1, smoothstep(ramp(bt, 0, BLOCK.contact)));
-      if (bt > BLOCK.contact + BLOCK.hitStop) {
-        recoil = smoothstep(ramp(bt, BLOCK.contact + BLOCK.hitStop, BLOCK.counterLands));
-        punch = lerp(1, 0.35, recoil);
-      }
-      hit2 = smoothstep(ramp(bt, BLOCK.counterLands, BLOCK.counterLands + 0.25));
-    }
-    const strike = punch > 0 || bt >= 0 ? 1 : 0;
-    // the punch accelerates: slow first third, then fast (the eye reads it as force)
-    const drive = Math.pow(punch, 1.6);
-
-    // lunge: weight onto the front foot as the fist goes out; knocked back by the counter
+    // --- the threat: the knife comes out, comes up, comes at you
+    const draw = smoothstep(ramp(local, BEAT.confront, BEAT.confront + 0.03));
+    const raise = smoothstep(ramp(local, BEAT.cock, BEAT.commit));
+    let thrust = view.punch; // 0..1: 1 = the tip right in front of your eyes
+    if (t >= 0 && ko) thrust = lerp(1, 0.35, smoothstep(ramp(t, 0.2, 1.0))); // after the hit he lowers it
+    const reach = Math.pow(thrust, 1.4);
+    // he leans and steps into it
     const fx = Math.sin(yaw);
     const fz = Math.cos(yaw);
-    const lunge = 0.52 * drive * (1 - recoil * 0.5) - 0.12 * recoil - 0.55 * hit2;
-    const x = pos.x + fx * lunge;
-    const z = pos.z + fz * lunge;
-    j.root.position.set(x, 0, z);
-    j.root.rotation.y = yaw;
+    const step = 0.22 * reach;
+    root.position.set(pos.x + fx * step, 0, pos.z + fz * step);
+    root.rotation.y = yaw;
 
-    // --- body
-    const p = st.target;
-    activityPose(p, 'pockets', st.t, 731);
-    // gait from the route itself (the captured walk, walkClip.ts): the phase is the distance he has walked,
-    // the pace how fast the scroll moves him along it
+    // --- body: his walk (phase locked to the distance walked), easing into his stance as he stops
     const pace = walkPace(walkU);
-    const stride = gait.stride;
-    const phase = START_PHASE + (s / stride) * Math.PI * 2;
-    if (walkU >= 1) {
-      // planted: feet apart, right foot back, weight forward, shoulders hunched
-      const sq = smoothstep(squared);
-      p.hipLp = -0.12 * sq;
-      p.hipLr = 0.1 * sq;
-      p.hipRp = 0.22 * sq;
-      p.hipRr = 0.08 * sq;
-      p.kneeL = 0.18 * sq;
-      p.kneeR = 0.12 * sq;
-      p.ankleL = -0.06 * sq;
-      p.ankleR = -0.3 * sq;
-      p.spinePitch = 0.1 * sq;
-      p.headPitch = 0.08;
-      // menace: shoulders rolled forward, arms off the body, fists
-      const menace = smoothstep(ramp(local, BEAT.confront, BEAT.cock));
-      p.shLp = -0.15 * menace;
-      p.shRp = 0.1 * menace;
-      p.shLr = p.shRr = 0.12 * menace;
-      p.elL = -0.6 * menace - 0.2;
-      p.elR = -0.35 * menace - 0.2;
-      p.spineYaw = 0.12 * menace + Math.sin(st.t * 1.7) * 0.015 * menace; // weight rocking
-      p.hipsX = 0.02 * menace;
-    }
-    if (cock > 0 || strike) {
-      // wind-up: right shoulder back, weight on the back foot; then the torso whips round
-      p.spineYaw = lerp(0.12, 0.38, cock) * (1 - drive) - 0.5 * drive;
-      p.pelvisYaw = 0.16 * cock * (1 - drive) - 0.24 * drive;
-      p.spinePitch = lerp(0.1, 0.05, cock) + 0.18 * drive - 0.3 * recoil;
-      p.kneeL = 0.18 + 0.25 * drive;
-      p.hipLp = -0.12 - 0.25 * drive;
-      p.hipRp = 0.22 + 0.25 * drive;
-      p.kneeR = 0.12 - 0.08 * drive;
-      p.ankleR = -0.3 - 0.2 * drive;
-      p.headPitch = 0.05 + 0.1 * drive;
-    }
-    if (hit2 > 0) {
-      // the counter: head snaps round, knees go
-      p.headYaw = -0.7 * hit2;
-      p.headRoll = 0.35 * hit2;
-      p.headPitch = -0.3 * hit2;
-      p.spinePitch = -0.35 * hit2;
-      p.spineYaw += 0.4 * hit2;
-      p.kneeL += 0.4 * hit2;
-      p.kneeR += 0.3 * hit2;
-    }
-    // look at you: from the moment he notices, the head turns to you
-    const look = smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves));
-    let rel = Math.atan2(CAM.x - x, CAM.z - z) - yaw;
-    rel = Math.atan2(Math.sin(rel), Math.cos(rel));
-    if (hit2 === 0) {
-      p.headYaw = lerp(p.headYaw, clamp(rel, -1.2, 1.2) - p.spineYaw * 0.8, look);
-      p.headPitch = lerp(p.headPitch, 0.06 + (cock + drive) * 0.06, look);
-    }
-    copyPose(st.pose, p);
-    applyPose(j, st.pose);
-    if (pace > 0.01) {
-      // his head stays on you; the rest of him walks, leaning into it a little
-      applyWalk(j, phase, pace, { keepHead: true });
-      j.spine.rotateX(0.06 * pace);
-    }
-    j.head.quaternion.multiply(headFix);
+    const phase = START_PHASE + (s / rig.stride) * Math.PI * 2;
+    rig.stand(phase, pace);
+    root.updateMatrixWorld(true);
+    const body = (bx: number, by: number, bz: number, out: Vector3) => out.set(bx, by, bz).applyMatrix4(root.matrixWorld);
 
-    // feet: while he walks, a foot that carries his weight stays on the spot his route puts it on
-    // (under his hip at mid-stance), so it does not skate; computed from the progress, like everything else
-    if (pace > 0.01) {
-      const TAU = Math.PI * 2;
-      const targets: { L?: FootTarget; R?: FootTarget } = {};
-      for (const side of ['L', 'R'] as const) {
-        const u = stanceProgress(phase, side);
-        if (u < 0) continue;
-        // where his body was when this foot touched down
-        const back = (TOUCH - u) * STANCE_WINDOW[side].length;
-        const m = routeAt(clamp(s + (back / TAU) * stride, 0, ROUTE_LEN));
-        // the foot where the walk itself puts it at touch-down (calibrated on his rig), at his body's place then
-        const f = gait.foot[side];
-        const c = Math.cos(m.yaw);
-        const sn = Math.sin(m.yaw);
-        // pinned from touch-down until the heel starts to lift (the ankle rises and rolls forward over the toes)
-        const w = Math.min(1, pace * 1.5) * smoothstep(clamp((u - TOUCH) / 0.03 + 1, 0, 1)) * smoothstep(clamp((0.86 - u) / 0.1, 0, 1));
-        targets[side] = { anchor: new Vector3(m.x + f.x * c + f.z * sn, j.ankleHeight, m.z - f.x * sn + f.z * c), w, yaw: m.yaw };
+    // --- hands: once he squares up, the left hangs ready, the right holds the knife
+    const hands = smoothstep(ramp(local, BEAT.stop, BEAT.confront + 0.02));
+    if (hands > 0) {
+      const leftFK = rig.bone('LeftHand').getWorldPosition(tmp.a);
+      const left = body(0.24, 0.98 + 0.12 * raise, 0.16 + 0.08 * raise, tmp.b);
+      rig.leftHand(leftFK.lerp(left, hands), body(0.9, -0.6, -0.3, tmp.c).sub(root.position));
+      const rightFK = rig.bone('RightHand').getWorldPosition(tmp.a);
+      // low at his side, blade forward; up at his chest; then out at you
+      const low = body(-0.24, 0.96, 0.2, tmp.b);
+      const chest = body(-0.12, 1.28, 0.36, tmp.c);
+      const held = low.lerp(chest, raise);
+      // where the hand must be for the tip to sit TIP_NEAR in front of your eyes
+      const toHim = tmp.d.set(root.position.x - CAM.x, 0, root.position.z - CAM.z).normalize();
+      const tipAt = tmp.e.copy(CAM).addScaledVector(toHim, lerp(0.9, TIP_NEAR, reach)).setY(CAM.y - 0.06);
+      const bladeDir = new Vector3().subVectors(tipAt, held).normalize();
+      const atYou = tipAt.clone().addScaledVector(bladeDir, -0.24);
+      const handAt = held.clone().lerp(atYou, reach);
+      const dir = new Vector3().copy(raise > 0 || reach > 0 ? bladeDir : new Vector3(fx, -0.3, fz)).lerp(new Vector3(fx, -0.35, fz), 1 - Math.max(raise, reach)).normalize();
+      const pole = body(-0.9, -0.7, -0.4, new Vector3()).sub(root.position);
+      rig.rightHand(rightFK.lerp(handAt, hands), dir, pole);
+      // close in on the exact tip position (the grip sits a little off the wrist)
+      if (reach > 0) {
+        const tip = rig.tip(new Vector3());
+        const err = tipAt.clone().sub(tip).multiplyScalar(reach);
+        rig.rightHand(handAt.add(err), dir, pole);
       }
-      placeFeet(j, targets);
     }
-
-    // --- arms by IK once he squares up: his own fists placed in the world
-    if (cock > 0 || strike) {
-      j.root.updateMatrixWorld(true);
-      // in his body frame: x right, y up, z towards you
-      const body = (bx: number, by: number, bz: number, out: Vector3) => out.set(bx, by, bz).applyMatrix4(j.root.matrixWorld);
-      const cocked = body(0.2, 1.42, -0.08, tmp.a);
-      // the target: straight at your face; it stops where your raised guard will be
-      const contact = tmp.b.copy(CAM).addScaledVector(tmp.v.set(CAM.x - x, 0, CAM.z - z).normalize(), -0.42).setY(CAM.y - 0.02);
-      // if the fist cannot reach, he steps in further: the lunge grows until it can
-      j.shR.getWorldPosition(tmp.c);
-      const reach = 0.6;
-      const short = tmp.c.distanceTo(contact) - reach;
-      if (short > 0) {
-        const extra = Math.min(0.4, short) * drive;
-        j.root.position.x += fx * extra;
-        j.root.position.z += fz * extra;
-        j.root.updateMatrixWorld(true);
-        body(0.2, 1.42, -0.08, cocked);
-      }
-      // a slight outside arc, like a real cross
-      const mid = body(0.22, 1.55, 0.35, tmp.c);
-      const u = drive;
-      const fistAt = tmp.v.set(0, 0, 0);
-      fistAt.addScaledVector(cocked, (1 - u) * (1 - u)).addScaledVector(mid, 2 * u * (1 - u)).addScaledVector(contact, u * u);
-      // elbow out and down, in his frame
-      tmp.pole.set(0.7, -1, -0.3);
-      aimArm(j, 1, fistAt, tmp.pole);
-      // the other fist stays up by his chin, pulling back as the right goes out
-      const guard = body(-0.1, 1.56 + 0.03 * drive, 0.14 - 0.08 * drive, tmp.a);
-      tmp.lpole.set(-0.7, -1, -0.2);
-      aimArm(j, -1, guard, tmp.lpole);
-    }
-
-    // --- face: suspicion, then hostility, then the shout of the swing; shock when blocked
-    const e: Expression = st.expr;
-    const noticed = ramp(local, BEAT.noticed, BEAT.strangerMoves);
-    const confront = ramp(local, BEAT.confront, BEAT.cock);
-    e.anger = clamp(0.2 + 0.3 * noticed + 0.45 * confront + 0.1 * cock, 0, 1);
-    e.sneer = clamp(0.6 * confront + 0.4 * cock, 0, 1) * (1 - recoil);
-    e.open = clamp(0.12 * cock + 0.45 * drive, 0, 1) * (1 - recoil) + 0.55 * recoil + 0.3 * hit2;
-    e.shock = clamp(recoil * 0.9 + hit2, 0, 1);
-    if (bt >= 0 && ko) {
-      // satisfied, a little surprised it was that easy
-      e.anger = 0.35;
-      e.sneer = 0.7;
-      e.open = 0.1;
-      e.shock = 0;
-      e.lookY = -0.6;
-    }
-    e.lookX = 0;
-    e.lookY = -0.2;
-    // a blink now and then while he walks, never once he is in your face
-    if (confront < 0.1 && Math.sin(st.t * 0.9) > 0.985) e.anger = Math.min(1, e.anger + 0.6);
-    face.set(e);
+    rig.knife.visible = draw > 0.5;
+    rig.grip(draw);
+    // his eyes on you from the moment he notices you
+    rig.look(CAM, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)));
 
     // --- a key light on his face from the shop windows on your right, so you see who it is
     if (key.current) {
       key.current.visible = local > BEAT.noticed - 0.02;
       key.current.intensity = 24 * smoothstep(ramp(local, BEAT.noticed - 0.02, BEAT.strangerMoves + 0.05));
-      j.head.getWorldPosition(keyTarget.position);
+      rig.bone('Head').getWorldPosition(keyTarget.position);
       keyTarget.updateMatrixWorld();
       key.current.position.set(CAM.x + 1.6, 2.3, Math.min(CAM.z, keyTarget.position.z + 2.2));
     }
-    encounter.stranger.x = j.root.position.x;
-    encounter.stranger.z = j.root.position.z;
-    j.wrR.localToWorld(tmp.v.set(0, -0.1, 0));
-    encounter.fist.x = tmp.v.x;
-    encounter.fist.y = tmp.v.y;
-    encounter.fist.z = tmp.v.z;
+    encounter.stranger.x = root.position.x;
+    encounter.stranger.z = root.position.z;
+    rig.tip(tmp.a);
+    encounter.fist.x = tmp.a.x;
+    encounter.fist.y = tmp.a.y;
+    encounter.fist.z = tmp.a.z;
   });
-
-  function lieDown() {
-    j.root.position.set(DOWN.x, 0, DOWN.z);
-    j.root.rotation.y = DOWN.yaw;
-    const q = restPose();
-    Object.assign(q, { shLr: 1.25, shLp: 0, elL: -0.35, shRr: 0.2, shRp: 0.1, elR: -0.6, hipLp: -0.55, kneeL: 1.1, ankleL: 0.35, hipRp: 0.02, kneeR: 0.12, headYaw: 0.8, headPitch: 0 });
-    Object.assign(st.pose, q);
-    applyPose(j, st.pose);
-    j.head.quaternion.multiply(headFix);
-    j.hips.position.set(j.hipsRest.x, 0, j.hipsRest.z);
-    j.body.position.set(0, 0.2, 0);
-    j.body.rotation.set(-Math.PI / 2, 0, 0);
-    face.set({ anger: 0, sneer: 0, open: 0.35, shock: 0.4, lookX: 0, lookY: 0 });
-    if (key.current) key.current.visible = false;
-    encounter.stranger.x = DOWN.x;
-    encounter.stranger.z = DOWN.z;
-  }
 
   return (
     <>
-      <primitive object={j.root} />
+      <primitive object={rig.root} />
+      {/* the knife where it fell, by his right hand */}
+      <primitive object={rig.groundKnife} position={[DOWN.x - 0.55, 0.012, DOWN.z - 1.05]} rotation={[0, 2.2, 0]} />
       <primitive object={keyTarget} />
       <spotLight ref={key} target={keyTarget} color="#efeadf" intensity={0} angle={0.42} penumbra={0.7} decay={2} distance={9} visible={false} />
     </>
@@ -350,9 +185,9 @@ export function Bag({ active }: { active: boolean }) {
   const ref = useMemo(() => Object.assign(new Group(), { name: 'bag' }), []);
   const light = useRef<PointLight>(null);
   useFrame(() => {
-    // dropped in the struggle (under the ink), and back on your shoulder if you scroll back before it
+    // dropped in the struggle (under the black), and back on your shoulder if you scroll back before it
     const t = encounterAt(localProgress('city')).t;
-    const dropped = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.ink + 0.35;
+    const dropped = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.dark;
     ref.visible = active && t >= dropped;
     if (light.current) light.current.visible = ref.visible;
   });

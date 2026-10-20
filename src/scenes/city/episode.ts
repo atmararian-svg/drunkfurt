@@ -53,7 +53,7 @@ function encounterCamera(local: number, pose: CameraPose) {
     return;
   }
   if (local < BEAT.noticed - 0.02 || local > BEAT.cut) return;
-  if (v.outcome === 'blocked' && v.t >= BLOCK.ink + 0.35) return; // he is down, under the ink
+  if (v.outcome === 'blocked' && v.t >= BLOCK.dark) return; // the page is black; he is down
   const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1));
   const him = strangerGroundAt(local);
   const dx = him.x - pose.position.x;

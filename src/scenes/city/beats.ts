@@ -30,13 +30,14 @@ export const KO = {
   resolve: 2.6,
 } as const;
 
-/** Block sequence, in seconds of the fight's own clock after the click (spread over gate → aftermath). */
+/**
+ * You defended: the page goes black before anything is shown, two hits land in
+ * the dark (printed as BAM! and WHAM!), and it opens on him lying there.
+ * Seconds of the fight's own clock after the click (spread over gate → aftermath).
+ */
 export const BLOCK = {
-  guardUp: 0.12,
-  contact: 0.15,
-  hitStop: 0.07,
-  counter: 0.4,
-  counterLands: 0.53,
-  ink: 0.64,
+  dark: 0.12,
+  hit1: 0.42,
+  hit2: 0.86,
   resolve: 2.1,
 } as const;

@@ -82,7 +82,6 @@ export function encounterAt(local: number): EncounterView {
   if (!o && encounter.armed) punch = Math.min(1, SCROLLED_PUNCH + (performance.now() - encounter.armedAt) / 1000 / PUNCH_WINDOW);
   if (t >= 0) punch = local < BEAT.aftermath ? encounter.punchAtDecision : 0;
   let shake = 0;
-  if (t >= 0 && o === 'blocked') shake = pulse(t, BLOCK.contact, 1) + pulse(t, BLOCK.counterLands, 0.7);
   if (t >= 0 && o === 'knockedOut') shake = pulse(t, 0.03, 1.4);
   return { outcome: o, t, punch, shake };
 }
@@ -102,10 +101,10 @@ export function cityTimeScale(local: number) {
 interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
-    { at: 0, kind: 'exhale1' },
-    { at: BLOCK.contact, kind: 'block' },
-    { at: BLOCK.counter - 0.04, kind: 'exhale2' },
-    { at: BLOCK.counterLands, kind: 'punch' },
+    { at: BLOCK.hit1 - 0.03, kind: 'exhale1' },
+    { at: BLOCK.hit1, kind: 'block' },
+    { at: BLOCK.hit2 - 0.04, kind: 'exhale2' },
+    { at: BLOCK.hit2, kind: 'punch' },
   ],
   knockedOut: [
     { at: 0, kind: 'exhale2' },

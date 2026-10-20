@@ -5,7 +5,7 @@ import { story, useStory } from '../core/store';
 import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { PLANNED, builtEpisodes } from '../episodes';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
-import { drawBrushWipe, drawImpact, drawKnockout } from './brush';
+import { drawBrushWipe, drawHits, drawKnockout } from './brush';
 
 /** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
 function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
@@ -20,15 +20,12 @@ function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
   if (id === 'city' && encounter.outcome) {
     // once the fight has gone black, the page stays inked until the aftermath opens it again
     const t = encounterAt(local).t;
-    const black = encounter.outcome === 'blocked' ? BLOCK.ink + IMPACT_BLACK : KO.dark;
+    const black = encounter.outcome === 'blocked' ? BLOCK.dark : KO.dark;
     if (t >= black && local < BEAT.aftermath) return { w: 1, mode: 'open' };
     if (local >= BEAT.aftermath && local < BEAT.aftermath + 0.035) return { w: 1 - (local - BEAT.aftermath) / 0.035, mode: 'open' };
   }
   return { w: 0, mode: 'open' };
 }
-
-/** When the strike frames (drawImpact) have gone fully black, in seconds after they start. */
-const IMPACT_BLACK = 0.82;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -98,16 +95,16 @@ export function Overlay() {
         drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, id === 'city' && local > 0.5 ? 13 : 7);
         last = key;
       }
-      // the strike frames, a function of where the fight is (its time comes from the progress):
-      // blocked, they come in as your counter lands (the block itself plays in 3D);
+      // the fight frames, a function of where the fight is (its time comes from the progress):
+      // defended, the page goes black and the two hits are printed into the dark;
       // knocked out, a flash, then the lights go out as you fall
       const v = id === 'city' ? encounterAt(local) : null;
-      const hitT = !v || v.t < 0 || local >= BEAT.aftermath ? -1 : v.outcome === 'knockedOut' ? v.t : v.t - BLOCK.ink;
+      const hitT = !v || v.t < 0 || local >= BEAT.aftermath ? -1 : v.t;
       const hitKey = hitT < 0 ? '' : `${v!.outcome}${hitT.toFixed(3)}${hit.width}`;
       if (hitKey !== lastHit) {
         hctx.clearRect(0, 0, hit.width, hit.height);
         if (hitT >= 0 && v!.outcome === 'knockedOut') drawKnockout(hctx, hit.width, hit.height, hitT, KO.dark);
-        else if (hitT >= 0) drawImpact(hctx, hit.width, hit.height, hitT);
+        else if (hitT >= 0) drawHits(hctx, hit.width, hit.height, hitT, BLOCK);
         lastHit = hitKey;
       }
       raf = requestAnimationFrame(loop);

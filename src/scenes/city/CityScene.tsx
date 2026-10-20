@@ -12,7 +12,6 @@ import { cityNav } from './nav';
 import { BEAT, cityTimeScale, disarm, encounter, updateEncounter } from './encounter';
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
-import { PlayerArms } from './PlayerArms';
 import { Bag, Stranger, StrangerBoundary } from './Stranger';
 import { Street } from './Street';
 import { StreetFurniture } from './StreetFurniture';
@@ -92,7 +91,6 @@ export function CityScene({ active }: { active: boolean }) {
         <Stranger active={active} timeScale={timeScale} />
       </StrangerBoundary>
       <Bag active={active} />
-      <PlayerArms active={active} />
       <Soundscape active={active} />
     </>
   );

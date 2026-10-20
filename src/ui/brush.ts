@@ -121,84 +121,55 @@ export function drawBrushWipe(ctx: CanvasRenderingContext2D, W: number, H: numbe
 }
 
 /**
- * The strike: a flash of paper, black strokes slamming across, a small burst of
- * red (the only red in the experience), then black. `t` in seconds.
+ * The fight you do not see: the page goes black first, then the two hits are
+ * printed into the dark as comic sound effects (a jagged burst with a word on
+ * it), each popping in as it lands. `t` in seconds of the fight; `beats` gives
+ * when the black is complete and when each hit lands.
  */
-export function drawImpact(ctx: CanvasRenderingContext2D, W: number, H: number, t: number) {
+export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, beats: { dark: number; hit1: number; hit2: number }) {
   ctx.clearRect(0, 0, W, H);
   if (t < 0) return;
-  const rnd = mulberry32(99);
-  // paper flash
-  if (t < 0.14) {
-    ctx.fillStyle = `rgba(241,240,233,${0.9 * (1 - t / 0.14)})`;
-    ctx.fillRect(0, 0, W, H);
-  }
-  // speed lines radiating from the point of impact
-  const cx = W * 0.52;
-  const cy = H * 0.5;
-  if (t > 0.03 && t < 0.6) {
-    ctx.strokeStyle = 'rgba(12,12,12,0.85)';
-    for (let i = 0; i < 46; i++) {
-      const a = rnd() * Math.PI * 2;
-      const r0 = Math.min(W, H) * (0.18 + rnd() * 0.12);
-      const r1 = Math.max(W, H) * 0.9;
-      ctx.lineWidth = 1 + rnd() * 5;
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
-      ctx.lineTo(cx + Math.cos(a) * r1, cy + Math.sin(a) * r1);
-      ctx.stroke();
-    }
-  }
-  // three heavy strokes, one after another
-  const slams = [
-    { a: -0.5, at: 0.06 },
-    { a: 0.42, at: 0.16 },
-    { a: -0.12, at: 0.27 },
-  ];
-  ctx.fillStyle = '#0c0c0c';
-  for (const s of slams) {
-    const p = Math.min(1, Math.max(0, (t - s.at) / 0.09));
-    if (p <= 0) continue;
+  ctx.fillStyle = `rgba(10,10,10,${Math.min(1, t / beats.dark)})`;
+  ctx.fillRect(0, 0, W, H);
+  const u = Math.min(W, H);
+  const word = (text: string, at: number, cx: number, cy: number, tilt: number, seed: number) => {
+    const age = t - at;
+    if (age < 0) return;
+    // pops in a little too big, settles
+    const pop = age < 0.1 ? 1.35 - 0.35 * (age / 0.1) : 1;
+    const r = u * 0.2 * pop;
+    const rnd = mulberry32(seed);
     ctx.save();
     ctx.translate(cx, cy);
-    ctx.rotate(s.a);
-    const len = Math.max(W, H) * 1.3 * p;
-    const th = Math.min(W, H) * 0.16;
+    ctx.rotate(tilt);
+    // the burst: a jagged star in paper white with an ink edge
     ctx.beginPath();
-    ctx.moveTo(-len / 2, -th * 0.4);
-    for (let k = 0; k <= 12; k++) ctx.lineTo(-len / 2 + (len * k) / 12, -th / 2 + (rnd() - 0.5) * th * 0.25);
-    for (let k = 12; k >= 0; k--) ctx.lineTo(-len / 2 + (len * k) / 12, th / 2 + (rnd() - 0.5) * th * 0.25);
-    ctx.closePath();
-    ctx.fill();
-    ctx.restore();
-  }
-  // the red burst: small, sharp, gone quickly
-  const rp = Math.min(1, Math.max(0, (t - 0.12) / 0.08));
-  const rf = 1 - Math.min(1, Math.max(0, (t - 0.55) / 0.3));
-  if (rp > 0 && rf > 0) {
-    ctx.save();
-    ctx.translate(cx + W * 0.02, cy - H * 0.02);
-    ctx.rotate(0.3);
-    ctx.globalAlpha = rf;
-    ctx.fillStyle = '#d53a32';
-    ctx.beginPath();
-    const spikes = 11;
-    const R = Math.min(W, H) * 0.11 * (0.6 + 0.4 * rp);
-    for (let k = 0; k < spikes * 2; k++) {
-      const r = k % 2 === 0 ? R * (0.9 + rnd() * 0.5) : R * 0.38;
-      const a = (k / (spikes * 2)) * Math.PI * 2;
-      ctx.lineTo(Math.cos(a) * r, Math.sin(a) * r);
+    const n = 15;
+    for (let i = 0; i <= n * 2; i++) {
+      const a = (i / (n * 2)) * Math.PI * 2;
+      const rr = i % 2 === 0 ? r * (0.95 + rnd() * 0.25) : r * (0.55 + rnd() * 0.12);
+      ctx.lineTo(Math.cos(a) * rr * 1.25, Math.sin(a) * rr);
     }
     ctx.closePath();
+    ctx.fillStyle = '#f1f0e9';
     ctx.fill();
+    ctx.lineWidth = u * 0.008;
+    ctx.strokeStyle = '#101010';
+    ctx.stroke();
+    // the word: heavy condensed letters in the yellow accent, inked
+    ctx.font = `${Math.round(r * 0.62)}px Anton, Impact, 'Arial Narrow Bold', sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = u * 0.014;
+    ctx.strokeStyle = '#101010';
+    ctx.strokeText(text, 0, r * 0.04);
+    ctx.fillStyle = '#f5d21a';
+    ctx.fillText(text, 0, r * 0.04);
     ctx.restore();
-  }
-  // ink closes over everything
-  const black = Math.min(1, Math.max(0, (t - 0.42) / 0.4));
-  if (black > 0) {
-    ctx.fillStyle = `rgba(12,12,12,${black})`;
-    ctx.fillRect(0, 0, W, H);
-  }
+  };
+  word('BAM!', beats.hit1, W * 0.36, H * 0.4, -0.16, 3);
+  word('WHAM!', beats.hit2, W * 0.64, H * 0.6, 0.12, 8);
 }
 
 /**
