@@ -142,12 +142,25 @@ export function hand(side: -1 | 1, skin: Color, curl = 0): Piece[] {
       chain.multiply(new Matrix4().makeTranslation(0, -len, 0));
     });
   });
+  // a closing hand: the curled fingers pack into one mass on the palm side (the body of the fist)
+  if (curl > 0.5) {
+    const k = (curl - 0.5) / 0.5;
+    const mass = loft(
+      [
+        { at: -0.05, w: 0.03 * k + 0.004, front: 0.036, back: 0.034, cx: inward * (0.018 + 0.012 * k) },
+        { at: -0.075, w: 0.04 * k + 0.004, front: 0.041, back: 0.039, cx: inward * (0.02 + 0.014 * k), p: 3 },
+        { at: -0.1, w: 0.036 * k + 0.004, front: 0.038, back: 0.036, cx: inward * (0.016 + 0.012 * k), p: 3 },
+      ],
+      14,
+    );
+    out.push(paint(mass, skin));
+  }
   // thumb: from the ball of the thumb (the metacarpal is inside the palm), forwards and down when
   // open, across the front of the curled fingers in a fist
   const dOpen = new Vector3(inward * 0.3, -0.82, 0.5).normalize();
-  const dFist = new Vector3(inward * 0.75, -0.55, -0.2).normalize();
+  const dFist = new Vector3(inward * 0.35, -0.3, -0.89).normalize();
   const d = dOpen.lerp(dFist, curl).normalize();
-  const thumb = new Matrix4().compose(V.set(inward * (0.01 + 0.006 * curl), -0.048, 0.03 - 0.006 * curl), Q.setFromUnitVectors(new Vector3(0, -1, 0), d), ONE);
+  const thumb = new Matrix4().compose(V.set(inward * (0.01 + 0.03 * curl), -0.048 - 0.022 * curl, 0.03), Q.setFromUnitVectors(new Vector3(0, -1, 0), d), ONE);
   [0.036, 0.03].forEach((len, k) => {
     const seg = limb(len, 0.0118 - k * 0.0012, 0.0106 - k * 0.001, 0, 0.5, 7);
     seg.applyMatrix4(thumb);
