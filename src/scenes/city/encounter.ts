@@ -59,11 +59,16 @@ export const debug = { blockT: -1 };
 /** Seconds since the click, or -1. */
 export const blockTime = () => debug.blockT >= 0 ? debug.blockT : (encounter.impactAt > 0 && encounter.state !== 'approach' && encounter.state !== 'armed' ? (performance.now() - encounter.impactAt) / 1000 : -1);
 
+/** Seconds of real time between the DEFEND prompt and his fist landing. */
+const PUNCH_WINDOW = 3.7;
+let armedAt = 0;
+
 /** Called every frame by the city world. `dt` is already scaled by cityTimeScale. */
 export function updateEncounter(dt: number) {
   const local = localProgress('city');
   if (encounter.state === 'approach' && local >= BEAT.gate - 0.002) {
     encounter.state = 'armed';
+    armedAt = performance.now();
     story.setState({ prompt: 'defend' });
   } else if (encounter.state === 'armed' && local < BEAT.gate - 0.02) {
     // the visitor scrolled back before acting: the moment is not over, just postponed
@@ -73,10 +78,10 @@ export function updateEncounter(dt: number) {
   // the punch: the first few percent come with the scroll, then it keeps coming at a tenth of real speed
   // (a full punch takes ~0.3 s, so ~3 s here), and stops just short of you if you never react
   const scrolled = 0.12 * clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1);
-  // armed: the punch keeps coming at a tenth of real speed (dt is already scaled), about 3.7 s of real time
-  // from the prompt to contact. If it arrives, you are knocked out.
+  // armed: the punch keeps coming at a tenth of real speed, PUNCH_WINDOW seconds of wall-clock time from the
+  // prompt to contact (wall-clock, so a slow frame rate cannot stretch it). If it arrives, you are knocked out.
   if (encounter.state === 'armed') {
-    encounter.punch = Math.min(1, Math.max(encounter.punch, scrolled) + dt * 2.4);
+    encounter.punch = Math.min(1, Math.max(encounter.punch, scrolled + (performance.now() - armedAt) / 1000 / PUNCH_WINDOW));
     if (encounter.punch >= 1) knockOut();
   } else if (encounter.state === 'approach') encounter.punch = scrolled;
   encounter.shake = Math.max(0, encounter.shake - dt * 3.5);
