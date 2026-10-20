@@ -160,3 +160,43 @@ export function applyWalk(j: Joints, phase: number, amount: number, opts: { hold
   const st = (side: 'L' | 'R') => (t < 0.5 ? a[side].stance : b[side].stance);
   return { stanceL: w > 0.05 ? st('L') : 1, stanceR: w > 0.05 ? st('R') : 1 };
 }
+
+/**
+ * Measures how the captured walk lands on a particular skeleton: where each
+ * foot is (relative to the body, facing +z) just after it touches down, and
+ * how far the body must travel per cycle for a planted foot to stay put. For a
+ * walk that is a pure function of position (the stranger's), these make the
+ * pinned feet agree with the walk instead of being dragged onto a guess.
+ * Leaves the skeleton posed; pose it again afterwards.
+ */
+/** Where in its stance a foot counts as down (pinned from here). */
+export const TOUCH = 0.04;
+
+export function calibrateWalk(j: Joints) {
+  const pos = j.root.position.clone();
+  const yaw = j.root.rotation.y;
+  j.root.position.set(0, 0, 0);
+  j.root.rotation.set(0, 0, 0);
+  const at = (phase: number, side: 'L' | 'R') => {
+    // from the rig's rest place each time (applyWalk adds the sway to wherever the hips are)
+    j.hips.position.set(j.hipsRest.x, j.hips.position.y, j.hipsRest.z);
+    applyWalk(j, phase, 1);
+    j.root.updateMatrixWorld(true);
+    return (side === 'L' ? j.ankleL : j.ankleR).getWorldPosition(new Vector3());
+  };
+  const foot = { L: new Vector3(), R: new Vector3() };
+  let stride = 0;
+  for (const side of ['L', 'R'] as const) {
+    const w = STANCE_WINDOW[side];
+    // just after touch-down: where the foot is pinned from
+    foot[side].copy(at(w.start + w.length * TOUCH, side));
+    // the planted foot moves back past the hips as fast as the body must move forward
+    const a = at(w.start + w.length * 0.3, side);
+    const b = at(w.start + w.length * 0.7, side);
+    stride += ((a.z - b.z) / (w.length * 0.4)) * Math.PI * 2 * 0.5;
+  }
+  j.root.position.copy(pos);
+  j.root.rotation.y = yaw;
+  j.root.updateMatrixWorld(true);
+  return { stride, foot };
+}

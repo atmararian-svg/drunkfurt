@@ -14,11 +14,12 @@ import {
   Vector3,
 } from 'three';
 import { Expression, FACE_WINDOW, calmFace, faceMaterial } from '../../characters/face';
-import { Landmarks, faceDecal, monoMaterial, rigMesh } from '../../characters/meshRig';
+import { faceDecal, monoMaterial, rigMesh } from '../../characters/meshRig';
+import { LANDMARKS } from './strangerRig';
 import { loadGlb } from '../../characters/inlineModel';
 import { aimArm } from '../../characters/ik';
-import { activityPose, applyPose, copyPose, legLengths, restPose } from '../../characters/pose';
-import { START_PHASE, STANCE_WINDOW, WALK, applyWalk, stanceProgress, strideFor } from '../../characters/walkClip';
+import { activityPose, applyPose, copyPose, restPose } from '../../characters/pose';
+import { START_PHASE, STANCE_WINDOW, TOUCH, applyWalk, calibrateWalk, stanceProgress } from '../../characters/walkClip';
 import { lerpAngle } from '../../characters/crowd';
 import { FootTarget, placeFeet } from '../../characters/feet';
 import { clamp, smoothstep } from '../../core/math';
@@ -31,33 +32,11 @@ import { ROUTE_LEN, ramp, routeAt, routeS, walkPace } from './strangerRoute';
 /** Where he ends up afterwards: on his back, head towards the house fronts. */
 const DOWN = { x: 7.3, z: -36.8, yaw: -0.64 };
 export const BAG_SPOT = { x: 6.1, z: -35.3, yaw: 0.7 };
-const HEIGHT = 1.82;
 /** Your eyes when he swings (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/**
- * Where his joints are on the model (measured from the mesh, metres, feet on
- * y = 0, facing +z). "L" is the -x side, as in the procedural rig.
- */
-const LANDMARKS: Landmarks = {
-  height: HEIGHT,
-  hips: [0.03, 0.9, 0.0],
-  waist: [0.02, 1.02, -0.02],
-  neck: [-0.04, 1.55, -0.01],
-  headTop: [-0.14, 1.82, 0.02],
-  shoulder: [[-0.2, 1.45, -0.03], [0.19, 1.45, 0.0]],
-  elbow: [[-0.27, 1.12, -0.08], [0.27, 1.12, 0.01]],
-  wrist: [[-0.26, 0.9, -0.02], [0.25, 0.9, 0.08]],
-  fingertips: [[-0.24, 0.75, 0.0], [0.22, 0.76, 0.07]],
-  hip: [[-0.06, 0.9, -0.02], [0.12, 0.9, 0.02]],
-  knee: [[-0.09, 0.49, -0.035], [0.175, 0.49, 0.07]],
-  ankle: [[-0.05, 0.1, -0.03], [0.16, 0.1, 0.0]],
-  toe: [[-0.06, 0.04, 0.14], [0.19, 0.04, 0.16]],
-  face: [[-0.165, 1.632, 0], [-0.098, 1.632, 0], [-0.13, 1.556, 0]],
-  faceTilt: [0.68, 0.28],
-};
 
 /**
  * The stranger. Late thirties, a bad night behind him: a grey hoodie a size
@@ -72,7 +51,7 @@ const LANDMARKS: Landmarks = {
  */
 export function Stranger({ active, timeScale }: { active: boolean; timeScale: () => number }) {
   const gltf = suspend(() => loadGlb(attackerUrl), ['drunkfurt-attacker']);
-  const { j, face, headFix, legs } = useMemo(() => {
+  const { j, face, headFix, gait } = useMemo(() => {
     // the model's own textures (worn jacket, hoodie, scarf, torn jeans), printed in greys
     let map: MeshStandardMaterial['map'] = null;
     let normalMap: MeshStandardMaterial['normalMap'] = null;
@@ -92,8 +71,9 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     // the model stands with his head bowed and tilted; straighten most of that so he can look at you
     const headFix = new Quaternion().slerp(rig.headFix, 0.85);
     rig.joints.root.name = 'stranger';
-    const legs = legLengths(rig.joints);
-    return { j: rig.joints, face, headFix, legs };
+    // how the captured walk sits on his rig: foot placement at mid-stance, distance per cycle
+    const gait = calibrateWalk(rig.joints);
+    return { j: rig.joints, face, headFix, gait };
   }, [gltf]);
   // only ambient time (breathing, a blink) lives here; everything the story does is computed from the progress
   const st = useMemo(() => ({ pose: restPose(), target: restPose(), idle: restPose(), t: 0, expr: calmFace() }), []);
@@ -170,7 +150,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     // gait from the route itself (the captured walk, walkClip.ts): the phase is the distance he has walked,
     // the pace how fast the scroll moves him along it
     const pace = walkPace(walkU);
-    const stride = strideFor(WALK.speed, legs.thigh + legs.shin);
+    const stride = gait.stride;
     const phase = START_PHASE + (s / stride) * Math.PI * 2;
     if (walkU >= 1) {
       // planted: feet apart, right foot back, weight forward, shoulders hunched
@@ -242,14 +222,16 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       for (const side of ['L', 'R'] as const) {
         const u = stanceProgress(phase, side);
         if (u < 0) continue;
-        // where his body is when this foot is at mid-stance
-        const toMid = (0.5 - u) * STANCE_WINDOW[side].length;
-        const m = routeAt(clamp(s + (toMid / TAU) * stride, 0, ROUTE_LEN));
-        const rest = LANDMARKS.ankle[side === 'L' ? 0 : 1];
+        // where his body was when this foot touched down
+        const back = (TOUCH - u) * STANCE_WINDOW[side].length;
+        const m = routeAt(clamp(s + (back / TAU) * stride, 0, ROUTE_LEN));
+        // the foot where the walk itself puts it at touch-down (calibrated on his rig), at his body's place then
+        const f = gait.foot[side];
         const c = Math.cos(m.yaw);
         const sn = Math.sin(m.yaw);
-        const w = Math.min(1, pace * 1.5) * smoothstep(clamp(u / 0.06, 0, 1)) * smoothstep(clamp((1 - u) / 0.06, 0, 1));
-        targets[side] = { anchor: new Vector3(m.x + rest[0] * c + rest[2] * sn, j.ankleHeight, m.z - rest[0] * sn + rest[2] * c), w, yaw: m.yaw };
+        // pinned from touch-down until the heel starts to lift (the ankle rises and rolls forward over the toes)
+        const w = Math.min(1, pace * 1.5) * smoothstep(clamp((u - TOUCH) / 0.03 + 1, 0, 1)) * smoothstep(clamp((0.86 - u) / 0.1, 0, 1));
+        targets[side] = { anchor: new Vector3(m.x + f.x * c + f.z * sn, j.ankleHeight, m.z - f.x * sn + f.z * c), w, yaw: m.yaw };
       }
       placeFeet(j, targets);
     }
