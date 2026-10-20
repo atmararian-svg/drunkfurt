@@ -335,7 +335,7 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       // the blade (the hand's +x) along `dir`
       hand.getWorldQuaternion(QA);
       const blade = C.set(1, 0, 0).applyQuaternion(QA).normalize();
-      turnWorld(hand, QB.setFromUnitVectors(blade, D.copy(dir).normalize()));
+      turnWorld(hand, new Quaternion().setFromUnitVectors(blade, D.copy(dir).normalize()));
     },
     leftHand(target, pole) {
       twoBone(bone('LeftArm'), bone('LeftForeArm'), bone('LeftHand'), target, pole);
