@@ -20,6 +20,7 @@ const DOWN = { x: 7.0, z: -36.3, yaw: 0.9 };
 export const BAG_SPOT = { x: 6.1, z: -35.3, yaw: 0.7 };
 /** Your eyes when he comes at you (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
+const UP = new Vector3(0, 1, 0);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -112,12 +113,14 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       const left = body(0.24, 0.98 + 0.08 * raise, 0.16 + 0.06 * raise, tmp.b);
       rig.leftHand(leftFK.lerp(left, hands), body(0.9, -0.6, -0.3, tmp.c).sub(root.position));
       const rightFK = rig.bone('RightHand').getWorldPosition(tmp.a);
-      // low at his side, blade forward and down; then held out at chest height, forearm level,
-      // the blade turned half-way towards your face (the wrist bends about 30°, an easy hold)
+      // low at his side, blade forward and down; then held out at chest height, forearm level
+      // (the wrist bends about 20°, an easy hold)
       const held = body(-0.24, 0.96, 0.2, tmp.b).lerp(body(-0.26, 1.32, 0.42, tmp.c), raise);
       const fx = Math.sin(yaw);
       const fz = Math.cos(yaw);
-      const dir = tmp.d.set(fx, -0.35, fz).normalize().lerp(tmp.e.subVectors(CAM, held).normalize(), raise).normalize();
+      // raised: the blade up and leaning towards you, seen along its length (not end-on)
+      const raised = tmp.e.subVectors(CAM, held).normalize().add(UP).normalize();
+      const dir = tmp.d.set(fx, -0.35, fz).normalize().lerp(raised, raise).normalize();
       const pole = body(-0.5, -1, -0.5, new Vector3()).sub(root.position);
       rig.rightHand(rightFK.lerp(held, hands), dir, pole, 0.5);
     }
