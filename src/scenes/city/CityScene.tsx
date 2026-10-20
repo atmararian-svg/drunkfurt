@@ -14,7 +14,7 @@ import { BEAT, cityTimeScale, encounter, updateEncounter } from './encounter';
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
 import { PlayerArms } from './PlayerArms';
-import { Bag, Stranger } from './Stranger';
+import { Bag, Stranger, StrangerBoundary } from './Stranger';
 import { Street } from './Street';
 import { StreetFurniture } from './StreetFurniture';
 
@@ -91,7 +91,9 @@ export function CityScene({ active }: { active: boolean }) {
       <StreetFurniture active={active} />
       <Cars active={active} timeScale={timeScale} />
       <People crowd={crowd} scroll={() => localProgress('city')} timeScale={timeScale} enabled={active} />
-      <Stranger active={active} timeScale={timeScale} />
+      <StrangerBoundary>
+        <Stranger active={active} timeScale={timeScale} />
+      </StrangerBoundary>
       <Bag active={active} />
       <PlayerArms active={active} />
       <Soundscape active={active} />

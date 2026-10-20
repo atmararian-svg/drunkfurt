@@ -1,7 +1,7 @@
-import { useFrame, useLoader } from '@react-three/fiber';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { useFrame } from '@react-three/fiber';
+import { suspend } from 'suspend-react';
 import attackerUrl from '../../assets/attacker.glb?url';
-import { useMemo, useRef } from 'react';
+import { Component, ReactNode, useMemo, useRef } from 'react';
 import {
   CatmullRomCurve3,
   Group,
@@ -15,6 +15,7 @@ import {
 } from 'three';
 import { Expression, FACE_WINDOW, calmFace, faceMaterial } from '../../characters/face';
 import { Landmarks, faceDecal, monoMaterial, rigMesh } from '../../characters/meshRig';
+import { loadGlb } from '../../characters/inlineModel';
 import { aimArm } from '../../characters/ik';
 import { activityPose, applyPose, dampPose, restPose, walkPose } from '../../characters/pose';
 import { clamp, smoothstep } from '../../core/math';
@@ -82,7 +83,7 @@ const LANDMARKS: Landmarks = {
  * (real time): your guard takes his fist, he recoils, your counter lands, ink.
  */
 export function Stranger({ active, timeScale }: { active: boolean; timeScale: () => number }) {
-  const gltf = useLoader(GLTFLoader, attackerUrl);
+  const gltf = suspend(() => loadGlb(attackerUrl), ['drunkfurt-attacker']);
   const { j, face, rig, headFix } = useMemo(() => {
     // the model's own textures (worn jacket, hoodie, scarf, torn jeans), printed in greys
     let map: MeshStandardMaterial['map'] = null;
@@ -390,4 +391,21 @@ export function Bag({ active }: { active: boolean }) {
       </primitive>
     </>
   );
+}
+
+/**
+ * Keeps the city running if his model cannot be built (an old browser, a
+ * failed decode): the scene plays on without him instead of going black.
+ */
+export class StrangerBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(error: unknown) {
+    console.error('[Stranger] model failed to load', error);
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
 }
