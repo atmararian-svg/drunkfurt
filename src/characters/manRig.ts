@@ -45,7 +45,7 @@ export interface ManRig {
   stand(phase: number, walk: number): void;
   /** Leans his upper body forward from the hips by `a` radians (into a thrust). */
   lean(a: number): void;
-  /** Turns head and neck towards a world point (weight 0..1, limited like a neck can). */
+  /** Turns head and neck towards a world point (0 not at all … 1 the face square on it). */
   look(target: Vector3, w: number): void;
   /** Right hand to a world point with the blade pointing along `dir`; elbow towards `pole`. */
   rightHand(target: Vector3, dir: Vector3, pole: Vector3): void;
@@ -188,8 +188,8 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       { at: box.top - 0.088, w: hw * 2 + 0.008, front: hd * 0.9 + 0.016, back: hd * 1.05 + 0.016, cz },
       { at: box.top - 0.062, w: hw * 2 + 0.01, front: hd * 0.92 + 0.016, back: hd * 1.06 + 0.016, cz },
       { at: box.top - 0.05, w: hw * 2, front: hd * 0.86 + 0.01, back: hd * 1.02 + 0.012, cz },
-      { at: box.top - 0.02, w: hw * 1.86, front: hd * 0.8 + 0.008, back: hd * 0.98 + 0.01, cz: cz - 0.004 },
-      { at: box.top + 0.008, w: hw * 1.45, front: hd * 0.62, back: hd * 0.76, cz: cz - 0.008 },
+      { at: box.top - 0.024, w: hw * 1.86, front: hd * 0.8 + 0.008, back: hd * 0.98 + 0.01, cz: cz - 0.004 },
+      { at: box.top - 0.004, w: hw * 1.45, front: hd * 0.62, back: hd * 0.76, cz: cz - 0.008 },
     ],
     20,
   );
@@ -327,7 +327,7 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
         const now = C.copy(fwd).applyQuaternion(QA).normalize();
         const want = D.copy(target).sub(b.getWorldPosition(new Vector3())).normalize();
         QB.setFromUnitVectors(now, want);
-        turnWorld(b, new Quaternion().slerp(QB, w * share * 0.6));
+        turnWorld(b, new Quaternion().slerp(QB, Math.min(1, w) * share));
       }
     },
     rightHand(target, dir, pole) {

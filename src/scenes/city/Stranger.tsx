@@ -20,8 +20,14 @@ const DOWN = { x: 7.0, z: -36.3, yaw: 0.9 };
 export const BAG_SPOT = { x: 6.1, z: -35.3, yaw: 0.7 };
 /** Your eyes when he comes at you (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
-/** How close the blade's tip comes to your eyes when he holds it on you (m). */
-const TIP_NEAR = 0.24;
+/**
+ * Where the blade's tip ends when he holds it on you: this far in front of your
+ * eyes (m), a little low and off to the left of the frame's centre, where the
+ * DEFEND card does not cover it.
+ */
+const TIP_NEAR = 0.3;
+const TIP_LEFT = 0.11;
+const TIP_LOW = 0.035;
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
@@ -66,6 +72,11 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       root.rotation.y = DOWN.yaw;
       rig.lie();
       rig.knife.visible = false;
+      // the knife where it fell: on the pavement just past his open right hand
+      const hand = rig.bone('RightHand').getWorldPosition(tmp.a);
+      const out = tmp.b.set(hand.x - root.position.x, 0, hand.z - root.position.z).normalize();
+      rig.groundKnife.position.set(hand.x + out.x * 0.16, 0.012, hand.z + out.z * 0.16);
+      rig.groundKnife.rotation.set(0, Math.atan2(out.x, out.z) + 0.5, 0);
       rig.groundKnife.visible = true;
       if (key.current) key.current.visible = false;
       encounter.stranger.x = DOWN.x;
@@ -106,7 +117,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     const pace = walkPace(walkU);
     const phase = START_PHASE + (s / rig.stride) * Math.PI * 2;
     rig.stand(phase, pace);
-    rig.lean(0.3 * reach + 0.06 * raise);
+    rig.lean(0.22 * reach + 0.06 * raise);
     root.updateMatrixWorld(true);
     const body = (bx: number, by: number, bz: number, out: Vector3) => out.set(bx, by, bz).applyMatrix4(root.matrixWorld);
 
@@ -123,7 +134,11 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       const held = low.lerp(chest, raise);
       // where the hand must be for the tip to sit TIP_NEAR in front of your eyes
       const toHim = tmp.d.set(root.position.x - CAM.x, 0, root.position.z - CAM.z).normalize();
-      const tipAt = tmp.e.copy(CAM).addScaledVector(toHim, lerp(0.9, TIP_NEAR, reach)).setY(CAM.y - 0.06);
+      const tipAt = tmp.e
+        .copy(CAM)
+        .addScaledVector(toHim, lerp(0.9, TIP_NEAR, reach))
+        .add(new Vector3(toHim.z, 0, -toHim.x).multiplyScalar(TIP_LEFT * reach))
+        .setY(CAM.y - lerp(0.06, TIP_LOW, reach));
       const bladeDir = new Vector3().subVectors(tipAt, held).normalize();
       const atYou = tipAt.clone().addScaledVector(bladeDir, -0.24);
       const handAt = held.clone().lerp(atYou, reach);
@@ -139,7 +154,8 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     rig.knife.visible = draw > 0.5;
     rig.grip(draw);
     // his eyes on you from the moment he notices you
-    rig.look(CAM, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)));
+    // (leaning into the thrust, he keeps his face up at you)
+    rig.look(CAM, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * lerp(0.6, 0.95, reach));
 
     // --- a key light on his face from the shop windows on your right, so you see who it is
     if (key.current) {
@@ -160,8 +176,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
   return (
     <>
       <primitive object={rig.root} />
-      {/* the knife where it fell, by his right hand */}
-      <primitive object={rig.groundKnife} position={[DOWN.x - 0.55, 0.012, DOWN.z - 1.05]} rotation={[0, 2.2, 0]} />
+      <primitive object={rig.groundKnife} />
       <primitive object={keyTarget} />
       <spotLight ref={key} target={keyTarget} color="#efeadf" intensity={0} angle={0.42} penumbra={0.7} decay={2} distance={9} visible={false} />
     </>
