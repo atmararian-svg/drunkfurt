@@ -190,6 +190,10 @@ built from.
     notices you, hard when he stops, sneers as he winds up, shouts as he swings, and shows shock
     when he is blocked.
   - His fists are modelled and replace the scanned hands when he clenches.
+  - His walk is solved for his own leg lengths. While a foot carries his weight it is pinned to
+    the spot his route puts it on: under his hip at mid-stance, computed from the progress, so
+    the walk-up looks the same from either scroll direction. Measured in the browser, a planted
+    foot moves under 1 cm per step while he covers about 0.8 m (before: about 12 cm).
   - A key light from the shop windows lights his face from the moment he notices you.
 - **The punch** uses two-bone IK (`characters/ik.ts`), so the arm never stretches.
   - The fist follows a curved path from the cocked position to your face.
