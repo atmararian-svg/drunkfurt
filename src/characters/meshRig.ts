@@ -2,6 +2,7 @@ import {
   Bone,
   BufferGeometry,
   Color,
+  DoubleSide,
   Euler,
   Float32BufferAttribute,
   Group,
@@ -91,7 +92,9 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
   geo.translate(0, -bb.min.y, 0);
   geo.scale(k, k, k);
   if (!geo.getAttribute('normal')) geo.computeVertexNormals();
-  const bindMesh = new Mesh(geo, new MeshBasicMaterial());
+  geo.computeBoundingBox();
+  geo.computeBoundingSphere();
+  const bindMesh = new Mesh(geo, new MeshBasicMaterial({ side: DoubleSide }));
 
   // --- skeleton (joint names and nesting match characters/figure.ts)
   const root = new Group();
@@ -206,10 +209,17 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
 
   // --- the face frame from three points on it
   const ray = new Raycaster();
+  // depth of the face surface at a point: median of a few rays around it (scans have small holes)
   const hit = (p: V3) => {
-    ray.set(new Vector3(p[0], p[1], 1), new Vector3(0, 0, -1));
-    const h = ray.intersectObject(bindMesh, false)[0];
-    return h ? h.point.clone() : v(p);
+    const zs: number[] = [];
+    for (let dx = -2; dx <= 2; dx++)
+      for (let dy = -2; dy <= 2; dy++) {
+        ray.set(new Vector3(p[0] + dx * 0.006, p[1] + dy * 0.006, 1), new Vector3(0, 0, -1));
+        const h = ray.intersectObject(bindMesh, false)[0];
+        if (h) zs.push(h.point.z);
+      }
+    zs.sort((a, b) => a - b);
+    return new Vector3(p[0], p[1], zs.length ? zs[zs.length >> 1] : p[2]);
   };
   const eL = hit(L.face[0]);
   const eR = hit(L.face[1]);
@@ -225,6 +235,7 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
   // the head fix turns that face frame back to (x right, y up, z forward)
   const basis = new Matrix4().makeBasis(fx, fy, fn);
   const headFix = new Quaternion().setFromRotationMatrix(basis).invert();
+  if (import.meta.env?.DEV) console.info('[meshRig] face ' + JSON.stringify({ eL: eL.toArray(), eR: eR.toArray(), mo: mo.toArray(), n: fn.toArray(), y: fy.toArray() }));
 
   const joints = {
     root,

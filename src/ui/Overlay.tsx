@@ -18,7 +18,8 @@ function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
   if (!first && local < 0.045) return { w: 1, mode: 'open' };
   if (!first && local < 0.12) return { w: 1 - (local - 0.045) / 0.075, mode: 'open' };
   if (id === 'city' && encounter.state === 'resolved') {
-    if (local >= BEAT.cut && local < BEAT.aftermath) return { w: 1, mode: 'open' };
+    // from the moment of contact to the aftermath the page stays inked, however slow the scroll gets there
+    if (local >= BEAT.gate - 0.004 && local < BEAT.aftermath) return { w: 1, mode: 'open' };
     if (local >= BEAT.aftermath && local < BEAT.aftermath + 0.035) return { w: 1 - (local - BEAT.aftermath) / 0.035, mode: 'open' };
   }
   return { w: 0, mode: 'open' };
