@@ -139,8 +139,8 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
         .addScaledVector(toHim, lerp(0.9, TIP_NEAR, reach))
         .add(new Vector3(toHim.z, 0, -toHim.x).multiplyScalar(TIP_LEFT * reach))
         .setY(CAM.y - lerp(0.06, TIP_LOW, reach));
-      // the blade points from his hand at your eyes as it arrives
-      const bladeDir = new Vector3().subVectors(tipAt, held).normalize().lerp(new Vector3().subVectors(CAM, tipAt).normalize(), reach).normalize();
+      // the blade turns towards your eyes as it arrives, not quite end-on, so you see its length
+      const bladeDir = new Vector3().subVectors(tipAt, held).normalize().lerp(new Vector3().subVectors(CAM, tipAt).normalize(), 0.55 * reach).normalize();
       const atYou = tipAt.clone().addScaledVector(bladeDir, -0.24);
       const handAt = held.clone().lerp(atYou, reach);
       const dir = new Vector3().copy(raise > 0 || reach > 0 ? bladeDir : new Vector3(fx, -0.3, fz)).lerp(new Vector3(fx, -0.35, fz), 1 - Math.max(raise, reach)).normalize();
