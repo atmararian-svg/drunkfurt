@@ -40,17 +40,26 @@ scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) 
 
 **Figures** (`src/characters/`) are illustrated people, not capsule mannequins:
 
-- `anatomy.ts` builds organic body parts:
-  - limbs are turned profiles that taper and swell at calves and forearms;
-  - the torso has a chest, a waist and rounded deltoid shoulders;
-  - the head has a skull, jaw, nose, ears and hair or hats;
-  - hands are mittens with thumbs, and the shoes sit flat on the ground.
+- `shapes.ts` lofts the body through cross-sections taken where anatomy changes:
+  - the torso runs from the waist and ribcage through the chest and armpits, then the
+    shoulders slope through the trapezius into the neck;
+  - the deltoids are domes over the shoulder joints, below the trapezius line;
+  - limbs swell at the thigh, the calf and the forearm, and trousers fall straight;
+  - the head (`anatomy.ts`) runs from the chin through the jaw, cheekbones and brow to the
+    crown, with the back of the skull behind the face;
+  - hands have a palm, a thumb and four fingers of three phalanges each. An open hand and a
+    fist come from the same generator, with different finger curl;
+  - shoes have a heel counter, an instep rising to an ankle collar, laces, a rounded toe box,
+    a sole slightly wider than the upper and a little toe spring.
 - Outfits change the silhouette: coat, parka, jacket, hoodie, dress. Props include a
   backpack, shoulder bag, tote, rolling suitcase and phone. Builds vary from slim to broad
   and soft, and heights from 1.62 m to 1.86 m.
-- `figure.ts` assembles a joint hierarchy (hips → spine → neck/head and shoulders → elbows →
-  wrists, plus hips → knees → ankles). Each segment is a single merged mesh with vertex
-  colours, so one material covers everyone.
+- `figure.ts` builds a skeleton (hips → spine → head and shoulders → elbows → wrists, plus
+  hips → knees → ankles). Each person is one skinned mesh with vertex colours:
+  - each part is weighted to its bone, blending into the neighbouring bone around every
+    joint, so elbows, knees, hips and shoulders bend instead of opening a gap;
+  - coat skirts and hems hang from the hips and follow the legs part of the way;
+  - hands are separate meshes on the wrists (open or a fist).
 - `pose.ts` poses figures by activity:
   - waiting, hands in pockets, a phone in hand, a phone at the ear;
   - talking and listening (arms folded, nodding), looking up at the board;
@@ -61,7 +70,21 @@ scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) 
   - heel strike, a flexed knee in swing, a flat foot in stance and a push-off;
   - pelvis rotation and drop, with shoulders counter-rotating and arms swinging softly;
   - the hips are placed so the stance foot stays on the floor, and the cycle advances by
-    distance walked.
+    distance walked, solved for each figure's actual leg lengths;
+  - a walk from standing starts with the weight on the foot under the hips.
+- Feet are pinned while they carry weight (`feet.ts`):
+  - a foot that touches down stays on that spot, and the leg is solved to reach it with
+    two-bone IK, knee forwards;
+  - the foot keeps its heading while the body turns above it, so turning on the spot is a
+    few steps rather than feet rotating on the floor;
+  - the pelvis drops just enough for a pinned foot to stay down, and a free foot is never
+    pushed through the floor;
+  - at lift-off the foot is released and blends back into the swing.
+
+  This holds through starting, stopping, slowing and turning. In a 40 s test (walk,
+  slow, stop, turn round, set off again), feet in contact slip 17 cm in total, against
+  8.5 m for the gait alone. The worst single-frame slip is under 1 cm, and the
+  feet never float.
 - People draw only silhouette ink lines (contour and overlaps), so figures read as clean
   shapes.
 
@@ -82,8 +105,8 @@ built from.
   builds.
 - Walkers keep to their own strip of floor and slow down or wait for anyone in their way.
   After a while they step aside to a free spot.
-- The scroll-driven traveller's pose is a pure function of scroll position, so scrubbing back
-  replays it exactly.
+- The scroll-driven traveller's position and gait phase are pure functions of scroll
+  position, so scrubbing back replays them exactly.
 
 ## Rendering: an illustrated world with real depth
 
@@ -137,7 +160,7 @@ built from.
     crossing;
   - a long boulevard of 19th-century blocks. Their facades are line drawings (procedural canvas
     textures with wobbly ink) and they have shopfronts, mansard roofs and chimneys;
-  - bare trees, curved street lamps, blinking amber traffic lights, parked cars, and two moving
+  - bare trees, curved street lamps, blinking amber traffic lights, parked cars, and three moving
     cars with headlight beams and reflections in the wet road;
   - the skyline as silhouettes: a triangular tower with a lit crown, a cylinder with an antenna,
     the twin towers, a feather crown and an inverted pyramid. These shapes evoke Frankfurt's
@@ -175,22 +198,54 @@ built from.
   - If he is out of reach, he steps further in.
   - Slow motion starts only when he commits. The punch then keeps coming at a tenth of real
     speed.
-- **The encounter** (`encounter.ts`) is a small state machine: approach → armed → impact →
-  resolved, with an outcome that is kept once decided.
-  - A *gate* in `core/timeline.ts` holds the scroll at the DEFEND beat ("Click to block").
-  - **Blocked** (you click in time). In real time, your left forearm comes up and takes his
-    fist, he recoils, and your right counter lands (`PlayerArms.tsx`). There are two exhales
-    and two different impacts, each timed to its contact. Then come a paper flash, speed lines,
+- **The encounter** (`encounter.ts`) is drawn as a function of the scroll progress. The
+  only thing it remembers is the visitor's decision at the gate. `encounterAt(local)` gives the
+  stranger, the camera, your arms, the bag, the overlay and the soundscape everything they draw
+  from. Intervals (local progress, `beats.ts`):
+
+  | Interval | What happens |
+  | --- | --- |
+  | 0.60–0.735 | he walks up |
+  | 0.735–0.80 | he squares up and holds your eye |
+  | 0.80–0.822 | he winds up |
+  | 0.822–0.83 | he commits; time slows to a tenth |
+  | 0.83 | DEFEND: the story waits for your click ("Click to block") |
+  | 0.83–0.905 | the outcome, spread over this stretch of the scroll |
+  | 0.905–1 | the aftermath |
+
+  - **Blocked** (you click in time): your left forearm comes up and takes his fist, he recoils,
+    and your right counter lands (`PlayerArms.tsx`). Then come a paper flash, speed lines,
     heavy ink strokes, a small red burst (the only red in the experience), and black. In the
     aftermath he is on the pavement and your bag is still with you.
-  - **Knocked out** (you never click). The fist lands, the picture snaps, the eyelids close in
+  - **Knocked out** (you never click): the fist lands, the picture snaps, the eyelids close in
     ragged ink, and the camera falls sideways to the pavement. When you come to, he is gone and
     the bag lies next to you.
-  - Either way the page then scrolls itself to the aftermath. The result is permanent: scrolling
-    back shows the street as it is after the fight and never re-arms or replays it. Scroll stays
-    free everywhere else.
+  - Once you decide, the page plays the outcome by moving the progress itself (`playProgress` in
+    `core/timeline.ts`, wall-clock timed). Scrolling yourself takes over at once. Every frame of
+    the fight is a position on the scroll, so scrolling back rewinds it: into the middle of the
+    fight you see that moment, and before he walks up he is back in his doorway. Scrolling
+    forward again replays the same outcome. The prompt does not come back once you have decided.
+  - The only part that runs on real time is the DEFEND window: his fist keeps coming for
+    3.7 s while the story waits. Scroll back before the gate and the window closes; the moment
+    is postponed, not decided.
+  - Sounds are cues fired as the playback crosses them, forwards only. They never feed back
+    into what is drawn, and scrubbing never repeats them.
 - **Time**: everything in the city (people, cars, the stranger) runs on a time scale that eases
   to 10% as he closes in.
+- **Traffic** (`traffic.ts`, plan in `trafficPlan.ts`) is a few scripted cars on fixed lanes,
+  deterministic and pure (fixed sub-steps, no randomness):
+  - Each car is an oriented box over its body and tyres. Lanes are polylines with arcs at the
+    corners, sampled by arc length, so heading never jumps.
+  - The driving lanes run at ±1.75 m from the middle of the boulevard, clear of the parked cars
+    (0.36 m to spare). Before this, a lane ran at 2.3 m and the passing car's tyres cut
+    through the parked cars.
+  - Each step a car sweeps its box along its lane as far as it needs to stop, plus a following
+    gap. It slows to stop 1.6 m short of the first parked car, visitor or car it would touch.
+  - Where lanes cross or merge, the car that would arrive later yields; ties go to the
+    priority lane. A move that would make two boxes overlap is never made, and spawning
+    waits until the entry is clear.
+  - A third car comes up the boulevard and turns into the cross street, crossing one car's lane
+    and merging into another's, so the junction gets real give-way traffic.
 - **Fight sounds** are distinct sounds, each timed to its contact:
   - a short, sharp boxer's exhale as your guard comes up;
   - a dull, bony knock when his fist meets your forearm;
@@ -299,13 +354,24 @@ wipe opens.
   with `src: null`. `AudioDirector` builds the graph after the first click (autoplay-safe). Add
   licensed or recorded files to `public/audio/` and set `src`. It already has a world low-pass for the time-dilation scene,
   and a separate "body" bus for breathing and heartbeat that bypasses it.
-- **Placeholders**: passengers are simple volumetric silhouettes. The buildings and road bridge
-  beyond the open end are blocks. Train interiors are a painted texture, not geometry (except
+- **Placeholders**: the buildings and road bridge beyond the open end are blocks. Train interiors are a painted texture, not geometry (except
   the open vestibule). Shopfront names are generic.
 - Train numbers, times and destinations on the displays are fictional.
 
 ## Dev inspection hook
 
-In dev builds `window.__drunkfurt.setProgress(p)` jumps to a global progress value (0..1)
-without smoothing, for automated screenshots. `window.__ink.uniforms.get('uDebug').value = 1`
-shows the ink buffer. Neither exists in production builds.
+In dev builds, the following hooks exist for automated screenshots and checks. None of them
+exist in production builds.
+
+- `window.__drunkfurt.setProgress(p)` jumps to a global progress value (0..1) without
+  smoothing.
+- `window.__drunkfurt.encounterAt(local)` returns what the encounter shows at a local
+  progress.
+- `window.__traffic.step(seconds)` fast-forwards the cars.
+- `window.__ink.uniforms.get('uDebug').value = 1` shows the ink buffer.
+
+**Character lab** (`/lab.html` on the dev server, `src/lab/`): the city's people on a measured
+floor under the same comic rendering, a walker at any gait phase, and a gallery of hands
+(open, half-closed, fist) and shoes, for close inspection. `window.__lab.cam(pos, target,
+fov)` frames a view, and `window.__lab.walk(phase)` poses the walker. It is a separate page
+and is not part of the production build.

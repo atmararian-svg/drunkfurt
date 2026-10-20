@@ -1,9 +1,11 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { useMemo } from 'react';
 import { Color, Group, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
-import { ellipsoid, fist, limb, merge, paint, place } from '../../characters/anatomy';
+import { ellipsoid, limb, merge, paint, place } from '../../characters/anatomy';
+import { hand } from '../../characters/shapes';
 import { clamp, smoothstep } from '../../core/math';
-import { BLOCK, blockTime, encounter } from './encounter';
+import { localProgress } from '../../core/timeline';
+import { BLOCK, encounterAt } from './encounter';
 
 const grey = (v: number) => new Color().setStyle(`rgb(${v},${v},${v})`);
 const ramp = (x: number, a: number, b: number) => clamp((x - a) / (b - a), 0, 1);
@@ -30,7 +32,7 @@ function forearm(side: -1 | 1, mat: MeshStandardMaterial) {
     merge([
       paint(limb(0.27, 0.05, 0.043, 0.006, 0.25, 14), sleeve),
       paint(place(ellipsoid(0.05, 0.03, 0.05), [0, -0.255, 0]), sleeve), // cuff
-      ...fist(side, skin).map((p) => place(p, [0, -0.27, 0])),
+      ...hand(side, skin, 1).map((p) => place(p, [0, -0.27, 0])),
     ]),
     mat,
   );
@@ -60,8 +62,9 @@ export function PlayerArms({ active }: { active: boolean }) {
   }, []);
 
   useFrame(() => {
-    const bt = active ? blockTime() : -1;
-    const on = bt >= 0 && bt < BLOCK.ink + 0.5 && encounter.state === 'impact' && encounter.outcome === 'blocked';
+    const view = encounterAt(localProgress('city'));
+    const bt = active && view.outcome === 'blocked' ? view.t : -1;
+    const on = bt >= 0 && bt < BLOCK.ink + 0.5;
     left.visible = right.visible = on;
     if (!on) return;
     rig.position.copy(camera.position);

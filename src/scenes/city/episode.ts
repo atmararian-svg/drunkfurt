@@ -4,7 +4,8 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 import type { CameraPose } from '../../core/sequence';
 import type { EpisodeDef } from '../../episodes/types';
 import { CityScene } from './CityScene';
-import { BEAT, KO, blockTime, encounter } from './encounter';
+import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
+import { strangerGroundAt } from './strangerRoute';
 import { cityTrack } from './track';
 
 /**
@@ -26,38 +27,37 @@ import { cityTrack } from './track';
  */
 const KO_DOWN = { x: 6.25, y: 0.24, z: -33.6 };
 
+/** The camera at the gate: where you stand when he swings. */
+const GATE_FRAME = { x: 6.5, y: 1.68, z: -34, yaw: deg(2), pitch: 0 };
+
 function encounterCamera(local: number, pose: CameraPose) {
+  const v = encounterAt(local);
   // knocked out: from the hit to the ground, then lying on the pavement looking at your bag
-  if (encounter.outcome === 'knockedOut') {
-    const t = encounter.state === 'impact' ? blockTime() : 99;
-    if (encounter.state === 'impact' || local >= BEAT.cut) {
-      const snap = smoothstep(clamp(t / KO.snap, 0, 1));
-      const fall = smoothstep(clamp((t - KO.fallFrom) / (KO.fallTo - KO.fallFrom), 0, 1));
-      const start = { x: pose.position.x, y: pose.position.y, z: pose.position.z, yaw: pose.yaw, pitch: pose.pitch };
-      if (encounter.state === 'resolved') Object.assign(start, { x: 6.5, y: 1.68, z: -34, yaw: deg(2), pitch: 0 });
-      // the head snaps back and up, then you go down sideways
-      pose.position.set(
-        lerp(start.x, KO_DOWN.x, fall),
-        lerp(start.y, KO_DOWN.y, fall * fall),
-        lerp(start.z + 0.18 * snap, KO_DOWN.z, fall),
-      );
-      pose.yaw = lerp(start.yaw + 0.12 * snap, deg(6), fall);
-      pose.pitch = lerp(start.pitch + 0.45 * snap * (1 - fall), deg(-14), fall);
-      pose.roll = lerp(-0.25 * snap, deg(-78), fall);
-      pose.fov = 46;
-      if (encounter.state === 'resolved') {
-        // lying still, breathing
-        const b = Math.sin(performance.now() / 900) * 0.004;
-        pose.position.y += b;
-      }
-      return;
-    }
+  if (v.outcome === 'knockedOut' && v.t >= 0) {
+    const t = v.t;
+    const snap = smoothstep(clamp(t / KO.snap, 0, 1));
+    const fall = smoothstep(clamp((t - KO.fallFrom) / (KO.fallTo - KO.fallFrom), 0, 1));
+    const start = GATE_FRAME;
+    // the head snaps back and up, then you go down sideways
+    pose.position.set(
+      lerp(start.x, KO_DOWN.x, fall),
+      lerp(start.y, KO_DOWN.y, fall * fall),
+      lerp(start.z + 0.18 * snap, KO_DOWN.z, fall),
+    );
+    pose.yaw = lerp(start.yaw + 0.12 * snap, deg(6), fall);
+    pose.pitch = lerp(start.pitch + 0.45 * snap * (1 - fall), deg(-14), fall);
+    pose.roll = lerp(-0.25 * snap, deg(-78), fall);
+    pose.fov = 46;
+    // lying still, breathing (ambient, a few millimetres)
+    pose.position.y += Math.sin(performance.now() / 900) * 0.004 * smoothstep(clamp(t - KO.fallTo, 0, 1));
+    return;
   }
-  if (encounter.state === 'resolved' && local < BEAT.cut) return; // nothing left to track
   if (local < BEAT.noticed - 0.02 || local > BEAT.cut) return;
+  if (v.outcome === 'blocked' && v.t >= BLOCK.ink + 0.35) return; // he is down, under the ink
   const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1));
-  const dx = encounter.stranger.x - pose.position.x;
-  const dz = encounter.stranger.z - pose.position.z;
+  const him = strangerGroundAt(local);
+  const dx = him.x - pose.position.x;
+  const dz = him.z - pose.position.z;
   const dist = Math.hypot(dx, dz);
   if (dist > 0.5) {
     const want = Math.atan2(-dx, -dz);
@@ -67,14 +67,14 @@ function encounterCamera(local: number, pose: CameraPose) {
     pose.pitch += smoothstep(clamp((4 - dist) / 2.5, 0, 1)) * 0.05;
   }
   // lean back from the incoming fist
-  const lean = 0.07 * Math.pow(encounter.punch, 1.5);
+  const lean = 0.07 * Math.pow(v.punch, 1.5);
   pose.position.x -= Math.sin(pose.yaw) * -lean;
   pose.position.z += Math.cos(pose.yaw) * lean;
-  pose.pitch -= 0.03 * encounter.punch;
-  // impact jolt: a few centimetres and a fraction of a degree, decaying fast
-  const k = encounter.shake * encounter.shake;
+  pose.pitch -= 0.03 * v.punch;
+  // impact jolt: a few centimetres and a fraction of a degree, decaying fast (a function of the fight's own clock)
+  const k = v.shake * v.shake;
   if (k > 0) {
-    const t = performance.now() / 1000;
+    const t = v.t;
     pose.position.x += Math.sin(t * 61) * 0.012 * k;
     pose.position.y += Math.sin(t * 47 + 1) * 0.01 * k;
     pose.roll += Math.sin(t * 53 + 2) * 0.012 * k;

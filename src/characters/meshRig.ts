@@ -21,7 +21,8 @@ import {
 } from 'three';
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { fist, merge, paint, place } from './anatomy';
+import { merge, paint, place } from './anatomy';
+import { hand } from './shapes';
 import type { Joints } from './figure';
 
 /**
@@ -213,7 +214,7 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
 
   // --- modelled fists, shown in place of the hands when he clenches
   const fistMesh = (side: -1 | 1) => {
-    const m = new Mesh(merge(fist(side, new Color('#625b55')).map((p) => place(p, [0, 0, 0], [0, 0, 0], [0.82, 0.82, 0.82]))), fistMaterial);
+    const m = new Mesh(merge(hand(side, new Color('#625b55'), 1).map((p) => place(p, [0, 0, 0], [0, 0, 0], [1.04, 1.04, 1.04]))), fistMaterial);
     m.userData.ink = 'silhouette';
     m.castShadow = true;
     m.visible = false;

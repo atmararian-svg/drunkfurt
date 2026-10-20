@@ -2,37 +2,42 @@ import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
 import { BEAT, BLOCK, KO } from './beats';
-import { Gate, gates, globalProgress, localProgress, scrollToProgress } from '../../core/timeline';
+import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 
 /**
- * The encounter, as a small state machine shared by the world and the UI:
+ * The encounter. What you see is a function of the scroll progress and of one
+ * remembered fact, the visitor's decision at the gate. Nothing else persists:
+ * scroll back before he walks up and he is standing in his doorway again;
+ * scroll back into the fight and it is reconstructed at that moment.
  *
- *   approach → armed → impact → resolved
+ * Intervals (Episode 2 local progress, see beats.ts):
+ *   strangerMoves → stop    he walks up
+ *   stop → cock             he squares up and holds your eye
+ *   cock → commit           he winds up
+ *   commit → gate           the punch starts; time slows to a tenth
+ *   gate                    DEFEND: the story waits for your click (the only
+ *                           real-time part: his fist keeps coming while you wait)
+ *   gate → aftermath        the outcome, mapped onto progress: blocked (guard,
+ *                           counter, ink) or knocked out (hit, fall, darkness)
+ *   aftermath → 1           afterwards: he is on the pavement, or gone
  *
- *  - approach: the stranger's walk is driven by scroll; time slows towards the gate.
- *  - armed:    the story waits at the gate (scroll cannot pass); DEFEND is shown.
- *  - impact:   the click landed; the comic strike plays (about a second).
- *  - resolved: the gate is open for good and the camera moves on to the aftermath.
- *
- * Resolution is permanent, so scrolling back and forth never re-arms the prompt
- * or replays the strike. Nothing waits on an animation: the click resolves the
- * gate immediately, and the move to the aftermath is scheduled on a timer.
+ * Once decided, the page plays the outcome by moving the progress itself
+ * (timeline autoplay) and the gate stays open. Sounds are cues fired as that
+ * playback crosses them; they never feed back into what is drawn.
  */
-export type EncounterState = 'approach' | 'armed' | 'impact' | 'resolved';
-/** How it ended. Set once and never cleared: scrolling back does not undo what happened. */
 export type Outcome = 'blocked' | 'knockedOut' | null;
 
 export { BEAT, BLOCK, KO } from './beats';
 
 export const encounter = {
-  state: 'approach' as EncounterState,
+  /** The visitor's decision. Set once, at the gate. */
   outcome: null as Outcome,
-  /** performance.now() of the strike, for the overlay. */
-  impactAt: 0,
-  /** The punch, 0 (wound up) … 1 (fist at your guard). Advances in slow motion while armed. */
-  punch: 0,
-  /** Camera shake, decays by itself. */
-  shake: 0,
+  /** How far his punch had come when the decision fell (0..1). */
+  punchAtDecision: 0,
+  /** The DEFEND window is open: the story waits at the gate. */
+  armed: false,
+  /** performance.now() when the window opened. */
+  armedAt: 0,
   /** Stranger's position (written by the stranger each frame, read by the camera). */
   stranger: { x: 0, z: 0 },
   /** His right fist (knuckles), world space, for checks and feedback. */
@@ -42,99 +47,124 @@ export const encounter = {
 const gate: Gate = { episode: 'city', at: BEAT.gate, open: false };
 gates.push(gate);
 
+/** Seconds of real time between the DEFEND prompt and his fist landing. */
+const PUNCH_WINDOW = 3.7;
+/** How far the punch comes with the scroll alone, before the gate. */
+const SCROLLED_PUNCH = 0.12;
+
+/** Length of the outcome, in seconds of playback, spread over gate → aftermath. */
+export const sequenceSeconds = (o: Outcome) => (o === 'knockedOut' ? KO.resolve : BLOCK.resolve);
+
+/** Seconds into the outcome at a local progress (unclamped above), or -1 before it / undecided. */
+export function sequenceTime(local: number) {
+  if (!encounter.outcome || local < BEAT.gate) return -1;
+  return ((local - BEAT.gate) / (BEAT.aftermath - BEAT.gate)) * sequenceSeconds(encounter.outcome);
+}
+
+export interface EncounterView {
+  outcome: Outcome;
+  /** Seconds into the outcome, or -1. */
+  t: number;
+  /** His punch: 0 wound up … 1 at your guard (before the outcome takes over). */
+  punch: number;
+  /** Camera jolt, 0..1.4, from the contacts. */
+  shake: number;
+}
+
+const pulse = (t: number, at: number, amp: number) => (t >= at ? amp * Math.exp(-(t - at) * 4.5) : 0);
+
+/** Everything the world, the camera and the overlay need, at a local progress. */
+export function encounterAt(local: number): EncounterView {
+  const o = encounter.outcome;
+  const t = sequenceTime(local);
+  const u = clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1);
+  let punch = (o ? encounter.punchAtDecision : SCROLLED_PUNCH) * u;
+  if (!o && encounter.armed) punch = Math.min(1, SCROLLED_PUNCH + (performance.now() - encounter.armedAt) / 1000 / PUNCH_WINDOW);
+  if (t >= 0) punch = local < BEAT.aftermath ? encounter.punchAtDecision : 0;
+  let shake = 0;
+  if (t >= 0 && o === 'blocked') shake = pulse(t, BLOCK.contact, 1) + pulse(t, BLOCK.counterLands, 0.7);
+  if (t >= 0 && o === 'knockedOut') shake = pulse(t, 0.03, 1.4);
+  return { outcome: o, t, punch, shake };
+}
+
 /**
- * Time scale of the city. Normal speed through the approach and the stand-off;
- * the moment he commits to the punch, everything drops to a tenth.
+ * Time scale of the city: normal through the approach and the stand-off, a
+ * tenth from the commit through the fight, a hush afterwards.
  */
 export function cityTimeScale(local: number) {
-  if (encounter.state === 'resolved') return local >= BEAT.cut ? 0.35 : 1; // the hush afterwards; normal time if you scroll back
-  if (encounter.state === 'impact' || encounter.state === 'armed') return 0.1;
+  if (encounter.armed) return 0.1;
+  if (encounter.outcome && local >= BEAT.gate) return local >= BEAT.aftermath ? 0.35 : 0.1;
   const s = smoothstep(clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1));
   return 1 - 0.9 * s;
 }
 
-/** Dev inspection: pin the block sequence at a time (seconds) to look at single frames. */
-export const debug = { blockT: -1 };
+// --- sound cues of the outcome, fired as the playback crosses them (never on a scrub backwards)
+interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
+const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
+  blocked: [
+    { at: 0, kind: 'exhale1' },
+    { at: BLOCK.contact, kind: 'block' },
+    { at: BLOCK.counter - 0.04, kind: 'exhale2' },
+    { at: BLOCK.counterLands, kind: 'punch' },
+  ],
+  knockedOut: [
+    { at: 0, kind: 'exhale2' },
+    { at: 0.03, kind: 'ko' },
+    { at: 0.16, kind: 'ring' },
+    { at: KO.fallTo, kind: 'fall' },
+  ],
+};
+let lastT = -1;
 
-/** Seconds since the click, or -1. */
-export const blockTime = () => debug.blockT >= 0 ? debug.blockT : (encounter.impactAt > 0 && encounter.state !== 'approach' && encounter.state !== 'armed' ? (performance.now() - encounter.impactAt) / 1000 : -1);
-
-/** Seconds of real time between the DEFEND prompt and his fist landing. */
-const PUNCH_WINDOW = 3.7;
-let armedAt = 0;
-
-/** Called every frame by the city world. `dt` is already scaled by cityTimeScale. */
-export function updateEncounter(dt: number) {
+/** Called every frame by the city world. */
+export function updateEncounter() {
   const local = localProgress('city');
-  if (encounter.state === 'approach' && local >= BEAT.gate - 0.002) {
-    encounter.state = 'armed';
-    armedAt = performance.now();
-    story.setState({ prompt: 'defend' });
-  } else if (encounter.state === 'armed' && local < BEAT.gate - 0.02) {
-    // the visitor scrolled back before acting: the moment is not over, just postponed
-    encounter.state = 'approach';
-    story.setState({ prompt: null });
+  if (!encounter.outcome) {
+    if (!encounter.armed && local >= BEAT.gate - 0.002) {
+      encounter.armed = true;
+      encounter.armedAt = performance.now();
+      story.setState({ prompt: 'defend' });
+    } else if (encounter.armed && local < BEAT.gate - 0.02) {
+      // the visitor scrolled back before acting: the moment is not over, just postponed
+      disarm();
+    }
+    if (encounter.armed && encounterAt(local).punch >= 1) decide('knockedOut');
   }
-  // the punch: the first few percent come with the scroll, then it keeps coming at a tenth of real speed
-  // (a full punch takes ~0.3 s, so ~3 s here), and stops just short of you if you never react
-  const scrolled = 0.12 * clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1);
-  // armed: the punch keeps coming at a tenth of real speed, PUNCH_WINDOW seconds of wall-clock time from the
-  // prompt to contact (wall-clock, so a slow frame rate cannot stretch it). If it arrives, you are knocked out.
-  if (encounter.state === 'armed') {
-    encounter.punch = Math.min(1, Math.max(encounter.punch, scrolled + (performance.now() - armedAt) / 1000 / PUNCH_WINDOW));
-    if (encounter.punch >= 1) knockOut();
-  } else if (encounter.state === 'approach') encounter.punch = scrolled;
-  encounter.shake = Math.max(0, encounter.shake - dt * 3.5);
-  const limit = (encounter.outcome === 'knockedOut' ? KO.resolve : BLOCK.resolve) * 1000 + 400;
-  if (encounter.state === 'impact' && debug.blockT < 0 && performance.now() - encounter.impactAt > limit) resolve();
+  // sound follows the playback forwards only, and only while the page plays it
+  const t = sequenceTime(local);
+  const prev = Math.max(lastT, -0.001);
+  if (encounter.outcome && autoplay.active && t > prev && t - prev < 0.5) {
+    for (const c of CUES[encounter.outcome]) if (c.at > prev && c.at <= t) audio.fight(c.kind);
+  }
+  lastT = t;
+}
+
+/** Leaving the episode, or scrolling back past the gate, hides a waiting prompt. */
+export function disarm() {
+  if (!encounter.armed) return;
+  encounter.armed = false;
+  story.setState({ prompt: null });
 }
 
 /** The visitor's click. Returns whether it did anything. */
 export function defend() {
-  if (encounter.state !== 'armed') return false;
-  encounter.state = 'impact';
-  encounter.outcome = 'blocked';
-  encounter.impactAt = performance.now();
-  gate.open = true;
-  story.setState({ prompt: null });
+  if (!encounter.armed || encounter.outcome) return false;
   audio.unlock();
-  // you raise your guard with a grunt; his fist meets your forearm; you answer with a straight right
-  audio.fight('exhale1');
-  window.setTimeout(() => {
-    audio.fight('block');
-    encounter.shake = 1;
-  }, BLOCK.contact * 1000);
-  window.setTimeout(() => audio.fight('exhale2'), (BLOCK.counter - 0.04) * 1000);
-  window.setTimeout(() => {
-    audio.fight('punch');
-    encounter.shake = 0.7;
-  }, BLOCK.counterLands * 1000);
-  window.setTimeout(resolve, BLOCK.resolve * 1000);
+  decide('blocked');
   return true;
 }
 
-/** You did not react in time: his fist lands. */
-function knockOut() {
-  if (encounter.state !== 'armed') return;
-  encounter.state = 'impact';
-  encounter.outcome = 'knockedOut';
-  encounter.impactAt = performance.now();
+function decide(o: 'blocked' | 'knockedOut') {
+  encounter.punchAtDecision = Math.min(1, encounterAt(localProgress('city')).punch);
+  encounter.outcome = o;
+  encounter.armed = false;
   gate.open = true;
   story.setState({ prompt: null });
-  // his effort and the hit; the ringing; you go down
-  audio.fight('exhale2');
-  window.setTimeout(() => {
-    audio.fight('ko');
-    encounter.shake = 1.4;
-  }, 30);
-  window.setTimeout(() => audio.fight('ring'), 160);
-  window.setTimeout(() => audio.fight('fall'), KO.fallTo * 1000);
-  window.setTimeout(resolve, KO.resolve * 1000);
-}
-
-function resolve() {
-  if (encounter.state !== 'impact') return;
-  encounter.state = 'resolved';
-  encounter.punch = 0;
-  scrollToProgress(globalProgress('city', BEAT.aftermath + 0.045));
+  // play the outcome: from the gate through the aftermath's first frames, at the sequence's own speed
+  const from = BEAT.gate;
+  const to = BEAT.aftermath + 0.045;
+  const seconds = sequenceSeconds(o) * ((to - from) / (BEAT.aftermath - from));
+  lastT = -1;
+  playProgress(globalProgress('city', from), globalProgress('city', to), seconds);
+  timeline.target = timeline.progress = globalProgress('city', from);
 }

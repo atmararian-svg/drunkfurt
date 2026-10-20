@@ -61,8 +61,35 @@ export function localProgress(id: EpisodeId, p = timeline.progress) {
   return clamp((p - r.start) / (r.end - r.start), 0, 1);
 }
 
+/**
+ * A scripted move of the progress: a beat that plays by itself (the fight after
+ * the visitor's decision). While it runs, progress follows the script exactly,
+ * without smoothing, and the page scroll is kept in step, so everything
+ * downstream still reads the one progress value. Wall-clock timed, so a slow
+ * frame rate cannot stretch it. Any input from the visitor stops it where it is.
+ */
+export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0 };
+
+export function playProgress(from: number, to: number, seconds: number) {
+  Object.assign(autoplay, { active: true, from, to, seconds, start: performance.now() });
+}
+
+export function stopAutoplay() {
+  autoplay.active = false;
+}
+
 export function stepTimeline(dt: number) {
   const prev = timeline.progress;
+  if (autoplay.active) {
+    const u = clamp((performance.now() - autoplay.start) / 1000 / autoplay.seconds, 0, 1);
+    const p = autoplay.from + (autoplay.to - autoplay.from) * u;
+    timeline.target = timeline.progress = p;
+    const max = document.documentElement.scrollHeight - window.innerHeight;
+    window.scrollTo({ top: p * max, behavior: 'auto' });
+    if (u >= 1) autoplay.active = false;
+    timeline.velocity = damp(timeline.velocity, (p - prev) / Math.max(dt, 1e-4), 8, dt);
+    return;
+  }
   // heavy but responsive smoothing: scrolling feels like moving a camera dolly
   timeline.progress = damp(timeline.progress, timeline.target, 4.2, dt);
   if (Math.abs(timeline.progress - timeline.target) < 1e-5) timeline.progress = timeline.target;

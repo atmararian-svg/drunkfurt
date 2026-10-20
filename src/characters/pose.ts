@@ -1,6 +1,5 @@
 import { Euler, Object3D, Quaternion, Vector3 } from 'three';
 import { clamp, damp } from '../core/math';
-import { BODY } from './anatomy';
 import type { Joints } from './figure';
 
 /**
@@ -27,6 +26,9 @@ export interface Pose {
   hipRp: number; hipRr: number; kneeR: number; ankleR: number;
   /** Absolute hips height when sitting (m above ground, unscaled); 0 = grounded by the legs. */
   seat: number;
+  /** Whether each foot carries weight (1) or swings (0); feet that carry weight are pinned to the ground (feet.ts). */
+  stanceL: number;
+  stanceR: number;
 }
 
 export const restPose = (): Pose => ({
@@ -37,6 +39,8 @@ export const restPose = (): Pose => ({
   hipLp: 0, hipLr: 0, kneeL: 0.04, ankleL: -0.04,
   hipRp: 0, hipRr: 0, kneeR: 0.04, ankleR: -0.04,
   seat: 0,
+  stanceL: 1,
+  stanceR: 1,
 });
 
 const KEYS = Object.keys(restPose()) as (keyof Pose)[];
@@ -249,10 +253,18 @@ export function activityPose(p: Pose, a: Activity, t: number, seed: number) {
 /** Distance covered per gait cycle (two steps); crowd.ts advances the phase by the same amount. */
 export const STRIDE_M = 1.44;
 /** Share of the cycle a foot spends on the ground. */
-const STANCE = 1.22 * Math.PI;
+export const STANCE = 1.22 * Math.PI;
+/** Phase at which the left foot is in the middle of its stance (under the hips): where a walk starts from standing. */
+export const START_PHASE = STANCE / 2;
 
-export function walkPose(p: Pose, phase: number, k: number, style: { swing: number; lean: number; stride: number }, scale = 1) {
-  const legLen = (BODY.thigh + BODY.shin) * scale;
+/** Thigh and shin of a rig, in metres (the gait is solved for the legs the figure actually has). */
+export function legLengths(j: Joints) {
+  const s = j.body.scale.y;
+  return { thigh: j.kneeL.position.length() * s, shin: j.ankleL.position.length() * s };
+}
+
+export function walkPose(p: Pose, phase: number, k: number, style: { swing: number; lean: number; stride: number }, legs: { thigh: number; shin: number }) {
+  const legLen = legs.thigh + legs.shin;
   // during stance the foot is planted, so it travels backwards relative to the hips
   // exactly as fast as the body moves forwards
   const reach = (STRIDE_M * (STANCE / (Math.PI * 2))) / 2;
@@ -267,8 +279,8 @@ export function walkPose(p: Pose, phase: number, k: number, style: { swing: numb
       const rel = reach - 2 * reach * u; // foot ahead of the hip (m), decreasing linearly
       knee = 0.16 * Math.sin(u * Math.PI); // a little give under load
       // solve the hip angle for the bent two-segment leg so the ankle lands exactly on `rel`
-      const lt = BODY.thigh * scale;
-      const ls = BODY.shin * scale;
+      const lt = legs.thigh;
+      const ls = legs.shin;
       hip = -Math.asin(clamp(rel / legLen, -0.9, 0.9));
       for (let it = 0; it < 4; it++) {
         const f = -(lt * Math.sin(hip) + ls * Math.sin(hip + knee)) - rel;
@@ -285,12 +297,14 @@ export function walkPose(p: Pose, phase: number, k: number, style: { swing: numb
       knee = (1.0 + 0.15 * (style.stride - 1)) * Math.sin(Math.PI * Math.min(1, u * 1.15));
       footWorld = 0.5 * (1 - e) - 0.12 * e;
     }
-    return { hip: hip * k, knee: knee * k, ankle: (footWorld - hip - knee) * k };
+    return { hip: hip * k, knee: knee * k, ankle: (footWorld - hip - knee) * k, stance: s < STANCE ? 1 : 0 };
   };
   const L = leg(phase);
   const R = leg(phase + Math.PI);
   p.hipLp = L.hip; p.kneeL = 0.03 + L.knee; p.ankleL = L.ankle;
   p.hipRp = R.hip; p.kneeR = 0.03 + R.knee; p.ankleR = R.ankle;
+  p.stanceL = L.stance;
+  p.stanceR = R.stance;
   p.hipLr = p.hipRr = 0.015;
   p.pelvisYaw = 0.09 * Math.sin(phase) * k;
   p.pelvisRoll = 0.035 * Math.sin(phase * 2 + 0.6) * k;

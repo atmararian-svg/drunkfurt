@@ -13,6 +13,7 @@ import {
   Vector3,
 } from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { loft } from './shapes';
 
 /**
  * Body-part geometry for the illustrated people of DRUNKFURT.
@@ -138,68 +139,34 @@ export interface Build {
   waist: number;
 }
 
-/** Chest and shoulders, from the waist (y = 0) up to the base of the neck. */
-export function torso(b: Build, padding: number) {
-  const c = 0.158 * b.girth + padding;
-  const w = c * b.waist;
-  const g = lathe(
+export const shoulderX = (b: Build) => 0.175 * b.shoulders;
+
+/**
+ * Head, pivot at the top of the neck: one lofted volume from the chin to the
+ * crown (jaw, cheekbones, temples, forehead, the back of the skull further
+ * back than the face is forward), plus nose, brow and ears.
+ */
+export function head(skin: Color) {
+  const skull = loft(
     [
-      [0, 0.445],
-      [0.06, 0.44],
-      [c * 0.62, 0.415],
-      [c * 0.92, 0.37],
-      [c, 0.3],
-      [c * 0.98, 0.2],
-      [w * 1.02, 0.1],
-      [w, 0.02],
-      [w * 0.98, -0.04],
-      [0, -0.05],
+      { at: -0.032, w: 0.046, front: 0.018, back: 0.018, cz: 0.066 },
+      { at: -0.01, w: 0.094, front: 0.034, back: 0.04, cz: 0.05 },
+      { at: 0.025, w: 0.122, front: 0.05, back: 0.068, cz: 0.03 },
+      { at: 0.065, w: 0.138, front: 0.079, back: 0.088, cz: 0.012 },
+      { at: 0.105, w: 0.148, front: 0.087, back: 0.1, cz: 0.002 },
+      { at: 0.14, w: 0.15, front: 0.084, back: 0.103, cz: -0.004 },
+      { at: 0.168, w: 0.134, front: 0.068, back: 0.092, cz: -0.01 },
+      { at: 0.188, w: 0.094, front: 0.044, back: 0.062, cz: -0.014 },
     ],
     18,
   );
-  g.scale(1.12 * b.shoulders, 1, 0.64);
-  return g;
-}
-
-/** Deltoids: the rounded caps that make shoulders read as shoulders. */
-export function deltoids(b: Build, padding: number) {
-  const x = shoulderX(b);
-  return [-1, 1].map((s) => place(ellipsoid(0.058 + padding, 0.062 + padding, 0.06 + padding), [s * (x - 0.005), BODY.shoulderY - 0.005, 0]));
-}
-
-export const shoulderX = (b: Build) => 0.175 * b.shoulders;
-
-/** Pelvis and seat, from below the hip joints up into the torso. */
-export function pelvis(b: Build, padding: number) {
-  const h = 0.158 * b.hips + padding;
-  const g = lathe(
-    [
-      [0, 0.16],
-      [h * 0.86, 0.15],
-      [h * 0.94, 0.08],
-      [h, 0.0],
-      [h * 0.94, -0.06],
-      [h * 0.62, -0.11],
-      [0, -0.12],
-    ],
-    16,
-  );
-  g.scale(1, 1, 0.74);
-  return g;
-}
-
-export function neck(girth: number) {
-  return place(limb(0.1, 0.048 * girth, 0.052 * girth, 0, 0.5, 10), [0, BODY.headY, 0]);
-}
-
-/** Skull, jaw, nose and ears; pivot at the top of the neck. */
-export function head(skin: Color) {
   return [
-    place(ellipsoid(0.077, 0.1, 0.094), [0, 0.1, 0.004]),
-    place(ellipsoid(0.06, 0.062, 0.07), [0, 0.048, 0.028]),
-    place(ellipsoid(0.011, 0.02, 0.016), [0, 0.078, 0.097], [-0.25, 0, 0]),
-    place(ellipsoid(0.011, 0.022, 0.016), [-0.077, 0.088, 0.002]),
-    place(ellipsoid(0.011, 0.022, 0.016), [0.077, 0.088, 0.002]),
+    skull,
+    // nose, brow ridge, ears
+    place(ellipsoid(0.011, 0.021, 0.016), [0, 0.072, 0.098], [-0.3, 0, 0]),
+    place(ellipsoid(0.05, 0.008, 0.01), [0, 0.114, 0.078]),
+    place(ellipsoid(0.01, 0.024, 0.016), [-0.075, 0.085, 0.0]),
+    place(ellipsoid(0.01, 0.024, 0.016), [0.075, 0.085, 0.0]),
   ].map((p) => paint(p, skin));
 }
 
@@ -228,33 +195,6 @@ export function hairPieces(style: Hair, hat: Hat, hairC: Color, hatC: Color) {
   return [...out, ...hats];
 }
 
-/** Mitten hand with a thumb; pivot at the wrist, hanging down, palm facing inwards (side = -1 left, 1 right). */
-export function hand(side: -1 | 1, skin: Color) {
-  return [
-    place(ellipsoid(0.021, 0.048, 0.04), [0, -0.05, 0.004]),
-    place(ellipsoid(0.017, 0.04, 0.034), [side * 0.002, -0.105, 0.006]),
-    place(limb(0.045, 0.012, 0.01, 0, 0.5, 8), [-side * 0.01, -0.03, 0.035], [0.55, 0, side * 0.25]),
-  ].map((p) => paint(p, skin));
-}
-
-/**
- * Closed fist, pivot at the wrist, hanging down: knuckles at the far end, a
- * row of finger rolls, and the thumb folded across. Knuckles face +z when the
- * forearm is raised forward.
- */
-export function fist(side: -1 | 1, skin: Color) {
-  return [
-    // back of the hand / palm, a compact block
-    place(ellipsoid(0.036, 0.048, 0.03), [0, -0.05, 0]),
-    // four knuckles in a slight arc at the end of the fist
-    ...[-1.5, -0.5, 0.5, 1.5].map((k) => place(ellipsoid(0.011, 0.013, 0.013), [k * 0.017, -0.094 + Math.abs(k) * 0.003, 0.006])),
-    // curled fingers under the knuckles
-    place(ellipsoid(0.034, 0.018, 0.016), [0, -0.082, 0.022]),
-    // thumb wrapped across the fingers
-    place(ellipsoid(0.01, 0.026, 0.01), [-side * 0.012, -0.066, 0.034], [0, 0, side * 1.1]),
-  ].map((p) => paint(p, skin));
-}
-
 /**
  * Worn cloth: pushes vertices in and out along their normals with a smooth
  * pseudo-random field, so hems sag, fabric bunches and silhouettes stop being
@@ -279,12 +219,4 @@ export function rough(g: Piece, amount: number, seed: number) {
   pos.needsUpdate = true;
   g.computeVertexNormals();
   return g;
-}
-
-/** Shoe, pivot at the ankle (0.075 m above the ground when flat). */
-export function shoe(shoeC: Color, soleC: Color) {
-  return [
-    paint(place(ellipsoid(0.046, 0.042, 0.122), [0, -0.03, 0.05]), shoeC),
-    paint(place(box(0.094, 0.018, 0.25), [0, -0.066, 0.048]), soleC),
-  ];
 }

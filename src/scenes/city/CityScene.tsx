@@ -4,13 +4,12 @@ import { audio } from '../../audio/AudioDirector';
 import { createCrowd } from '../../characters/crowd';
 import { People } from '../../characters/People';
 import { clamp } from '../../core/math';
-import { story } from '../../core/store';
 import { localProgress } from '../../core/timeline';
 import { Buildings } from './Buildings';
 import { Cars } from './Cars';
 import { CITY_PEOPLE } from './cast';
 import { cityNav } from './nav';
-import { BEAT, cityTimeScale, encounter, updateEncounter } from './encounter';
+import { BEAT, cityTimeScale, disarm, encounter, updateEncounter } from './encounter';
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
 import { PlayerArms } from './PlayerArms';
@@ -35,16 +34,17 @@ function Soundscape({ active }: { active: boolean }) {
     if (!active || !audio.running) return;
     audio.startCityAmbience();
     const local = localProgress('city');
-    const resolved = encounter.state === 'resolved';
-    const tension = resolved ? 0 : clamp((local - BEAT.strangerMoves) / (BEAT.gate - BEAT.strangerMoves), 0, 1);
-    const after = resolved && local >= BEAT.cut;
+    // all from the progress: tension builds as he walks up, breaks once the fight is decided
+    const decided = !!encounter.outcome && local >= BEAT.gate;
+    const tension = decided ? 0 : clamp((local - BEAT.strangerMoves) / (BEAT.gate - BEAT.strangerMoves), 0, 1);
+    const after = decided && local >= BEAT.cut;
     audio.setAmbience(after ? 0.3 : 1 - 0.65 * tension, 0.8);
     const cutoff = after ? 2600 : 20000 * Math.pow(650 / 20000, tension);
     if (Math.abs(cutoff - st.cutoff) / st.cutoff > 0.04) {
       audio.setWorldMuffle(cutoff, 0.5);
       st.cutoff = cutoff;
     }
-    audio.setHeartbeat(!resolved && tension > 0.6 ? 1 : 0);
+    audio.setHeartbeat(!decided && tension > 0.6 ? 1 : 0);
   });
   return null;
 }
@@ -63,17 +63,14 @@ export function CityScene({ active }: { active: boolean }) {
     gl.compile(scene, camera);
   }, [active, gl, scene, camera]);
 
-  useFrame((_, dt) => {
+  useFrame(() => {
     if (!active) return;
-    updateEncounter(Math.min(dt, 0.05) * timeScale());
+    updateEncounter();
   });
 
   // leaving the episode backwards hides any pending prompt
   useEffect(() => {
-    if (!active && encounter.state === 'armed') {
-      encounter.state = 'approach';
-      story.setState({ prompt: null });
-    }
+    if (!active) disarm();
   }, [active]);
 
   return (

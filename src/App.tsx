@@ -2,10 +2,10 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense, useEffect } from 'react';
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 import { useStory } from './core/store';
-import { TOTAL_LENGTH, locate, readScroll, scrollToProgress, timeline } from './core/timeline';
+import { TOTAL_LENGTH, locate, readScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
-import { debug as encounterDebug, encounter } from './scenes/city/encounter';
+import { encounter, encounterAt } from './scenes/city/encounter';
 import { Stylizer } from './render/Stylizer';
 import { Overlay } from './ui/Overlay';
 
@@ -44,6 +44,12 @@ export function App() {
     const onScroll = () => readScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
+    // the visitor takes over from a scripted beat the moment they scroll themselves
+    const interrupt = (e: Event) => {
+      if (e instanceof KeyboardEvent && !['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(e.code)) return;
+      stopAutoplay();
+    };
+    for (const ev of ['wheel', 'touchstart', 'keydown'] as const) window.addEventListener(ev, interrupt, { passive: true });
     if (import.meta.env.DEV) {
       (window as unknown as Record<string, unknown>).__drunkfurt = {
         timeline,
@@ -51,7 +57,7 @@ export function App() {
         locate,
         EPISODES,
         encounter,
-        encounterDebug,
+        encounterAt,
         get scene() {
           return (window as unknown as { __scene?: unknown }).__scene;
         },
@@ -63,6 +69,7 @@ export function App() {
         },
         /** Jump straight to a global progress value, without smoothing. */
         setProgress(p: number) {
+          stopAutoplay();
           scrollToProgress(p, false);
           readScroll();
           timeline.progress = timeline.target;
@@ -72,6 +79,7 @@ export function App() {
     return () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
+      for (const ev of ['wheel', 'touchstart', 'keydown'] as const) window.removeEventListener(ev, interrupt);
     };
   }, []);
 

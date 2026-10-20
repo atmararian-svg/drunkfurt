@@ -4,7 +4,7 @@ import { clamp } from '../core/math';
 import { story, useStory } from '../core/store';
 import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { PLANNED, builtEpisodes } from '../episodes';
-import { BEAT, BLOCK, KO, defend, encounter } from '../scenes/city/encounter';
+import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawImpact, drawKnockout } from './brush';
 
 /** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
@@ -17,13 +17,18 @@ function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
   const first = EPISODE_SPANS[0].id === id;
   if (!first && local < 0.045) return { w: 1, mode: 'open' };
   if (!first && local < 0.12) return { w: 1 - (local - 0.045) / 0.075, mode: 'open' };
-  if (id === 'city' && encounter.state === 'resolved') {
-    // from the moment of contact to the aftermath the page stays inked, however slow the scroll gets there
-    if (local >= BEAT.gate - 0.004 && local < BEAT.aftermath) return { w: 1, mode: 'open' };
+  if (id === 'city' && encounter.outcome) {
+    // once the fight has gone black, the page stays inked until the aftermath opens it again
+    const t = encounterAt(local).t;
+    const black = encounter.outcome === 'blocked' ? BLOCK.ink + IMPACT_BLACK : KO.dark;
+    if (t >= black && local < BEAT.aftermath) return { w: 1, mode: 'open' };
     if (local >= BEAT.aftermath && local < BEAT.aftermath + 0.035) return { w: 1 - (local - BEAT.aftermath) / 0.035, mode: 'open' };
   }
   return { w: 0, mode: 'open' };
 }
+
+/** When the strike frames (drawImpact) have gone fully black, in seconds after they start. */
+const IMPACT_BLACK = 0.82;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -54,7 +59,7 @@ export function Overlay() {
     const wctx = wipe.getContext('2d')!;
     const hctx = hit.getContext('2d')!;
     let last = '';
-    let lastHit = -1;
+    let lastHit = '';
     const size = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       for (const c of [wipe, hit]) {
@@ -64,6 +69,7 @@ export function Overlay() {
       last = '';
     };
     size();
+    hit.style.opacity = '1';
     window.addEventListener('resize', size);
 
     const loop = () => {
@@ -92,21 +98,17 @@ export function Overlay() {
         drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, id === 'city' && local > 0.5 ? 13 : 7);
         last = key;
       }
-      // the strike, in real time; fades once the scroll has carried the ink over
-      if (encounter.impactAt > 0) {
-        // blocked: the comic strike frames come in as your counter lands (the block itself plays in 3D);
-        // knocked out: a flash, then the lights go out as you fall
-        const ko = encounter.outcome === 'knockedOut';
-        const t = (performance.now() - encounter.impactAt) / 1000 - (ko ? 0 : BLOCK.ink);
-        if (t < (ko ? KO.resolve + 0.6 : 1.9)) {
-          if (ko) drawKnockout(hctx, hit.width, hit.height, t, KO.dark);
-          else drawImpact(hctx, hit.width, hit.height, t);
-          hit.style.opacity = ko ? '1' : String(1 - clamp((t - 1.4) / 0.5, 0, 1));
-          lastHit = t;
-        } else if (lastHit >= 0) {
-          hctx.clearRect(0, 0, hit.width, hit.height);
-          lastHit = -1;
-        }
+      // the strike frames, a function of where the fight is (its time comes from the progress):
+      // blocked, they come in as your counter lands (the block itself plays in 3D);
+      // knocked out, a flash, then the lights go out as you fall
+      const v = id === 'city' ? encounterAt(local) : null;
+      const hitT = !v || v.t < 0 || local >= BEAT.aftermath ? -1 : v.outcome === 'knockedOut' ? v.t : v.t - BLOCK.ink;
+      const hitKey = hitT < 0 ? '' : `${v!.outcome}${hitT.toFixed(3)}${hit.width}`;
+      if (hitKey !== lastHit) {
+        hctx.clearRect(0, 0, hit.width, hit.height);
+        if (hitT >= 0 && v!.outcome === 'knockedOut') drawKnockout(hctx, hit.width, hit.height, hitT, KO.dark);
+        else if (hitT >= 0) drawImpact(hctx, hit.width, hit.height, hitT);
+        lastHit = hitKey;
       }
       raf = requestAnimationFrame(loop);
     };

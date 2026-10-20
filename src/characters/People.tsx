@@ -1,11 +1,9 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo } from 'react';
 import { Color, Group, MeshBasicMaterial, MeshStandardMaterial } from 'three';
-import { clamp } from '../core/math';
 import { playerState } from '../player/playerState';
+import { animatePerson, createPerson } from './animate';
 import { Crowd, stepCrowd, validateCrowd } from './crowd';
-import { Joints, buildFigure } from './figure';
-import { Pose, activityPose, applyPose, dampPose, restPose, walkPose } from './pose';
 
 interface Props {
   crowd: Crowd;
@@ -31,9 +29,9 @@ export function People({ crowd, scroll, timeScale, onStep, enabled = true }: Pro
     const screen = new MeshBasicMaterial({ color: new Color('#dfe6ee').multiplyScalar(1.5) });
     const root = new Group();
     const figures = crowd.people.map((p) => {
-      const j = buildFigure(p.look, mat, screen);
-      root.add(j.root);
-      return { j, pose: restPose(), target: restPose(), seed: hashName(p.name) };
+      const fig = createPerson(p, mat, screen);
+      root.add(fig.j.root);
+      return fig;
     });
     return { figures, root };
   }, [crowd]);
@@ -52,57 +50,9 @@ export function People({ crowd, scroll, timeScale, onStep, enabled = true }: Pro
     const t = clock.t;
     stepCrowd(crowd, dt, scroll(), playerState.position);
     onStep?.(crowd);
-    crowd.state.forEach((st, i) => {
-      const def = crowd.people[i];
-      const f = figures[i];
-      const j: Joints = f.j;
-      j.root.position.set(st.x, 0, st.z);
-      j.root.rotation.y = st.yaw;
-      const b = def.b;
-      const walker = b.kind === 'lane' || b.kind === 'scroll';
-      const k = walker ? clamp(st.speed / 1.0, 0, 1) : 0;
-      const activity =
-        b.kind === 'stand' || b.kind === 'sit'
-          ? b.activity
-          : b.kind === 'scroll'
-            ? b.idle ?? 'pockets'
-            : def.look.carry === 'suitcase'
-              ? 'suitcase'
-              : 'pockets';
-      activityPose(f.target, activity, t, f.seed);
-      if (k > 0.02 || (walker && st.turn > 0.3)) {
-        // blend into the gait as they get going; the cycle is locked to distance walked
-        const walk = f.target;
-        const idle: Pose = { ...walk };
-        walkPose(walk, st.phase, Math.max(k, clamp(st.turn / 3, 0, 0.35)), def.gait ?? { swing: 0.8, lean: 0.03, stride: 1 }, def.look.height / 1.75);
-        for (const key of Object.keys(walk) as (keyof Pose)[]) walk[key] = idle[key] + (walk[key] - idle[key]) * Math.min(1, k * 3 + 0.4);
-        dampPose(f.pose, walk, 30, dt);
-      } else {
-        dampPose(f.pose, f.target, 5, dt);
-      }
-      applyPose(j, f.pose);
-      j.phone.visible = activity === 'phone' || activity === 'call' || activity === 'sitPhone';
-      if (j.suitcase) {
-        if (walker && k > 0.02) {
-          // rolled behind on its wheels
-          j.suitcase.position.set(0.24, 0, -0.5);
-          j.suitcase.rotation.set(0.42, 0, 0);
-          f.pose.shRp = 0.45;
-          f.pose.elR = -0.08;
-          applyPose(j, f.pose);
-        } else {
-          j.suitcase.position.set(0.36, 0, 0.06);
-          j.suitcase.rotation.set(0, 0, 0);
-        }
-      }
-    });
+    crowd.state.forEach((st, i) => animatePerson(figures[i], crowd.people[i], st, t, dt));
   });
 
   return <primitive object={root} />;
 }
 
-export function hashName(s: string) {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 1000;
-  return h;
-}

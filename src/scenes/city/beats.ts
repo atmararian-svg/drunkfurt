@@ -13,12 +13,15 @@ export const BEAT = {
   cock: 0.8,
   commit: 0.822,
   gate: 0.83,
-  /** Under ink from here until AFTERMATH once resolved. */
+  /** The camera cuts away here (under the ink of the fight). */
   cut: 0.85,
   aftermath: 0.905,
 } as const;
 
-/** Knockout sequence (you did not block), in real seconds after the fist lands. */
+/**
+ * Knockout sequence (you did not block), in seconds of the fight's own clock
+ * after the fist lands. The whole sequence is spread over gate → aftermath.
+ */
 export const KO = {
   snap: 0.12,
   fallFrom: 0.35,
@@ -27,7 +30,7 @@ export const KO = {
   resolve: 2.6,
 } as const;
 
-/** Block sequence, in real seconds after the click. */
+/** Block sequence, in seconds of the fight's own clock after the click (spread over gate → aftermath). */
 export const BLOCK = {
   guardUp: 0.12,
   contact: 0.15,

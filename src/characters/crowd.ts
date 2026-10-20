@@ -1,7 +1,7 @@
 import { clamp } from '../core/math';
 import type { Look } from './figure';
 import { Nav, PERSON_RADIUS, clearance } from './nav';
-import { STRIDE_M, type Activity } from './pose';
+import { START_PHASE, STRIDE_M, type Activity } from './pose';
 
 /**
  * A small, purposeful crowd. Every movement has a reason and stays on walkable
@@ -187,6 +187,7 @@ export function stepCrowd(c: Crowd, dt: number, scrollT: number, visitor: { x: n
     const prevX = st.x;
     const prevZ = st.z;
     const prevYaw = st.yaw;
+    const wasStill = st.speed < 0.02;
 
     if (b.kind === 'scroll' && path) {
       const u = clamp((scrollT - b.t0) / (b.t1 - b.t0), 0, 1);
@@ -250,7 +251,14 @@ export function stepCrowd(c: Crowd, dt: number, scrollT: number, visitor: { x: n
     // walk cycle driven by distance actually covered (no foot sliding, stops when they stop)
     const moved = Math.hypot(st.x - prevX, st.z - prevZ);
     if (b.kind === 'scroll') st.speed = moved / Math.max(dt, 1e-4);
+    // setting off from standing: the first step is taken with the weight on the foot under the hips
+    if (wasStill && moved > 1e-4 && b.kind === 'lane') st.phase = START_PHASE;
     st.phase += (moved / STRIDE_M) * Math.PI * 2;
+    // scroll walkers: the cycle is a pure function of how far along the route they are
+    if (b.kind === 'scroll' && path) {
+      const u = clamp((scrollT - b.t0) / (b.t1 - b.t0), 0, 1);
+      st.phase = START_PHASE + ((u * u * (3 - 2 * u) * path.length) / STRIDE_M) * Math.PI * 2;
+    }
     const turned = Math.abs(lerpAngle(prevYaw, st.yaw, 1) - prevYaw);
     st.turn = turned / Math.max(dt, 1e-4);
     if (moved < 1e-4) st.phase += turned * 1.2; // shuffle the feet while turning

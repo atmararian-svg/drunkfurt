@@ -17,36 +17,23 @@ import { Expression, FACE_WINDOW, calmFace, faceMaterial } from '../../character
 import { Landmarks, faceDecal, monoMaterial, rigMesh } from '../../characters/meshRig';
 import { loadGlb } from '../../characters/inlineModel';
 import { aimArm } from '../../characters/ik';
-import { activityPose, applyPose, dampPose, restPose, walkPose } from '../../characters/pose';
+import { STANCE, STRIDE_M, activityPose, applyPose, copyPose, legLengths, lerpPose, restPose, walkPose } from '../../characters/pose';
+import { lerpAngle } from '../../characters/crowd';
+import { FootTarget, placeFeet } from '../../characters/feet';
 import { clamp, smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
-import { BEAT, BLOCK, blockTime, encounter } from './encounter';
+import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
 import { cityMaterials } from './cityMaterials';
 import { EYE, VISITOR_STOP } from './layout';
-import { STRANGER_ROUTE } from './strangerRoute';
+import { ROUTE_LEN, ramp, routeAt, routeS, walkPace } from './strangerRoute';
 
 /** Where he ends up afterwards: on his back, head towards the house fronts. */
 const DOWN = { x: 7.3, z: -36.8, yaw: -0.64 };
 export const BAG_SPOT = { x: 6.1, z: -35.3, yaw: 0.7 };
 const HEIGHT = 1.82;
-const SCALE = HEIGHT / 1.75;
 /** Your eyes when he swings (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
 
-const segLen = (a: [number, number], b: [number, number]) => Math.hypot(b[0] - a[0], b[1] - a[1]);
-const LENS = STRANGER_ROUTE.slice(1).map((p, i) => segLen(STRANGER_ROUTE[i], p));
-const ROUTE_LEN = LENS.reduce((a, b) => a + b, 0);
-
-function routeAt(s: number) {
-  let i = 0;
-  while (i < LENS.length - 1 && s > LENS[i]) s -= LENS[i++];
-  const a = STRANGER_ROUTE[i];
-  const b = STRANGER_ROUTE[i + 1];
-  const u = clamp(s / LENS[i], 0, 1);
-  return { x: a[0] + (b[0] - a[0]) * u, z: a[1] + (b[1] - a[1]) * u, yaw: Math.atan2(b[0] - a[0], b[1] - a[1]) };
-}
-
-const ramp = (x: number, a: number, b: number) => clamp((x - a) / (b - a), 0, 1);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
 /**
@@ -105,29 +92,32 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     faceDecal(rig, face.material, [FACE_WINDOW.width * sx, FACE_WINDOW.height * sy], (FACE_WINDOW.centerY - FACE_WINDOW.eyeY) * sy);
     // the model stands with his head bowed and tilted; straighten most of that so he can look at you
     const headFix = new Quaternion().slerp(rig.headFix, 0.85);
+    rig.joints.root.name = 'stranger';
     return { j: rig.joints, face, rig, headFix };
   }, [gltf]);
-  const st = useMemo(
-    () => ({ pose: restPose(), target: restPose(), phase: 0, t: 0, last: new Vector3(), primed: false, expr: calmFace(), yaw: -Math.PI / 2 + 0.35 }),
-    [],
-  );
+  // only ambient time (breathing, a blink) lives here; everything the story does is computed from the progress
+  const st = useMemo(() => ({ pose: restPose(), target: restPose(), idle: restPose(), t: 0, expr: calmFace() }), []);
   const tmp = useMemo(() => ({ v: new Vector3(), a: new Vector3(), b: new Vector3(), c: new Vector3(), pole: new Vector3(), lpole: new Vector3() }), []);
   const key = useRef<SpotLight>(null);
   const keyTarget = useMemo(() => new Object3D(), []);
 
   useFrame((_, rawDt) => {
     if (!active) return;
-    const dt = Math.min(rawDt, 0.05) * timeScale();
-    st.t += dt;
+    st.t += Math.min(rawDt, 0.05) * timeScale();
     const local = localProgress('city');
-    const state = encounter.state;
-    const bt = blockTime();
+    const view = encounterAt(local);
+    const bt = view.t;
+    const ko = view.outcome === 'knockedOut';
 
-    // Once it is over, it stays over: whatever part of the street you scroll back to, he is
-    // either on the pavement where he fell (you blocked) or gone (you went down).
-    if (state === 'resolved') {
-      j.root.visible = encounter.outcome === 'blocked';
-      if (j.root.visible) lieDown();
+    // after the fight: on the pavement where he fell (you blocked), or gone (you went down);
+    // both only from the moment it happened, under the ink, so scrolling back brings him back
+    if (view.outcome === 'blocked' && (bt >= BLOCK.ink + 0.35 || local >= BEAT.aftermath)) {
+      j.root.visible = true;
+      lieDown();
+      return;
+    }
+    if (ko && (bt >= KO.dark || local >= BEAT.aftermath)) {
+      j.root.visible = false;
       if (key.current) key.current.visible = false;
       return;
     }
@@ -137,32 +127,31 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
 
     // --- where he is: walking the route, then planted, then lunging
     const walkU = ramp(local, BEAT.strangerMoves, BEAT.stop);
-    const s = (1 - Math.pow(1 - walkU, 1.8)) * ROUTE_LEN;
+    const s = routeS(walkU);
     const pos = routeAt(s);
     const squared = ramp(local, BEAT.stop, BEAT.confront + 0.02);
     const toYou = Math.atan2(CAM.x - pos.x, CAM.z - pos.z);
-    let yaw = walkU <= 0 ? st.yaw : walkU < 1 ? pos.yaw : lerp(pos.yaw, toYou, smoothstep(squared));
-    if (walkU <= 0) yaw = lerp(-Math.PI / 2 + 0.35, Math.atan2(CAM.x - pos.x, CAM.z - pos.z), smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * 0.6);
-    st.yaw = yaw;
+    // in the doorway he turns his head and shoulders to you; walking, he faces his way; planted, he squares up
+    const doorway = lerp(-Math.PI / 2 + 0.35, toYou, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * 0.6);
+    const yaw = walkU < 1 ? lerpAngle(doorway, pos.yaw, smoothstep(ramp(walkU, 0, 0.08))) : lerpAngle(pos.yaw, toYou, smoothstep(squared));
 
     // punch progress: wind-up by scroll, the strike itself in (slow) time, the block sequence in real time
     const cock = smoothstep(ramp(local, BEAT.cock, BEAT.commit));
-    let punch = encounter.punch; // 0..1, 1 = fist at your guard
+    let punch = view.punch; // 0..1, 1 = fist at your guard
     let recoil = 0;
     let hit2 = 0;
-    const ko = encounter.outcome === 'knockedOut';
     if (bt >= 0 && ko) {
       // it landed: the arm follows through, then he straightens up and looks down at you
       punch = lerp(1, 0.25, smoothstep(ramp(bt, 0.15, 0.9)));
     } else if (bt >= 0) {
-      punch = lerp(encounter.punch, 1, smoothstep(ramp(bt, 0, BLOCK.contact)));
+      punch = lerp(view.punch, 1, smoothstep(ramp(bt, 0, BLOCK.contact)));
       if (bt > BLOCK.contact + BLOCK.hitStop) {
         recoil = smoothstep(ramp(bt, BLOCK.contact + BLOCK.hitStop, BLOCK.counterLands));
         punch = lerp(1, 0.35, recoil);
       }
       hit2 = smoothstep(ramp(bt, BLOCK.counterLands, BLOCK.counterLands + 0.25));
     }
-    const strike = punch > 0 || state !== 'approach' ? 1 : 0;
+    const strike = punch > 0 || bt >= 0 ? 1 : 0;
     // the punch accelerates: slow first third, then fast (the eye reads it as force)
     const drive = Math.pow(punch, 1.6);
 
@@ -174,21 +163,19 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     const z = pos.z + fz * lunge;
     j.root.position.set(x, 0, z);
     j.root.rotation.y = yaw;
-    const moved = st.primed ? Math.hypot(x - st.last.x, z - st.last.z) : 0;
-    st.last.set(x, 0, z);
-    st.primed = true;
-    if (walkU > 0 && walkU < 1) st.phase += (moved / 1.44) * Math.PI * 2;
 
     // --- body
     const p = st.target;
     activityPose(p, 'pockets', st.t, 731);
-    const speed = moved / Math.max(dt, 1e-4);
-    const walking = walkU > 0 && walkU < 1 && speed > 0.05;
-    if (walking) {
-      walkPose(p, st.phase, clamp(speed / 1.2, 0.3, 1), { swing: 0.5, lean: 0.07, stride: 1.0 }, SCALE);
+    // gait from the route itself: the phase is the distance walked, the pace how fast the scroll moves him along it
+    const pace = walkPace(walkU);
+    if (pace > 0.01) {
+      const idle = copyPose(st.idle, p);
+      walkPose(p, (s / STRIDE_M) * Math.PI * 2, 1, { swing: 0.5, lean: 0.07, stride: 1.0 }, legLengths(j));
       // shoulders up and a little forward, hands out of the pocket, fists loose
       p.shLr = p.shRr = 0.04;
       p.spinePitch += 0.04;
+      lerpPose(p, idle, p, pace);
     }
     if (walkU >= 1) {
       // planted: feet apart, right foot back, weight forward, shoulders hunched
@@ -243,9 +230,29 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       p.headYaw = lerp(p.headYaw, clamp(rel, -1.2, 1.2) - p.spineYaw * 0.8, look);
       p.headPitch = lerp(p.headPitch, 0.06 + (cock + drive) * 0.06, look);
     }
-    dampPose(st.pose, p, bt >= 0 ? 30 : walking ? 30 : 8, dt + (bt >= 0 ? rawDt : 0));
+    copyPose(st.pose, p);
     applyPose(j, st.pose);
     j.head.quaternion.multiply(headFix);
+
+    // feet: while he walks, a foot that carries his weight stays on the spot his route puts it on
+    // (under his hip at mid-stance), so it does not skate; computed from the progress, like everything else
+    if (pace > 0.01) {
+      const TAU = Math.PI * 2;
+      const phase = (s / STRIDE_M) * TAU;
+      const targets: { L?: FootTarget; R?: FootTarget } = {};
+      for (const side of ['L', 'R'] as const) {
+        const ph = (((phase + (side === 'L' ? 0 : Math.PI)) % TAU) + TAU) % TAU;
+        if (ph >= STANCE) continue;
+        const u = ph / STANCE;
+        const m = routeAt(clamp(s + ((STANCE / 2 - ph) / TAU) * STRIDE_M, 0, ROUTE_LEN));
+        const rest = LANDMARKS.ankle[side === 'L' ? 0 : 1];
+        const c = Math.cos(m.yaw);
+        const sn = Math.sin(m.yaw);
+        const w = Math.min(1, pace * 1.5) * smoothstep(clamp(u / 0.12, 0, 1)) * smoothstep(clamp((1 - u) / 0.12, 0, 1));
+        targets[side] = { anchor: new Vector3(m.x + rest[0] * c + rest[2] * sn, j.ankleHeight, m.z - rest[0] * sn + rest[2] * c), w, yaw: m.yaw };
+      }
+      placeFeet(j, targets);
+    }
 
     // --- arms by IK once he squares up: fists placed in the world
     const fists = ramp(local, BEAT.confront + 0.02, BEAT.cock);
@@ -296,7 +303,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     e.sneer = clamp(0.6 * confront + 0.4 * cock, 0, 1) * (1 - recoil);
     e.open = clamp(0.12 * cock + 0.45 * drive, 0, 1) * (1 - recoil) + 0.55 * recoil + 0.3 * hit2;
     e.shock = clamp(recoil * 0.9 + hit2, 0, 1);
-    if (bt >= 0 && encounter.outcome === 'knockedOut') {
+    if (bt >= 0 && ko) {
       // satisfied, a little surprised it was that easy
       e.anger = 0.35;
       e.sneer = 0.7;
@@ -369,11 +376,13 @@ export function Bag({ active }: { active: boolean }) {
     ]);
     return new TubeGeometry(c, 40, 0.018, 6, false);
   }, []);
-  const ref = useMemo(() => new Group(), []);
+  const ref = useMemo(() => Object.assign(new Group(), { name: 'bag' }), []);
   const light = useRef<PointLight>(null);
   useFrame(() => {
-    // dropped in the struggle either way, and still there if you scroll back up the street
-    ref.visible = active && encounter.state === 'resolved';
+    // dropped in the struggle (under the ink), and back on your shoulder if you scroll back before it
+    const t = encounterAt(localProgress('city')).t;
+    const dropped = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.ink + 0.35;
+    ref.visible = active && t >= dropped;
     if (light.current) light.current.visible = ref.visible;
   });
   return (
