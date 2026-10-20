@@ -71,7 +71,7 @@ const LANDMARKS: Landmarks = {
  */
 export function Stranger({ active, timeScale }: { active: boolean; timeScale: () => number }) {
   const gltf = suspend(() => loadGlb(attackerUrl), ['drunkfurt-attacker']);
-  const { j, face, rig, headFix } = useMemo(() => {
+  const { j, face, headFix } = useMemo(() => {
     // the model's own textures (worn jacket, hoodie, scarf, torn jeans), printed in greys
     let map: MeshStandardMaterial['map'] = null;
     let normalMap: MeshStandardMaterial['normalMap'] = null;
@@ -82,9 +82,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
         normalMap = m.normalMap;
       }
     });
-    const fistMat = new MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
-    fistMat.userData.comic = { mono: true, halftone: 0.55 };
-    const rig = rigMesh(gltf, LANDMARKS, monoMaterial(map, normalMap), fistMat);
+    const rig = rigMesh(gltf, LANDMARKS, monoMaterial(map, normalMap));
     // his face, drawn: fitted to the model's eyes and mouth, feathered into his head
     const face = faceMaterial(150, { lines: true, mask: true });
     const sx = rig.face.eyeGap / FACE_WINDOW.eyeGap;
@@ -93,7 +91,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     // the model stands with his head bowed and tilted; straighten most of that so he can look at you
     const headFix = new Quaternion().slerp(rig.headFix, 0.85);
     rig.joints.root.name = 'stranger';
-    return { j: rig.joints, face, rig, headFix };
+    return { j: rig.joints, face, headFix };
   }, [gltf]);
   // only ambient time (breathing, a blink) lives here; everything the story does is computed from the progress
   const st = useMemo(() => ({ pose: restPose(), target: restPose(), idle: restPose(), t: 0, expr: calmFace() }), []);
@@ -254,10 +252,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       placeFeet(j, targets);
     }
 
-    // --- arms by IK once he squares up: fists placed in the world
-    const fists = ramp(local, BEAT.confront + 0.02, BEAT.cock);
-    j.fistL.visible = j.fistR.visible = fists > 0.3 || bt >= 0;
-    j.handL.visible = j.handR.visible = !j.fistL.visible;
+    // --- arms by IK once he squares up: his own fists placed in the world
     if (cock > 0 || strike) {
       j.root.updateMatrixWorld(true);
       // in his body frame: x right, y up, z towards you
@@ -288,12 +283,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       const guard = body(-0.1, 1.56 + 0.03 * drive, 0.14 - 0.08 * drive, tmp.a);
       tmp.lpole.set(-0.7, -1, -0.2);
       aimArm(j, -1, guard, tmp.lpole);
-    } else if (fists > 0) {
-      // fists at his sides, arms tensed
-      j.fistL.visible = j.fistR.visible = fists > 0.3;
     }
-
-    rig.sync();
 
     // --- face: suspicion, then hostility, then the shout of the swing; shock when blocked
     const e: Expression = st.expr;
@@ -344,9 +334,6 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     j.hips.position.set(j.hipsRest.x, 0, j.hipsRest.z);
     j.body.position.set(0, 0.2, 0);
     j.body.rotation.set(-Math.PI / 2, 0, 0);
-    j.fistL.visible = j.fistR.visible = false;
-    j.handL.visible = j.handR.visible = true;
-    rig.sync();
     face.set({ anger: 0, sneer: 0, open: 0.35, shock: 0.4, lookX: 0, lookY: 0 });
     if (key.current) key.current.visible = false;
     encounter.stranger.x = DOWN.x;

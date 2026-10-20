@@ -1,7 +1,6 @@
 import {
   Bone,
   BufferGeometry,
-  Color,
   DoubleSide,
   Euler,
   Float32BufferAttribute,
@@ -21,8 +20,7 @@ import {
 } from 'three';
 import { DecalGeometry } from 'three/examples/jsm/geometries/DecalGeometry.js';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { merge, paint, place } from './anatomy';
-import { hand } from './shapes';
+import { paint } from './anatomy';
 import type { Joints } from './figure';
 
 /**
@@ -37,8 +35,8 @@ import type { Joints } from './figure';
  * falling off with the fourth power of that normalised distance, so joints
  * bend smoothly but a sleeve never follows the leg it hangs beside.
  *
- * Hands are bound to their own bones, so a clenched fist can replace an open
- * hand: the hand bone collapses into the sleeve and a modelled fist appears.
+ * The hands are the model's own, bound to their own bones (they turn with the
+ * wrists); nothing replaces them.
  */
 export type V3 = [number, number, number];
 
@@ -70,8 +68,6 @@ export interface Landmarks {
 export interface MeshRig {
   joints: Joints;
   mesh: SkinnedMesh;
-  /** Applies the hand/fist swap after poses set `fistL/R.visible`. */
-  sync(): void;
   /** Rotation that turns the modelled head pose (bowed, tilted) into a level, forward-facing one. */
   headFix: Quaternion;
   /** Frame of the face in head-bone space, for a drawn face decal. */
@@ -82,7 +78,7 @@ export interface MeshRig {
 
 const v = (a: V3) => new Vector3(...a);
 
-export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMaterial: Material): MeshRig {
+export function rigMesh(gltf: GLTF, L: Landmarks, material: Material): MeshRig {
   // --- bake the mesh: one geometry, feet on y = 0, scaled to the target height
   let src: Mesh | null = null;
   gltf.scene.updateMatrixWorld(true);
@@ -212,18 +208,10 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
   root.updateMatrixWorld(true);
   mesh.bind(new Skeleton(bones), mesh.matrixWorld);
 
-  // --- modelled fists, shown in place of the hands when he clenches
-  const fistMesh = (side: -1 | 1) => {
-    const m = new Mesh(merge(hand(side, new Color('#625b55'), 1).map((p) => place(p, [0, 0, 0], [0, 0, 0], [1.04, 1.04, 1.04]))), fistMaterial);
-    m.userData.ink = 'silhouette';
-    m.castShadow = true;
-    m.visible = false;
-    return m;
-  };
-  const fistL = fistMesh(-1);
-  const fistR = fistMesh(1);
-  A[0].wr.add(fistL);
-  A[1].wr.add(fistR);
+  // his hands are the model's own (already closed): nothing is swapped in; the joint set's
+  // hand/fist slots are empty placeholders so poses can toggle them harmlessly
+  const fistL = new Object3D();
+  const fistR = new Object3D();
   const handL = new Object3D();
   const handR = new Object3D();
 
@@ -286,15 +274,10 @@ export function rigMesh(gltf: GLTF, L: Landmarks, material: Material, fistMateri
     fistR,
   } as unknown as Joints;
 
-  const sync = () => {
-    A[0].hand.scale.setScalar(fistL.visible ? 0.02 : 1);
-    A[1].hand.scale.setScalar(fistR.visible ? 0.02 : 1);
-  };
 
   return {
     joints,
     mesh,
-    sync,
     headFix,
     face: { center: eyeMid.clone().sub(neckW), x: fx, y: fy, n: fn, eyeGap, eyeToMouth },
     bindMesh,
