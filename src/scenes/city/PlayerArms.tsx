@@ -61,7 +61,7 @@ export function PlayerArms({ active }: { active: boolean }) {
 
   useFrame(() => {
     const bt = active ? blockTime() : -1;
-    const on = bt >= 0 && bt < BLOCK.ink + 0.5 && encounter.state === 'impact';
+    const on = bt >= 0 && bt < BLOCK.ink + 0.5 && encounter.state === 'impact' && encounter.outcome === 'blocked';
     left.visible = right.visible = on;
     if (!on) return;
     rig.position.copy(camera.position);

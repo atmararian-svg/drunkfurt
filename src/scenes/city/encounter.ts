@@ -1,7 +1,7 @@
 import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
-import { BEAT, BLOCK } from './beats';
+import { BEAT, BLOCK, KO } from './beats';
 import { Gate, gates, globalProgress, localProgress, scrollToProgress } from '../../core/timeline';
 
 /**
@@ -19,11 +19,14 @@ import { Gate, gates, globalProgress, localProgress, scrollToProgress } from '..
  * gate immediately, and the move to the aftermath is scheduled on a timer.
  */
 export type EncounterState = 'approach' | 'armed' | 'impact' | 'resolved';
+/** How it ended. Set once and never cleared: scrolling back does not undo what happened. */
+export type Outcome = 'blocked' | 'knockedOut' | null;
 
-export { BEAT, BLOCK } from './beats';
+export { BEAT, BLOCK, KO } from './beats';
 
 export const encounter = {
   state: 'approach' as EncounterState,
+  outcome: null as Outcome,
   /** performance.now() of the strike, for the overlay. */
   impactAt: 0,
   /** The punch, 0 (wound up) … 1 (fist at your guard). Advances in slow motion while armed. */
@@ -44,7 +47,7 @@ gates.push(gate);
  * the moment he commits to the punch, everything drops to a tenth.
  */
 export function cityTimeScale(local: number) {
-  if (encounter.state === 'resolved' && local >= BEAT.cut) return 0.35; // the hush afterwards
+  if (encounter.state === 'resolved') return local >= BEAT.cut ? 0.35 : 1; // the hush afterwards; normal time if you scroll back
   if (encounter.state === 'impact' || encounter.state === 'armed') return 0.1;
   const s = smoothstep(clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1));
   return 1 - 0.9 * s;
@@ -70,16 +73,22 @@ export function updateEncounter(dt: number) {
   // the punch: the first few percent come with the scroll, then it keeps coming at a tenth of real speed
   // (a full punch takes ~0.3 s, so ~3 s here), and stops just short of you if you never react
   const scrolled = 0.12 * clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1);
-  if (encounter.state === 'armed') encounter.punch = Math.min(0.9, Math.max(encounter.punch, scrolled) + dt * 0.1 * 3.2 * (1 - encounter.punch * 0.6));
-  else if (encounter.state === 'approach') encounter.punch = scrolled;
+  // armed: the punch keeps coming at a tenth of real speed (dt is already scaled), about 3.7 s of real time
+  // from the prompt to contact. If it arrives, you are knocked out.
+  if (encounter.state === 'armed') {
+    encounter.punch = Math.min(1, Math.max(encounter.punch, scrolled) + dt * 2.4);
+    if (encounter.punch >= 1) knockOut();
+  } else if (encounter.state === 'approach') encounter.punch = scrolled;
   encounter.shake = Math.max(0, encounter.shake - dt * 3.5);
-  if (encounter.state === 'impact' && debug.blockT < 0 && performance.now() - encounter.impactAt > BLOCK.resolve * 1000 + 400) resolve();
+  const limit = (encounter.outcome === 'knockedOut' ? KO.resolve : BLOCK.resolve) * 1000 + 400;
+  if (encounter.state === 'impact' && debug.blockT < 0 && performance.now() - encounter.impactAt > limit) resolve();
 }
 
 /** The visitor's click. Returns whether it did anything. */
 export function defend() {
   if (encounter.state !== 'armed') return false;
   encounter.state = 'impact';
+  encounter.outcome = 'blocked';
   encounter.impactAt = performance.now();
   gate.open = true;
   story.setState({ prompt: null });
@@ -99,8 +108,28 @@ export function defend() {
   return true;
 }
 
+/** You did not react in time: his fist lands. */
+function knockOut() {
+  if (encounter.state !== 'armed') return;
+  encounter.state = 'impact';
+  encounter.outcome = 'knockedOut';
+  encounter.impactAt = performance.now();
+  gate.open = true;
+  story.setState({ prompt: null });
+  // his effort and the hit; the ringing; you go down
+  audio.fight('exhale2');
+  window.setTimeout(() => {
+    audio.fight('ko');
+    encounter.shake = 1.4;
+  }, 30);
+  window.setTimeout(() => audio.fight('ring'), 160);
+  window.setTimeout(() => audio.fight('fall'), KO.fallTo * 1000);
+  window.setTimeout(resolve, KO.resolve * 1000);
+}
+
 function resolve() {
   if (encounter.state !== 'impact') return;
   encounter.state = 'resolved';
+  encounter.punch = 0;
   scrollToProgress(globalProgress('city', BEAT.aftermath + 0.045));
 }

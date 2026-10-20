@@ -14,6 +14,8 @@ export interface Caption {
   place: 'tl' | 'tr' | 'bl' | 'br';
   /** Yellow box for narration that matters, white for everything else. */
   tone?: 'yellow' | 'paper';
+  /** Only shown when this holds (e.g. one caption per outcome of an interaction). */
+  when?: () => boolean;
 }
 
 export interface EpisodeDef {
@@ -33,4 +35,10 @@ export interface EpisodeDef {
   captions: Caption[];
   /** Local progress values a click advances between. */
   beats: number[];
+  /**
+   * Keeps the camera's look-around movement inside the scene: given the
+   * composed camera position and the offset the visitor's head wants, return
+   * the offset to use (default: unchanged).
+   */
+  clampHead?: (base: { x: number; y: number; z: number }, offset: { x: number; y: number; z: number }) => void;
 }

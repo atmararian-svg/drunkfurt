@@ -200,3 +200,59 @@ export function drawImpact(ctx: CanvasRenderingContext2D, W: number, H: number, 
     ctx.fillRect(0, 0, W, H);
   }
 }
+
+/**
+ * Knocked out, from your own eyes: a white-red flash with the speed lines of
+ * the hit, then black closing in from above and below in ragged ink, like
+ * heavy eyelids. `t` in seconds; `dark` is when the frame is fully black.
+ */
+export function drawKnockout(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, dark: number) {
+  ctx.clearRect(0, 0, W, H);
+  if (t < 0) return;
+  const rnd = mulberry32(5);
+  if (t < 0.18) {
+    const a = 1 - t / 0.18;
+    ctx.fillStyle = `rgba(241,240,233,${0.95 * a})`;
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(213,58,50,${0.35 * a})`;
+    ctx.fillRect(0, 0, W, H);
+  }
+  if (t < 0.5) {
+    const cx = W * 0.5;
+    const cy = H * 0.48;
+    ctx.strokeStyle = `rgba(12,12,12,${0.8 * (1 - t / 0.5)})`;
+    for (let i = 0; i < 40; i++) {
+      const ang = rnd() * Math.PI * 2;
+      const r0 = Math.min(W, H) * (0.12 + rnd() * 0.1);
+      ctx.lineWidth = 1 + rnd() * 4;
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(ang) * r0, cy + Math.sin(ang) * r0);
+      ctx.lineTo(cx + Math.cos(ang) * W, cy + Math.sin(ang) * W);
+      ctx.stroke();
+    }
+  }
+  // eyelids: ragged black from top and bottom, closing (and flickering open once)
+  const close = Math.min(1, Math.max(0, (t - 0.35) / (dark - 0.35)));
+  const flutter = t > 0.9 && t < 1.15 ? 0.25 * Math.sin(((t - 0.9) / 0.25) * Math.PI) : 0;
+  const c = Math.max(0, close - flutter);
+  if (c > 0) {
+    ctx.fillStyle = '#0c0c0c';
+    for (const dir of [1, -1]) {
+      const edge = dir > 0 ? (H / 2) * c * 1.05 : H - (H / 2) * c * 1.05;
+      ctx.beginPath();
+      ctx.moveTo(0, dir > 0 ? 0 : H);
+      for (let k = 0; k <= 24; k++) {
+        const x = (k / 24) * W;
+        const sag = Math.sin((k / 24) * Math.PI) * H * 0.06 * dir;
+        ctx.lineTo(x, edge + sag + (rnd() - 0.5) * H * 0.02);
+      }
+      ctx.lineTo(W, dir > 0 ? 0 : H);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+  if (t >= dark) {
+    ctx.fillStyle = '#0c0c0c';
+    ctx.fillRect(0, 0, W, H);
+  }
+}

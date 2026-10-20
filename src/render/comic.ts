@@ -16,6 +16,8 @@ import { Material, MeshPhysicalMaterial, MeshStandardMaterial } from 'three';
  *   { cell?: number }       → halftone cell size in CSS pixels (default 6)
  *   { halftone?: number }   → width of the dotted transitions, 0 = clean band edges,
  *                             1 = default; large smooth surfaces want less
+ *   { mono?: boolean }      → print in greys only (for textured models whose colours
+ *                             would otherwise survive the banding)
  *   { hatch?: boolean }     → hatch the two darkest transitions on vertical faces
  *                             instead of dots (masonry, platform walls, undercarriage)
  */
@@ -23,6 +25,7 @@ export interface ComicOptions {
   cell?: number;
   halftone?: number;
   hatch?: boolean;
+  mono?: boolean;
 }
 
 const CHUNK = /* glsl */ `
@@ -102,6 +105,9 @@ const APPLY = /* glsl */ `
   vec3 hue = outgoingLight / max(lum, 1e-5);
   float sat = max(max(hue.r, hue.g), hue.b) - min(min(hue.r, hue.g), hue.b);
   hue = mix(vec3(1.0), hue, clamp(sat * 1.2, 0.0, 1.0));
+  #if COMIC_MONO
+    hue = vec3(1.0);
+  #endif
   outgoingLight = hue * tone;
 }
 #include <opaque_fragment>
@@ -119,13 +125,14 @@ export function applyComic(mat: Material, dpr: number) {
   // 0.28 stops each side by default: dots stay at band edges instead of filling whole surfaces
   const w = Math.max(0.001, 0.28 * (opts && opts.halftone !== undefined ? opts.halftone : 1));
   const hatch = opts && opts.hatch ? 1 : 0;
+  const mono = opts && opts.mono ? 1 : 0;
   mat.onBeforeCompile = (shader) => {
-    shader.defines = { ...(shader.defines ?? {}), COMIC_CELL: cell.toFixed(2), COMIC_W: w.toFixed(3), COMIC_HATCH: hatch };
+    shader.defines = { ...(shader.defines ?? {}), COMIC_CELL: cell.toFixed(2), COMIC_W: w.toFixed(3), COMIC_HATCH: hatch, COMIC_MONO: mono };
     shader.fragmentShader = shader.fragmentShader
       .replace('#include <common>', `#include <common>\n${CHUNK}`)
       .replace('#include <opaque_fragment>', APPLY);
   };
-  mat.customProgramCacheKey = () => `comic-${cell.toFixed(2)}-${w.toFixed(3)}-${hatch}`;
+  mat.customProgramCacheKey = () => `comic-${cell.toFixed(2)}-${w.toFixed(3)}-${hatch}-${mono}`;
   // Comic surfaces read as printed matter, not polished metal.
   mat.envMapIntensity = 0;
   mat.needsUpdate = true;

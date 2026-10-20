@@ -1,8 +1,10 @@
-import { clamp, smoothstep } from '../../core/math';
+import { clamp, deg, smoothstep } from '../../core/math';
+
+const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 import type { CameraPose } from '../../core/sequence';
 import type { EpisodeDef } from '../../episodes/types';
 import { CityScene } from './CityScene';
-import { BEAT, encounter } from './encounter';
+import { BEAT, KO, blockTime, encounter } from './encounter';
 import { cityTrack } from './track';
 
 /**
@@ -22,7 +24,36 @@ import { cityTrack } from './track';
  * your face it frames his face and shoulders. As the punch comes you lean back
  * a little; the block and the counter jolt the camera, briefly.
  */
+const KO_DOWN = { x: 6.25, y: 0.24, z: -33.6 };
+
 function encounterCamera(local: number, pose: CameraPose) {
+  // knocked out: from the hit to the ground, then lying on the pavement looking at your bag
+  if (encounter.outcome === 'knockedOut') {
+    const t = encounter.state === 'impact' ? blockTime() : 99;
+    if (encounter.state === 'impact' || local >= BEAT.cut) {
+      const snap = smoothstep(clamp(t / KO.snap, 0, 1));
+      const fall = smoothstep(clamp((t - KO.fallFrom) / (KO.fallTo - KO.fallFrom), 0, 1));
+      const start = { x: pose.position.x, y: pose.position.y, z: pose.position.z, yaw: pose.yaw, pitch: pose.pitch };
+      if (encounter.state === 'resolved') Object.assign(start, { x: 6.5, y: 1.68, z: -34, yaw: deg(2), pitch: 0 });
+      // the head snaps back and up, then you go down sideways
+      pose.position.set(
+        lerp(start.x, KO_DOWN.x, fall),
+        lerp(start.y, KO_DOWN.y, fall * fall),
+        lerp(start.z + 0.18 * snap, KO_DOWN.z, fall),
+      );
+      pose.yaw = lerp(start.yaw + 0.12 * snap, deg(6), fall);
+      pose.pitch = lerp(start.pitch + 0.45 * snap * (1 - fall), deg(-14), fall);
+      pose.roll = lerp(-0.25 * snap, deg(-78), fall);
+      pose.fov = 46;
+      if (encounter.state === 'resolved') {
+        // lying still, breathing
+        const b = Math.sin(performance.now() / 900) * 0.004;
+        pose.position.y += b;
+      }
+      return;
+    }
+  }
+  if (encounter.state === 'resolved' && local < BEAT.cut) return; // nothing left to track
   if (local < BEAT.noticed - 0.02 || local > BEAT.cut) return;
   const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1));
   const dx = encounter.stranger.x - pose.position.x;
@@ -59,12 +90,20 @@ export const cityEpisode: EpisodeDef = {
   World: CityScene,
   track: cityTrack,
   adjustPose: encounterCamera,
+  // the visitor can lean and crane, but not into the shop windows or the parked cars
+  clampHead: (base, o) => {
+    const x = base.x + o.x;
+    if (x > 9.1) o.x = 9.1 - base.x;
+    if (x < -9.1) o.x = -9.1 - base.x;
+    if (base.y + o.y < 0.15) o.y = 0.15 - base.y;
+  },
   beats: [0, 0.12, 0.22, 0.31, 0.4, 0.5, 0.62, BEAT.stop, BEAT.cock, BEAT.gate, 0.95, 1],
   captions: [
     { from: 0.14, to: 0.27, place: 'tl', kicker: 'Midnight, give or take', text: 'Outside, the city was awake. Not in a good way.' },
     { from: 0.3, to: 0.41, place: 'br', text: 'Banks at the end of the street. Everyone else down here.' },
     { from: 0.46, to: 0.58, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet.' },
     { from: 0.63, to: 0.72, place: 'bl', tone: 'yellow', text: 'Some people walk somewhere. He was walking at me.' },
-    { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.' },
+    { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', when: () => encounter.outcome === 'blocked' },
+    { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'When I came to, he was gone. He did not even take the bag.', when: () => encounter.outcome === 'knockedOut' },
   ],
 };

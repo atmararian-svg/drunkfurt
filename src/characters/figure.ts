@@ -68,6 +68,10 @@ export interface Joints {
   ankleR: Group;
   suitcase?: Group;
   phone: Object3D;
+  /** Height of the ankle joint above the sole, in the body's units. */
+  ankleHeight: number;
+  /** Rest x/z of the hips joint (the rig's centre over the feet). */
+  hipsRest: { x: number; z: number };
   /** Open hands and closed fists; toggle visibility to clench. */
   handL: Object3D;
   handR: Object3D;
@@ -294,6 +298,8 @@ export function buildFigure(look: Look, mat: Material, screen: MeshBasicMaterial
     ankleR: RL.ankle,
     suitcase,
     phone,
+    ankleHeight: BODY.ankle,
+    hipsRest: { x: 0, z: 0 },
     handL: L.open,
     handR: R.open,
     fistL: L.closed,

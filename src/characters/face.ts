@@ -76,15 +76,51 @@ function stroke(ctx: CanvasRenderingContext2D, pts: [number, number][], w: numbe
   ctx.stroke();
 }
 
-function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression) {
+export interface FaceStyle {
+  /** A short, dark beard over the jaw and upper lip instead of stubble. */
+  beard?: boolean;
+  /** Feather the edges to transparent (for a decal over a modelled face). */
+  mask?: boolean;
+}
+
+function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression, style: FaceStyle = {}) {
   const a = Math.max(0, e.anger - e.shock * 0.8);
   const ink = '#141414';
   ctx.clearRect(0, 0, PX, PX);
   ctx.fillStyle = shade(skin);
   ctx.fillRect(0, 0, PX, PX);
+  // cheek and temple shading: drawn planes, darker under the cheekbones
+  for (const s of [-1, 1]) {
+    const g = ctx.createRadialGradient(X(s * 0.05), Y(0.07), 0, X(s * 0.05), Y(0.07), S(0.05));
+    g.addColorStop(0, 'rgba(20,20,20,0.28)');
+    g.addColorStop(1, 'rgba(20,20,20,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, PX, PX);
+  }
+  if (style.beard) {
+    // beard: a dark mass over jaw, chin and upper lip, its edge broken into short strokes
+    ctx.fillStyle = 'rgba(28,28,28,0.78)';
+    ctx.beginPath();
+    ctx.moveTo(X(-0.058), Y(0.085));
+    ctx.quadraticCurveTo(X(-0.056), Y(-0.005), X(0), Y(-0.012));
+    ctx.quadraticCurveTo(X(0.056), Y(-0.005), X(0.058), Y(0.085));
+    ctx.lineTo(X(0.04), Y(0.07));
+    ctx.quadraticCurveTo(X(0.02), Y(0.066), X(0.013), Y(0.062));
+    ctx.lineTo(X(-0.013), Y(0.062));
+    ctx.quadraticCurveTo(X(-0.02), Y(0.066), X(-0.04), Y(0.07));
+    ctx.closePath();
+    ctx.fill();
+    for (let i = 0; i < 260; i++) {
+      const t = hash(i * 7.1) * Math.PI;
+      const r = 0.055 + hash(i * 3.3) * 0.006;
+      const x = Math.cos(t) * r;
+      const y = 0.06 - Math.sin(t) * 0.07;
+      stroke(ctx, [[x, y], [x * 1.03, y - 0.005]], 1.5, 'rgba(25,25,25,0.6)');
+    }
+  }
 
   // stubble: speckle over jaw, chin and upper lip, thinning towards the cheeks
-  for (let i = 0; i < 2600; i++) {
+  for (let i = 0; i < (style.beard ? 0 : 2600); i++) {
     const x = (hash(i) - 0.5) * 0.12;
     const y = 0.012 + hash(i + 0.5) * 0.058;
     const onJaw = (x / 0.058) ** 2 + ((y - 0.03) / 0.04) ** 2 < 1 && !(Math.abs(x) < 0.016 && y > 0.05 && y < 0.068);
@@ -192,27 +228,66 @@ function drawFace(ctx: CanvasRenderingContext2D, skin: number, e: Expression) {
   // lower lip shadow and chin crease
   stroke(ctx, [[-0.01, my - 0.007 - open * 0.012], [0.01, my - 0.007 - open * 0.012]], 2.5, 'rgba(20,20,20,0.45)');
   stroke(ctx, [[-0.008, 0.02 - open * 0.006], [0.0, 0.018 - open * 0.006], [0.008, 0.02 - open * 0.006]], 2, 'rgba(20,20,20,0.35)');
+  if (style.mask) {
+    // keep an oval over the face (brows to chin), feathered into the modelled head
+    ctx.globalCompositeOperation = 'destination-in';
+    const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    g.addColorStop(0, 'rgba(0,0,0,1)');
+    g.addColorStop(0.78, 'rgba(0,0,0,1)');
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.save();
+    ctx.translate(X(0), Y(0.078));
+    ctx.scale(S(0.064), S(0.082));
+    ctx.fillStyle = g;
+    ctx.fillRect(-1, -1, 2, 2);
+    ctx.restore();
+    ctx.globalCompositeOperation = 'source-over';
+  }
 }
 
-export function buildFace(skinShade: number, sculpt: Material): FaceRig {
-  const group = new Group();
+/** Canvas-drawn face as a material, redrawn only when the expression changes noticeably. */
+export function faceMaterial(skinShade: number, style: FaceStyle = {}) {
   const canvas = document.createElement('canvas');
   canvas.width = canvas.height = PX;
   const ctx = canvas.getContext('2d')!;
   const tex = new CanvasTexture(canvas);
   tex.colorSpace = SRGBColorSpace;
   tex.anisotropy = 4;
-  const mat = new MeshStandardMaterial({ map: tex, roughness: 0.8, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const material = new MeshStandardMaterial({
+    map: tex,
+    roughness: 0.8,
+    transparent: !!style.mask,
+    depthWrite: !style.mask,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4,
+  });
   // the drawing is the shading here: clean band edges, no dots across the features
-  mat.userData.comic = { halftone: 0 };
+  material.userData.comic = { halftone: 0, mono: true };
+  let last = '';
+  const set = (e: Expression) => {
+    const key = [e.anger, e.sneer, e.open, e.shock, e.lookX, e.lookY].map((v) => Math.round(v * 30)).join(',');
+    if (key === last) return;
+    last = key;
+    drawFace(ctx, skinShade, e, style);
+    tex.needsUpdate = true;
+  };
+  set(calmFace());
+  return { material, set };
+}
 
-  const upper = new Mesh(patch(SKULL, 0.42, 1.95, 1.05, 1.006), mat);
-  const lower = new Mesh(patch(JAW, 0.7, 2.6, 1.0, 1.008), mat);
+/** The drawing window in head space: decals scale their box to this. */
+export const FACE_WINDOW = { width: WIN.x1 - WIN.x0, height: WIN.y1 - WIN.y0, centerY: (WIN.y0 + WIN.y1) / 2, eyeY: 0.111, mouthY: 0.043, eyeGap: 0.062 };
+
+export function buildFace(skinShade: number, sculpt: Material): FaceRig {
+  const group = new Group();
+  const { material, set } = faceMaterial(skinShade);
+  const upper = new Mesh(patch(SKULL, 0.42, 1.95, 1.05, 1.006), material);
+  const lower = new Mesh(patch(JAW, 0.7, 2.6, 1.0, 1.008), material);
   for (const m of [upper, lower]) {
     m.userData.ink = false;
     group.add(m);
   }
-
   // a sculpted, slightly crooked nose so the head has a profile
   const skin = new Color().setStyle(shade(skinShade));
   const nose = new Mesh(
@@ -224,15 +299,5 @@ export function buildFace(skinShade: number, sculpt: Material): FaceRig {
   );
   nose.userData.ink = 'silhouette';
   group.add(nose);
-
-  let last = '';
-  const set = (e: Expression) => {
-    const key = [e.anger, e.sneer, e.open, e.shock, e.lookX, e.lookY].map((v) => Math.round(v * 30)).join(',');
-    if (key === last) return;
-    last = key;
-    drawFace(ctx, skinShade, e);
-    tex.needsUpdate = true;
-  };
-  set(calmFace());
   return { group, set };
 }

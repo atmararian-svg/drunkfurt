@@ -17,13 +17,13 @@ export const rigPose: CameraPose = { position: new Vector3(), yaw: 0, pitch: 0, 
 const LOOK_YAW = deg(7);
 const LOOK_PITCH = deg(4);
 /**
- * Looking around also moves your head a little, as if you leaned and craned
- * within the spot you stand in: sideways towards where you look, a touch up or
- * down, and slightly forward when you look to the side.
+ * Looking around also moves your head, as if you leaned and craned within the
+ * spot you stand in. The head moves inside an invisible ellipsoid around the
+ * composed camera position (14 cm sideways, 6 cm up and down, 6 cm forward),
+ * towards where you look, and each episode can clamp it further so it never
+ * enters scenery.
  */
-const LEAN_SIDE = 0.11;
-const LEAN_UP = 0.045;
-const LEAN_FWD = 0.05;
+const HEAD = { side: 0.14, up: 0.06, fwd: 0.06 };
 
 /**
  * The camera is on rails: the active episode's track, sampled at the scroll
@@ -33,7 +33,7 @@ const LEAN_FWD = 0.05;
 export function ScrollCameraRig() {
   const camera = useThree((s) => s.camera) as PerspectiveCamera;
   const st = useMemo(
-    () => ({ lookYaw: 0, lookPitch: 0, leanX: 0, leanY: 0, speed: 0, phase: 0, last: new Vector3(), primed: false, episode: '' }),
+    () => ({ lookYaw: 0, lookPitch: 0, leanX: 0, leanY: 0, off: new Vector3(), speed: 0, phase: 0, last: new Vector3(), primed: false, episode: '' }),
     [],
   );
 
@@ -82,12 +82,19 @@ export function ScrollCameraRig() {
 
     const sin = Math.sin(pose.yaw);
     const cos = Math.cos(pose.yaw);
-    const side = bobX + st.leanX * LEAN_SIDE;
-    const fwd = Math.abs(st.leanX) * LEAN_FWD;
+    // head offset inside the ellipsoid (the pointer already lies in -1..1, so the point stays inside)
+    const free = clamp(1 - Math.abs(pose.roll) / 0.6, 0, 1); // not while lying on the ground
+    const r = st.leanX * HEAD.side * free;
+    const u = st.leanY * HEAD.up * free;
+    const f = Math.hypot(st.leanX, st.leanY * 0.5) * HEAD.fwd * free;
+    st.off.x = cos * r - sin * f;
+    st.off.y = u;
+    st.off.z = -sin * r - cos * f;
+    ep?.clampHead?.(pose.position, st.off);
     camera.position.set(
-      pose.position.x + cos * side - sin * fwd,
-      pose.position.y + bobY + st.leanY * LEAN_UP,
-      pose.position.z - sin * side - cos * fwd,
+      pose.position.x + st.off.x + cos * bobX,
+      pose.position.y + st.off.y + bobY,
+      pose.position.z + st.off.z - sin * bobX,
     );
     camera.rotation.set(pose.pitch + st.lookPitch, pose.yaw + st.lookYaw, pose.roll + Math.sin(st.phase) * 0.003 * k);
     const fov = pose.fov ?? 54;

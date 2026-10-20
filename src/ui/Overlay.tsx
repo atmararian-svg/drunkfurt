@@ -4,8 +4,8 @@ import { clamp } from '../core/math';
 import { story, useStory } from '../core/store';
 import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { PLANNED, builtEpisodes } from '../episodes';
-import { BEAT, BLOCK, defend, encounter } from '../scenes/city/encounter';
-import { drawBrushWipe, drawImpact } from './brush';
+import { BEAT, BLOCK, KO, defend, encounter } from '../scenes/city/encounter';
+import { drawBrushWipe, drawImpact, drawKnockout } from './brush';
 
 /** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
 function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
@@ -43,6 +43,7 @@ export function Overlay() {
     let raf = 0;
     const el = root.current!;
     const captions = Array.from(el.querySelectorAll<HTMLElement>('[data-caption]'));
+    const capDefs = episodes.flatMap((ep) => ep.captions);
     const titles = Array.from(el.querySelectorAll<HTMLElement>('[data-title]'));
     const fill = el.querySelector<HTMLElement>('.rail-fill')!;
     const cue = el.querySelector<HTMLElement>('.cue')!;
@@ -67,10 +68,11 @@ export function Overlay() {
     const loop = () => {
       const p = timeline.progress;
       const { id, local } = locate(p);
-      for (const c of captions) {
-        const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to);
+      captions.forEach((c, i) => {
+        const when = capDefs[i].when;
+        const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to) && (!when || when());
         c.classList.toggle('is-on', on);
-      }
+      });
       // a title shows at the start of its episode; later episodes show it over the ink of the hand-over
       titles.forEach((t) => {
         const i = episodes.findIndex((e) => e.id === t.dataset.ep);
@@ -91,11 +93,14 @@ export function Overlay() {
       }
       // the strike, in real time; fades once the scroll has carried the ink over
       if (encounter.impactAt > 0) {
-        // the comic strike frames come in as the counter lands; the block itself is played in 3D
-        const t = (performance.now() - encounter.impactAt) / 1000 - BLOCK.ink;
-        if (t < 1.9) {
-          drawImpact(hctx, hit.width, hit.height, t);
-          hit.style.opacity = String(1 - clamp((t - 1.4) / 0.5, 0, 1));
+        // blocked: the comic strike frames come in as your counter lands (the block itself plays in 3D);
+        // knocked out: a flash, then the lights go out as you fall
+        const ko = encounter.outcome === 'knockedOut';
+        const t = (performance.now() - encounter.impactAt) / 1000 - (ko ? 0 : BLOCK.ink);
+        if (t < (ko ? KO.resolve + 0.6 : 1.9)) {
+          if (ko) drawKnockout(hctx, hit.width, hit.height, t, KO.dark);
+          else drawImpact(hctx, hit.width, hit.height, t);
+          hit.style.opacity = ko ? '1' : String(1 - clamp((t - 1.4) / 0.5, 0, 1));
           lastHit = t;
         } else if (lastHit >= 0) {
           hctx.clearRect(0, 0, hit.width, hit.height);

@@ -29,6 +29,9 @@ export const cues = {
   fightExhale2: { src: null, bus: 'body', gain: 0.9 },
   fightBlock: { src: null, bus: 'body', gain: 1 },
   fightPunch: { src: null, bus: 'body', gain: 1 },
+  fightKnockout: { src: null, bus: 'body', gain: 1 },
+  fightRing: { src: null, bus: 'body', gain: 0.6 },
+  fightFall: { src: null, bus: 'body', gain: 0.9 },
 } satisfies Record<string, CueDef>;
 
 export type CueId = keyof typeof cues;
@@ -269,8 +272,8 @@ class AudioDirector {
    *  - exhale2: a heavier, lower exhale ("hhf") behind the counter-punch;
    *  - punch:   knuckles on a jaw: a hard crack with a deep body thump.
    */
-  fight(kind: 'exhale1' | 'exhale2' | 'block' | 'punch') {
-    const cue = ({ exhale1: 'fightExhale1', exhale2: 'fightExhale2', block: 'fightBlock', punch: 'fightPunch' } as const)[kind];
+  fight(kind: 'exhale1' | 'exhale2' | 'block' | 'punch' | 'ko' | 'ring' | 'fall') {
+    const cue = ({ exhale1: 'fightExhale1', exhale2: 'fightExhale2', block: 'fightBlock', punch: 'fightPunch', ko: 'fightKnockout', ring: 'fightRing', fall: 'fightFall' } as const)[kind];
     if (this.play(cue)) return;
     const ctx = this.ctx;
     if (!ctx) return;
@@ -319,6 +322,26 @@ class AudioDirector {
       tone('sine', 190, 90, 0.75, 0.004, 0.16);
       noiseHit('bandpass', 2200, 0.7, 0.5, 0.002, 0.05);
       noiseHit('lowpass', 500, 0.7, 0.4, 0.003, 0.09);
+    } else if (kind === 'ko') {
+      // his fist on your face, from the inside: a dull, enormous thud, low and close, little crack
+      tone('sine', 85, 30, 0.9, 0.004, 0.6);
+      noiseHit('lowpass', 420, 0.8, 0.7, 0.003, 0.25);
+      noiseHit('bandpass', 1800, 0.9, 0.25, 0.002, 0.04);
+    } else if (kind === 'ring') {
+      // the ringing in your ears afterwards: a thin, high tone that slowly fades
+      const o = ctx.createOscillator();
+      o.frequency.value = 3150;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.0001, t);
+      g.gain.exponentialRampToValueAtTime(0.07, t + 0.15);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + 3.2);
+      o.connect(g).connect(out);
+      o.start(t);
+      o.stop(t + 3.3);
+    } else if (kind === 'fall') {
+      // you hit the pavement: a soft, heavy body thump
+      tone('sine', 70, 38, 0.6, 0.01, 0.3);
+      noiseHit('lowpass', 300, 0.7, 0.45, 0.006, 0.2);
     } else {
       // the counter lands: sharp crack on top, deep thump underneath, a short tail
       noiseHit('highpass', 2400, 0.7, 0.55, 0.002, 0.06);

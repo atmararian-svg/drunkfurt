@@ -18,6 +18,15 @@ export const BEAT = {
   aftermath: 0.905,
 } as const;
 
+/** Knockout sequence (you did not block), in real seconds after the fist lands. */
+export const KO = {
+  snap: 0.12,
+  fallFrom: 0.35,
+  fallTo: 1.25,
+  dark: 1.6,
+  resolve: 2.6,
+} as const;
+
 /** Block sequence, in real seconds after the click. */
 export const BLOCK = {
   guardUp: 0.12,

@@ -1,3 +1,4 @@
+import { Euler, Object3D, Quaternion, Vector3 } from 'three';
 import { clamp, damp } from '../core/math';
 import { BODY } from './anatomy';
 import type { Joints } from './figure';
@@ -307,11 +308,16 @@ export function walkPose(p: Pose, phase: number, k: number, style: { swing: numb
   p.hipsX = 0.012 * Math.sin(phase) * k;
 }
 
-const tmpVec = { x: 0, y: 0 };
-function legReach(hip: number, knee: number) {
-  // vertical distance from hip joint to ankle for given hip pitch and knee bend
-  tmpVec.y = BODY.thigh * Math.cos(hip) + BODY.shin * Math.cos(hip + knee);
-  return tmpVec.y;
+const QH = new Quaternion();
+const QK = new Quaternion();
+const V = new Vector3();
+const EUL = new Euler();
+/** Vertical drop from a hip joint to its ankle for the given rotations, from the rig's own limb vectors. */
+function legReach(hipJ: Object3D, kneeJ: Object3D, ankleJ: Object3D, hipRot: [number, number, number], knee: number) {
+  QH.setFromEuler(EUL.set(...hipRot));
+  QK.setFromEuler(EUL.set(knee, 0, 0));
+  V.copy(ankleJ.position).applyQuaternion(QK).add(kneeJ.position).applyQuaternion(QH).add(hipJ.position);
+  return -V.y;
 }
 
 /** Applies a pose to the joints. Standing poses are grounded: the lower foot stays on the floor. */
@@ -319,8 +325,11 @@ export function applyPose(j: Joints, p: Pose) {
   if (p.seat > 0) {
     j.hips.position.set(0, p.seat, 0);
   } else {
-    const reach = Math.max(legReach(p.hipLp, p.kneeL), legReach(p.hipRp, p.kneeR));
-    j.hips.position.set(p.hipsX, reach + BODY.ankle - p.hipsDrop, 0);
+    const reach = Math.max(
+      legReach(j.hipL, j.kneeL, j.ankleL, [p.hipLp, 0, -p.hipLr], p.kneeL),
+      legReach(j.hipR, j.kneeR, j.ankleR, [p.hipRp, 0, p.hipRr], p.kneeR),
+    );
+    j.hips.position.set(j.hipsRest.x + p.hipsX, reach + j.ankleHeight - p.hipsDrop, j.hipsRest.z);
   }
   j.hips.rotation.set(0, p.pelvisYaw, p.pelvisRoll);
   j.spine.rotation.set(p.spinePitch, p.spineYaw - p.pelvisYaw * 0.5, p.spineRoll - p.pelvisRoll * 0.8);

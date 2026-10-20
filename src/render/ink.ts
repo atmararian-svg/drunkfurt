@@ -19,12 +19,16 @@ export function createInkBufferMaterial(weight: number) {
     uniforms: { uFar: { value: 1300 }, uWeight: { value: weight } },
     vertexShader: /* glsl */ `
       #include <common>
+      #include <skinning_pars_vertex>
       varying vec3 vN;
       varying float vDepth;
       void main() {
+        #include <skinbase_vertex>
         #include <beginnormal_vertex>
+        #include <skinnormal_vertex>
         #include <defaultnormal_vertex>
         #include <begin_vertex>
+        #include <skinning_vertex>
         #include <project_vertex>
         vN = normalize(transformedNormal);
         vDepth = -mvPosition.z;

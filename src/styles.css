@@ -237,7 +237,7 @@ body { cursor: pointer; }
   opacity: 1;
   transform: translate(-50%, 0) rotate(-1.5deg);
   pointer-events: auto;
-  transition-delay: 0.6s;
+  transition-delay: 0.1s;
 }
 .act::before {
   /* a strip of tape holding the panel down */

@@ -1,25 +1,24 @@
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useLoader } from '@react-three/fiber';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import attackerUrl from '../../assets/attacker.glb?url';
 import { useMemo, useRef } from 'react';
 import {
   CatmullRomCurve3,
-  Color,
   Group,
-  MeshBasicMaterial,
   MeshStandardMaterial,
   Object3D,
   PointLight,
+  Quaternion,
   SpotLight,
   TubeGeometry,
   Vector3,
 } from 'three';
-import { Expression, buildFace, calmFace } from '../../characters/face';
-import { buildFigure } from '../../characters/figure';
+import { Expression, FACE_WINDOW, calmFace, faceMaterial } from '../../characters/face';
+import { Landmarks, faceDecal, monoMaterial, rigMesh } from '../../characters/meshRig';
 import { aimArm } from '../../characters/ik';
 import { activityPose, applyPose, dampPose, restPose, walkPose } from '../../characters/pose';
 import { clamp, smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
-import { mulberry32 } from '../../core/math';
-import { canvasTexture, grain } from '../../materials/textures';
 import { BEAT, BLOCK, blockTime, encounter } from './encounter';
 import { cityMaterials } from './cityMaterials';
 import { EYE, VISITOR_STOP } from './layout';
@@ -49,36 +48,26 @@ function routeAt(s: number) {
 const ramp = (x: number, a: number, b: number) => clamp((x - a) / (b - a), 0, 1);
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 
-/** Worn fabric: creases, a few stains and bobbles, multiplied over his vertex colours. */
-const wornFabric = () =>
-  canvasTexture('worn-fabric', 256, 256, (ctx, w, h) => {
-    const rnd = mulberry32(13);
-    ctx.fillStyle = '#d8d8d8';
-    ctx.fillRect(0, 0, w, h);
-    for (let i = 0; i < 26; i++) {
-      // creases: soft dark strokes
-      ctx.strokeStyle = `rgba(40,40,40,${0.12 + rnd() * 0.18})`;
-      ctx.lineWidth = 1 + rnd() * 3;
-      ctx.beginPath();
-      const x = rnd() * w;
-      const y = rnd() * h;
-      ctx.moveTo(x, y);
-      ctx.quadraticCurveTo(x + (rnd() - 0.5) * 60, y + rnd() * 40, x + (rnd() - 0.5) * 80, y + 30 + rnd() * 60);
-      ctx.stroke();
-    }
-    for (let i = 0; i < 9; i++) {
-      // stains
-      const g = ctx.createRadialGradient(0, 0, 0, 0, 0, 10 + rnd() * 26);
-      g.addColorStop(0, 'rgba(60,60,60,0.35)');
-      g.addColorStop(1, 'rgba(60,60,60,0)');
-      ctx.save();
-      ctx.translate(rnd() * w, rnd() * h);
-      ctx.fillStyle = g;
-      ctx.fillRect(-40, -40, 80, 80);
-      ctx.restore();
-    }
-    grain(ctx, w, h, 26, 14);
-  });
+/**
+ * Where his joints are on the model (measured from the mesh, metres, feet on
+ * y = 0, facing +z). "L" is the -x side, as in the procedural rig.
+ */
+const LANDMARKS: Landmarks = {
+  height: HEIGHT,
+  hips: [0.03, 0.9, 0.0],
+  waist: [0.02, 1.02, -0.02],
+  neck: [-0.04, 1.55, -0.01],
+  headTop: [-0.14, 1.82, 0.02],
+  shoulder: [[-0.2, 1.45, -0.03], [0.19, 1.45, 0.0]],
+  elbow: [[-0.27, 1.12, -0.08], [0.27, 1.12, 0.01]],
+  wrist: [[-0.26, 0.9, -0.02], [0.25, 0.9, 0.08]],
+  fingertips: [[-0.24, 0.75, 0.0], [0.22, 0.76, 0.07]],
+  hip: [[-0.06, 0.9, -0.02], [0.12, 0.9, 0.02]],
+  knee: [[-0.09, 0.49, -0.035], [0.175, 0.49, 0.07]],
+  ankle: [[-0.05, 0.1, -0.03], [0.16, 0.1, 0.0]],
+  toe: [[-0.06, 0.04, 0.14], [0.19, 0.04, 0.16]],
+  face: [[-0.205, 1.628, 0], [-0.112, 1.657, 0], [-0.13, 1.585, 0]],
+};
 
 /**
  * The stranger. Late thirties, a bad night behind him: a grey hoodie a size
@@ -92,20 +81,30 @@ const wornFabric = () =>
  * (real time): your guard takes his fist, he recoils, your counter lands, ink.
  */
 export function Stranger({ active, timeScale }: { active: boolean; timeScale: () => number }) {
-  const { j, face } = useMemo(() => {
-    const mat = new MeshStandardMaterial({ vertexColors: true, roughness: 0.95, map: wornFabric() });
-    mat.userData.comic = { halftone: 0.5 };
-    const j = buildFigure(
-      { height: HEIGHT, build: 'broad', outfit: 'hoodie', worn: true, top: 92, shirt: 150, bottom: 66, skin: 128, hair: 'cropped', hairShade: 40, shoe: 160 },
-      mat,
-      new MeshBasicMaterial({ color: new Color('#dfe6ee') }),
-    );
-    const faceMat = new MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
-    faceMat.userData.comic = { halftone: 0.3 };
-    const face = buildFace(128, faceMat);
-    j.head.add(face.group);
-    return { j, face };
-  }, []);
+  const gltf = useLoader(GLTFLoader, attackerUrl);
+  const { j, face, rig, headFix } = useMemo(() => {
+    // the model's own textures (worn jacket, hoodie, scarf, torn jeans), printed in greys
+    let map: MeshStandardMaterial['map'] = null;
+    let normalMap: MeshStandardMaterial['normalMap'] = null;
+    gltf.scene.traverse((o) => {
+      const m = (o as { material?: MeshStandardMaterial }).material;
+      if (m && m.map) {
+        map = m.map;
+        normalMap = m.normalMap;
+      }
+    });
+    const fistMat = new MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
+    fistMat.userData.comic = { mono: true, halftone: 0.4 };
+    const rig = rigMesh(gltf, LANDMARKS, monoMaterial(map, normalMap), fistMat);
+    // his face, drawn: fitted to the model's eyes and mouth, feathered into his head
+    const face = faceMaterial(150, { beard: true, mask: true });
+    const sx = rig.face.eyeGap / FACE_WINDOW.eyeGap;
+    const sy = rig.face.eyeToMouth / (FACE_WINDOW.eyeY - FACE_WINDOW.mouthY);
+    faceDecal(rig, face.material, [FACE_WINDOW.width * sx, FACE_WINDOW.height * sy], (FACE_WINDOW.centerY - FACE_WINDOW.eyeY) * sy);
+    // the model stands with his head bowed and tilted; straighten most of that so he can look at you
+    const headFix = new Quaternion().slerp(rig.headFix, 0.85);
+    return { j: rig.joints, face, rig, headFix };
+  }, [gltf]);
   const st = useMemo(
     () => ({ pose: restPose(), target: restPose(), phase: 0, t: 0, last: new Vector3(), primed: false, expr: calmFace(), yaw: -Math.PI / 2 + 0.35 }),
     [],
@@ -122,10 +121,15 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     const state = encounter.state;
     const bt = blockTime();
 
-    if (state === 'resolved' && local >= BEAT.cut) {
-      lieDown();
+    // Once it is over, it stays over: whatever part of the street you scroll back to, he is
+    // either on the pavement where he fell (you blocked) or gone (you went down).
+    if (state === 'resolved') {
+      j.root.visible = encounter.outcome === 'blocked';
+      if (j.root.visible) lieDown();
+      if (key.current) key.current.visible = false;
       return;
     }
+    j.root.visible = true;
     j.body.rotation.set(0, 0, 0);
     j.body.position.set(0, 0, 0);
 
@@ -144,7 +148,11 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     let punch = encounter.punch; // 0..1, 1 = fist at your guard
     let recoil = 0;
     let hit2 = 0;
-    if (bt >= 0) {
+    const ko = encounter.outcome === 'knockedOut';
+    if (bt >= 0 && ko) {
+      // it landed: the arm follows through, then he straightens up and looks down at you
+      punch = lerp(1, 0.25, smoothstep(ramp(bt, 0.15, 0.9)));
+    } else if (bt >= 0) {
       punch = lerp(encounter.punch, 1, smoothstep(ramp(bt, 0, BLOCK.contact)));
       if (bt > BLOCK.contact + BLOCK.hitStop) {
         recoil = smoothstep(ramp(bt, BLOCK.contact + BLOCK.hitStop, BLOCK.counterLands));
@@ -235,6 +243,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     }
     dampPose(st.pose, p, bt >= 0 ? 30 : walking ? 30 : 8, dt + (bt >= 0 ? rawDt : 0));
     applyPose(j, st.pose);
+    j.head.quaternion.multiply(headFix);
 
     // --- arms by IK once he squares up: fists placed in the world
     const fists = ramp(local, BEAT.confront + 0.02, BEAT.cock);
@@ -275,6 +284,8 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
       j.fistL.visible = j.fistR.visible = fists > 0.3;
     }
 
+    rig.sync();
+
     // --- face: suspicion, then hostility, then the shout of the swing; shock when blocked
     const e: Expression = st.expr;
     const noticed = ramp(local, BEAT.noticed, BEAT.strangerMoves);
@@ -283,6 +294,14 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     e.sneer = clamp(0.6 * confront + 0.4 * cock, 0, 1) * (1 - recoil);
     e.open = clamp(0.12 * cock + 0.45 * drive, 0, 1) * (1 - recoil) + 0.55 * recoil + 0.3 * hit2;
     e.shock = clamp(recoil * 0.9 + hit2, 0, 1);
+    if (bt >= 0 && encounter.outcome === 'knockedOut') {
+      // satisfied, a little surprised it was that easy
+      e.anger = 0.35;
+      e.sneer = 0.7;
+      e.open = 0.1;
+      e.shock = 0;
+      e.lookY = -0.6;
+    }
     e.lookX = 0;
     e.lookY = -0.2;
     // a blink now and then while he walks, never once he is in your face
@@ -312,11 +331,13 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     Object.assign(q, { shLr: 1.25, shLp: 0, elL: -0.35, shRr: 0.2, shRp: 0.1, elR: -0.6, hipLp: -0.55, kneeL: 1.1, ankleL: 0.35, hipRp: 0.02, kneeR: 0.12, headYaw: 0.8, headPitch: 0 });
     Object.assign(st.pose, q);
     applyPose(j, st.pose);
-    j.hips.position.set(0, 0, 0);
-    j.body.position.set(0, 0.11, 0);
+    j.head.quaternion.multiply(headFix);
+    j.hips.position.set(j.hipsRest.x, 0, j.hipsRest.z);
+    j.body.position.set(0, 0.2, 0);
     j.body.rotation.set(-Math.PI / 2, 0, 0);
     j.fistL.visible = j.fistR.visible = false;
     j.handL.visible = j.handR.visible = true;
+    rig.sync();
     face.set({ anger: 0, sneer: 0, open: 0.35, shock: 0.4, lookX: 0, lookY: 0 });
     if (key.current) key.current.visible = false;
     encounter.stranger.x = DOWN.x;
@@ -349,7 +370,8 @@ export function Bag({ active }: { active: boolean }) {
   const ref = useMemo(() => new Group(), []);
   const light = useRef<PointLight>(null);
   useFrame(() => {
-    ref.visible = active && encounter.state === 'resolved' && localProgress('city') >= BEAT.cut;
+    // dropped in the struggle either way, and still there if you scroll back up the street
+    ref.visible = active && encounter.state === 'resolved';
     if (light.current) light.current.visible = ref.visible;
   });
   return (
