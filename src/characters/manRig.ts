@@ -1,5 +1,4 @@
 import {
-  AnimationMixer,
   Bone,
   BufferGeometry,
   CanvasTexture,
@@ -143,12 +142,23 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   root.updateMatrixWorld(true);
   const restAnkle = Math.min(...ankles.map((b) => b.getWorldPosition(new Vector3()).y));
 
-  // --- his walk, sampled at will; and his stance, taken from the walk where both feet are down
+  // --- his walk, sampled at will; and his stance, taken from the walk where both feet are down.
+  // The clip's tracks are evaluated directly rather than through an AnimationMixer: the mixer only
+  // writes a bone when its value changed since its last write, so after the pose is reset to rest
+  // a frame at the same clip time (a still scroll) would leave him standing in his bind pose.
   const clip = gltf.animations[0];
-  const mixer = new AnimationMixer(model);
-  mixer.clipAction(clip).play();
+  const tracks = clip.tracks.flatMap((track) => {
+    const dot = track.name.lastIndexOf('.');
+    const node = model.getObjectByName(track.name.slice(0, dot));
+    const prop = track.name.slice(dot + 1);
+    if (!node || (prop !== 'quaternion' && prop !== 'position')) return [];
+    return [{ target: prop === 'quaternion' ? node.quaternion : node.position, sample: track.createInterpolant() }];
+  });
+  const sampleClip = (time: number) => {
+    for (const t of tracks) t.target.fromArray(t.sample.evaluate(time) as unknown as number[]);
+  };
   const snap = () => ({ q: list.map((b) => b.quaternion.clone()), hips: bone('Hips').position.clone() });
-  mixer.setTime(STANCE_T);
+  sampleClip(STANCE_T);
   const stance = snap();
   // feet a little closer than in mid-stride: the legs part-way back towards standing straight
   ['LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot'].forEach((n) => {
@@ -305,7 +315,7 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       model.rotation.set(0, 0, 0);
       // from the rest pose every time (the clip does not drive every bone, e.g. fingers), then the walk
       list.forEach((b, i) => b.quaternion.copy(rest[i]));
-      mixer.setTime(((((HEEL_STRIKE + (phase / (Math.PI * 2)) * clip.duration) % clip.duration) + clip.duration) % clip.duration));
+      sampleClip(((((HEEL_STRIKE + (phase / (Math.PI * 2)) * clip.duration) % clip.duration) + clip.duration) % clip.duration));
       if (walk < 1) {
         const w = Math.max(0, walk);
         // stance → walk: the walk pose has to be read before the stance is written over it

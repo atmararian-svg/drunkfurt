@@ -41,6 +41,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
   const rig = useMemo(() => {
     const r = buildMan(gltf, knifeGltf);
     r.root.name = 'stranger';
+    if (import.meta.env.DEV) (window as unknown as { __stranger: unknown }).__stranger = r;
     return r;
   }, [gltf, knifeGltf]);
   const tmp = useMemo(() => ({ a: new Vector3(), b: new Vector3(), c: new Vector3(), d: new Vector3(), e: new Vector3() }), []);
@@ -111,14 +112,14 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       const left = body(0.24, 0.98 + 0.08 * raise, 0.16 + 0.06 * raise, tmp.b);
       rig.leftHand(leftFK.lerp(left, hands), body(0.9, -0.6, -0.3, tmp.c).sub(root.position));
       const rightFK = rig.bone('RightHand').getWorldPosition(tmp.a);
-      // low at his side, blade forward and down; then up in front of his belly, the blade
-      // pointing up at your face (a hold the wrist takes without strain: about 30° of bend)
-      const held = body(-0.24, 0.96, 0.2, tmp.b).lerp(body(-0.18, 1.15, 0.4, tmp.c), raise);
+      // low at his side, blade forward and down; then held out at chest height, forearm level,
+      // the blade turned half-way towards your face (the wrist bends about 30°, an easy hold)
+      const held = body(-0.24, 0.96, 0.2, tmp.b).lerp(body(-0.26, 1.32, 0.42, tmp.c), raise);
       const fx = Math.sin(yaw);
       const fz = Math.cos(yaw);
       const dir = tmp.d.set(fx, -0.35, fz).normalize().lerp(tmp.e.subVectors(CAM, held).normalize(), raise).normalize();
-      const pole = body(-0.9, -0.7, -0.4, new Vector3()).sub(root.position);
-      rig.rightHand(rightFK.lerp(held, hands), dir, pole, lerp(0.4, 1, raise));
+      const pole = body(-0.5, -1, -0.5, new Vector3()).sub(root.position);
+      rig.rightHand(rightFK.lerp(held, hands), dir, pole, 0.5);
     }
     rig.knife.visible = draw > 0.5;
     rig.grip(draw);

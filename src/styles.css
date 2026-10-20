@@ -252,8 +252,9 @@ body { cursor: pointer; }
 /* --- the one action the story asks for ---------------------------------- */
 .act {
   position: absolute;
-  left: 50%;
-  bottom: max(18vh, 110px);
+  /* off-centre, so his face and the knife stay in view */
+  left: 73%;
+  bottom: max(12vh, 72px);
   display: grid;
   justify-items: center;
   gap: 10px;
@@ -326,6 +327,7 @@ body { cursor: pointer; }
   .rail { display: none; }
   .caption--tr, .caption--br { right: 20px; }
   .caption--tl, .caption--bl { left: 20px; }
+  .act { left: 50%; bottom: 40px; }
   .caption p { font-size: 14px; }
 }
 
