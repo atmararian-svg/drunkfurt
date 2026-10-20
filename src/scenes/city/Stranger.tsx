@@ -248,7 +248,7 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
         const rest = LANDMARKS.ankle[side === 'L' ? 0 : 1];
         const c = Math.cos(m.yaw);
         const sn = Math.sin(m.yaw);
-        const w = Math.min(1, pace * 1.5) * smoothstep(clamp(u / 0.12, 0, 1)) * smoothstep(clamp((1 - u) / 0.12, 0, 1));
+        const w = Math.min(1, pace * 1.5) * smoothstep(clamp(u / 0.06, 0, 1)) * smoothstep(clamp((1 - u) / 0.06, 0, 1));
         targets[side] = { anchor: new Vector3(m.x + rest[0] * c + rest[2] * sn, j.ankleHeight, m.z - rest[0] * sn + rest[2] * c), w, yaw: m.yaw };
       }
       placeFeet(j, targets);
