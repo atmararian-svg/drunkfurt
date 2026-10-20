@@ -17,7 +17,8 @@ import { Expression, FACE_WINDOW, calmFace, faceMaterial } from '../../character
 import { Landmarks, faceDecal, monoMaterial, rigMesh } from '../../characters/meshRig';
 import { loadGlb } from '../../characters/inlineModel';
 import { aimArm } from '../../characters/ik';
-import { STANCE, STRIDE_M, activityPose, applyPose, copyPose, legLengths, lerpPose, restPose, walkPose } from '../../characters/pose';
+import { activityPose, applyPose, copyPose, legLengths, restPose } from '../../characters/pose';
+import { START_PHASE, STANCE_WINDOW, WALK, applyWalk, stanceProgress, strideFor } from '../../characters/walkClip';
 import { lerpAngle } from '../../characters/crowd';
 import { FootTarget, placeFeet } from '../../characters/feet';
 import { clamp, smoothstep } from '../../core/math';
@@ -71,7 +72,7 @@ const LANDMARKS: Landmarks = {
  */
 export function Stranger({ active, timeScale }: { active: boolean; timeScale: () => number }) {
   const gltf = suspend(() => loadGlb(attackerUrl), ['drunkfurt-attacker']);
-  const { j, face, headFix } = useMemo(() => {
+  const { j, face, headFix, legs } = useMemo(() => {
     // the model's own textures (worn jacket, hoodie, scarf, torn jeans), printed in greys
     let map: MeshStandardMaterial['map'] = null;
     let normalMap: MeshStandardMaterial['normalMap'] = null;
@@ -91,7 +92,8 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     // the model stands with his head bowed and tilted; straighten most of that so he can look at you
     const headFix = new Quaternion().slerp(rig.headFix, 0.85);
     rig.joints.root.name = 'stranger';
-    return { j: rig.joints, face, headFix };
+    const legs = legLengths(rig.joints);
+    return { j: rig.joints, face, headFix, legs };
   }, [gltf]);
   // only ambient time (breathing, a blink) lives here; everything the story does is computed from the progress
   const st = useMemo(() => ({ pose: restPose(), target: restPose(), idle: restPose(), t: 0, expr: calmFace() }), []);
@@ -165,16 +167,11 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     // --- body
     const p = st.target;
     activityPose(p, 'pockets', st.t, 731);
-    // gait from the route itself: the phase is the distance walked, the pace how fast the scroll moves him along it
+    // gait from the route itself (the captured walk, walkClip.ts): the phase is the distance he has walked,
+    // the pace how fast the scroll moves him along it
     const pace = walkPace(walkU);
-    if (pace > 0.01) {
-      const idle = copyPose(st.idle, p);
-      walkPose(p, (s / STRIDE_M) * Math.PI * 2, 1, { swing: 0.5, lean: 0.07, stride: 1.0 }, legLengths(j));
-      // shoulders up and a little forward, hands out of the pocket, fists loose
-      p.shLr = p.shRr = 0.04;
-      p.spinePitch += 0.04;
-      lerpPose(p, idle, p, pace);
-    }
+    const stride = strideFor(WALK.speed, legs.thigh + legs.shin);
+    const phase = START_PHASE + (s / stride) * Math.PI * 2;
     if (walkU >= 1) {
       // planted: feet apart, right foot back, weight forward, shoulders hunched
       const sq = smoothstep(squared);
@@ -230,19 +227,24 @@ export function Stranger({ active, timeScale }: { active: boolean; timeScale: ()
     }
     copyPose(st.pose, p);
     applyPose(j, st.pose);
+    if (pace > 0.01) {
+      // his head stays on you; the rest of him walks, leaning into it a little
+      applyWalk(j, phase, pace, { keepHead: true });
+      j.spine.rotateX(0.06 * pace);
+    }
     j.head.quaternion.multiply(headFix);
 
     // feet: while he walks, a foot that carries his weight stays on the spot his route puts it on
     // (under his hip at mid-stance), so it does not skate; computed from the progress, like everything else
     if (pace > 0.01) {
       const TAU = Math.PI * 2;
-      const phase = (s / STRIDE_M) * TAU;
       const targets: { L?: FootTarget; R?: FootTarget } = {};
       for (const side of ['L', 'R'] as const) {
-        const ph = (((phase + (side === 'L' ? 0 : Math.PI)) % TAU) + TAU) % TAU;
-        if (ph >= STANCE) continue;
-        const u = ph / STANCE;
-        const m = routeAt(clamp(s + ((STANCE / 2 - ph) / TAU) * STRIDE_M, 0, ROUTE_LEN));
+        const u = stanceProgress(phase, side);
+        if (u < 0) continue;
+        // where his body is when this foot is at mid-stance
+        const toMid = (0.5 - u) * STANCE_WINDOW[side].length;
+        const m = routeAt(clamp(s + (toMid / TAU) * stride, 0, ROUTE_LEN));
         const rest = LANDMARKS.ankle[side === 'L' ? 0 : 1];
         const c = Math.cos(m.yaw);
         const sn = Math.sin(m.yaw);

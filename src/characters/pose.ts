@@ -242,84 +242,10 @@ export function activityPose(p: Pose, a: Activity, t: number, seed: number) {
   return p;
 }
 
-/**
- * Walking. `phase` advances with distance walked (2π per stride), `k` is 0..1
- * from standing to full pace. Built from the gait cycle rather than a sine on
- * each limb: heel strike with the knee nearly straight, a flexed knee in swing,
- * flat foot in stance with a push-off at the end, pelvis rotation and drop,
- * counter-rotating shoulders and arms that swing from the shoulder with a soft
- * elbow.
- */
-/** Distance covered per gait cycle (two steps); crowd.ts advances the phase by the same amount. */
-export const STRIDE_M = 1.44;
-/** Share of the cycle a foot spends on the ground. */
-export const STANCE = 1.22 * Math.PI;
-/** Phase at which the left foot is in the middle of its stance (under the hips): where a walk starts from standing. */
-export const START_PHASE = STANCE / 2;
-
-/** Thigh and shin of a rig, in metres (the gait is solved for the legs the figure actually has). */
+/** Thigh and shin of a rig, in metres. */
 export function legLengths(j: Joints) {
   const s = j.body.scale.y;
   return { thigh: j.kneeL.position.length() * s, shin: j.ankleL.position.length() * s };
-}
-
-export function walkPose(p: Pose, phase: number, k: number, style: { swing: number; lean: number; stride: number }, legs: { thigh: number; shin: number }) {
-  const legLen = legs.thigh + legs.shin;
-  // during stance the foot is planted, so it travels backwards relative to the hips
-  // exactly as fast as the body moves forwards
-  const reach = (STRIDE_M * (STANCE / (Math.PI * 2))) / 2;
-  const front = Math.asin(clamp(reach / legLen, -0.9, 0.9));
-  const leg = (ph: number) => {
-    const s = ((ph % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
-    let hip: number;
-    let knee: number;
-    let footWorld: number;
-    if (s < STANCE) {
-      const u = s / STANCE;
-      const rel = reach - 2 * reach * u; // foot ahead of the hip (m), decreasing linearly
-      knee = 0.16 * Math.sin(u * Math.PI); // a little give under load
-      // solve the hip angle for the bent two-segment leg so the ankle lands exactly on `rel`
-      const lt = legs.thigh;
-      const ls = legs.shin;
-      hip = -Math.asin(clamp(rel / legLen, -0.9, 0.9));
-      for (let it = 0; it < 4; it++) {
-        const f = -(lt * Math.sin(hip) + ls * Math.sin(hip + knee)) - rel;
-        const df = -(lt * Math.cos(hip) + ls * Math.cos(hip + knee));
-        hip -= f / df;
-      }
-      // heel strike toe-up, flat, then heel lifts for push-off
-      footWorld = -0.18 * Math.max(0, 1 - u / 0.12) + 0.5 * Math.max(0, (u - 0.78) / 0.22) ** 1.6;
-    } else {
-      const u = (s - STANCE) / (Math.PI * 2 - STANCE);
-      const e = u * u * (3 - 2 * u);
-      // swing the thigh from behind (+front) to ahead (-front)
-      hip = front - 2 * front * e;
-      knee = (1.0 + 0.15 * (style.stride - 1)) * Math.sin(Math.PI * Math.min(1, u * 1.15));
-      footWorld = 0.5 * (1 - e) - 0.12 * e;
-    }
-    return { hip: hip * k, knee: knee * k, ankle: (footWorld - hip - knee) * k, stance: s < STANCE ? 1 : 0 };
-  };
-  const L = leg(phase);
-  const R = leg(phase + Math.PI);
-  p.hipLp = L.hip; p.kneeL = 0.03 + L.knee; p.ankleL = L.ankle;
-  p.hipRp = R.hip; p.kneeR = 0.03 + R.knee; p.ankleR = R.ankle;
-  p.stanceL = L.stance;
-  p.stanceR = R.stance;
-  p.hipLr = p.hipRr = 0.015;
-  p.pelvisYaw = 0.09 * Math.sin(phase) * k;
-  p.pelvisRoll = 0.035 * Math.sin(phase * 2 + 0.6) * k;
-  p.spineYaw = -0.07 * Math.sin(phase) * k;
-  p.spinePitch = (0.04 + style.lean) * k + 0.01;
-  p.spineRoll = -0.015 * Math.sin(phase) * k;
-  // arms opposite to the legs, swing lagging slightly, elbows soft and a bit more bent forward
-  const armL = 0.3 * style.swing * Math.cos(phase + 0.25);
-  const armR = -0.3 * style.swing * Math.cos(phase + 0.25);
-  p.shLp = armL * k + 0.03; p.shLr = 0.07; p.elL = -0.22 - Math.max(0, -armL) * 0.6 * k;
-  p.shRp = armR * k + 0.03; p.shRr = 0.07; p.elR = -0.22 - Math.max(0, -armR) * 0.6 * k;
-  // head stays level: counter the bob and the twist
-  p.headPitch = 0.05;
-  p.headYaw = -p.spineYaw * 0.6;
-  p.hipsX = 0.012 * Math.sin(phase) * k;
 }
 
 const QH = new Quaternion();

@@ -2,7 +2,8 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { useMemo } from 'react';
 import { CanvasTexture, Color, Group, Mesh, MeshBasicMaterial, MeshStandardMaterial, NoToneMapping, PCFShadowMap, RepeatWrapping, SRGBColorSpace, Vector3 } from 'three';
 import { buildFigure, Joints, Look } from '../characters/figure';
-import { activityPose, applyPose, legLengths, restPose, STRIDE_M, walkPose } from '../characters/pose';
+import { activityPose, applyPose, legLengths, restPose } from '../characters/pose';
+import { WALK, applyWalk, strideFor } from '../characters/walkClip';
 import { CITY_PEOPLE } from '../scenes/city/cast';
 import { Stylizer } from '../render/Stylizer';
 import { Piece, merge } from '../characters/anatomy';
@@ -99,9 +100,11 @@ function Scene() {
       applyPose(j, p);
     });
     const w = world.walker;
-    walkPose(p, state.phase, 1, { swing: 0.9, lean: 0.04, stride: 1.05 }, legLengths(w));
+    // the captured walk at full pace, moving as far as one cycle covers
+    activityPose(p, 'pockets', 0, 5);
     applyPose(w, p);
-    w.root.position.x = -1.5 + (state.phase / (Math.PI * 2)) * STRIDE_M;
+    w.root.position.x = -1.5 + (state.phase / (Math.PI * 2)) * strideFor(WALK.speed, legLengths(w).thigh + legLengths(w).shin);
+    applyWalk(w, state.phase, 1);
   });
 
   return (

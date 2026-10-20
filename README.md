@@ -66,12 +66,19 @@ scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) 
   - smoking, adjusting a backpack, sitting, resting a hand on a suitcase.
 - Standing figures shift their weight between legs, breathe, and glance around. Gestures
   come from a deterministic event scheduler, so two people never move in sync.
-- The walk is built from a gait cycle:
-  - heel strike, a flexed knee in swing, a flat foot in stance and a push-off;
-  - pelvis rotation and drop, with shoulders counter-rotating and arms swinging softly;
-  - the hips are placed so the stance foot stays on the floor, and the cycle advances by
-    distance walked, solved for each figure's actual leg lengths;
-  - a walk from standing starts with the weight on the foot under the hips.
+- The walk is motion capture (`walkClip.ts`), from the supplied "Mr Man Walking" model
+  (a Mixamo-rigged character with a 1.03 s walk cycle):
+  - `tools/bakewalk.mjs` bakes the clip into `walkCycle.json` (40 KB instead of the 18 MB FBX).
+    It stores pelvis, chest, head and feet as rotations away from standing, every limb segment
+    as a direction in character space, the hip sway, and which foot carries weight.
+  - Any of our skeletons is posed by turning each joint so its own segment points the captured
+    way, so it works on the drawn people and on the stranger's fitted rig alike, whatever
+    their proportions. Only the motion is used; the model itself is not in the scenes.
+  - The clip walks in place at 1.64 m/s, 1.70 m per cycle. Slower walkers take
+    proportionally shorter steps (down to 55%) rather than the same long steps at a slower
+    beat, and the cycle advances by distance walked with the matching stride.
+  - The walk blends in over whatever stance a person has when they set off, and out again
+    when they stop; it starts with the weight on the foot under the hips.
 - Feet are pinned while they carry weight (`feet.ts`):
   - a foot that touches down stays on that spot, and the leg is solved to reach it with
     two-bone IK, knee forwards;
@@ -81,10 +88,10 @@ scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) 
     pushed through the floor;
   - at lift-off the foot is released and blends back into the swing.
 
-  This holds through starting, stopping, slowing and turning. In a 40 s test (walk,
-  slow, stop, turn round, set off again), feet in contact slip 17 cm in total, against
-  8.5 m for the gait alone. The worst single-frame slip is under 1 cm, and the
-  feet never float.
+  This holds through starting, stopping, slowing and turning. In a 40 s test (walk, slow,
+  stop, turn round, set off again; 2,748 frames with a foot down), planted feet do not
+  move at all, against 7.5 m of slip for the captured walk alone. The feet never float,
+  and they sink at most 1.2 cm into the floor.
 - People draw only silhouette ink lines (contour and overlaps), so figures read as clean
   shapes.
 
@@ -189,8 +196,9 @@ built from.
     a decal: brows, lids, nose and mouth lines are redrawn as he changes. He is wary when he
     notices you, hard when he stops, sneers as he winds up, shouts as he swings, and shows shock
     when he is blocked.
-  - His fists are modelled and replace the scanned hands when he clenches.
-  - His walk is solved for his own leg lengths. While a foot carries his weight it is pinned to
+  - He walks with the same captured cycle, sized to his own legs, leaning into it a
+    little, with his head kept on you. He keeps the model's own hands. While a foot carries
+    his weight it is pinned to
     the spot his route puts it on: under his hip at mid-stance, computed from the progress, so
     the walk-up looks the same from either scroll direction. Measured in the browser, a planted
     foot moves under 1 cm per step while he covers about 0.8 m (before: about 12 cm).

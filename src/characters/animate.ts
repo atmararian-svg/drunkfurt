@@ -1,9 +1,10 @@
 import { Material, MeshBasicMaterial } from 'three';
 import { clamp } from '../core/math';
-import type { PersonDef, PersonState } from './crowd';
+import { SCROLL_PACE, type PersonDef, type PersonState } from './crowd';
 import { createFooting, Footing, plantFeet } from './feet';
 import { buildFigure, Joints } from './figure';
-import { Pose, activityPose, applyPose, dampPose, legLengths, restPose, walkPose } from './pose';
+import { Pose, activityPose, applyPose, dampPose, legLengths, restPose } from './pose';
+import { applyWalk, strideAmplitude } from './walkClip';
 
 /** One animated person: the figure, its current and target poses, and its feet on the ground. */
 export interface Person {
@@ -13,11 +14,13 @@ export interface Person {
   seed: number;
   footing: Footing;
   legs: { thigh: number; shin: number };
+  /** How much they are walking (eases in as they set off and out as they stop). */
+  walk: number;
 }
 
 export function createPerson(def: PersonDef, mat: Material, screen: MeshBasicMaterial): Person {
   const j = buildFigure(def.look, mat, screen);
-  return { j, pose: restPose(), target: restPose(), seed: hashName(def.name), footing: createFooting(), legs: legLengths(j) };
+  return { j, pose: restPose(), target: restPose(), seed: hashName(def.name), footing: createFooting(), legs: legLengths(j), walk: 0 };
 }
 
 export function hashName(s: string) {
@@ -47,32 +50,33 @@ export function animatePerson(f: Person, def: PersonDef, st: PersonState, t: num
           ? 'suitcase'
           : 'pockets';
   activityPose(f.target, activity, t, f.seed);
-  if (k > 0.02 || (walker && st.turn > 0.3)) {
-    // blend into the gait as they get going; the cycle is locked to distance walked
-    const walk = f.target;
-    const idle: Pose = { ...walk };
-    walkPose(walk, st.phase, Math.max(k, clamp(st.turn / 3, 0, 0.35)), def.gait ?? { swing: 0.8, lean: 0.03, stride: 1 }, f.legs);
-    const stanceL = walk.stanceL;
-    const stanceR = walk.stanceR;
-    for (const key of Object.keys(walk) as (keyof Pose)[]) walk[key] = idle[key] + (walk[key] - idle[key]) * Math.min(1, k * 3 + 0.4);
-    dampPose(f.pose, walk, 30, dt);
-    // which foot is down comes straight from the gait, never smoothed
-    f.pose.stanceL = stanceL;
-    f.pose.stanceR = stanceR;
-  } else {
-    dampPose(f.pose, f.target, 5, dt);
-    f.pose.stanceL = f.pose.stanceR = 1;
-  }
+  // the stance underneath (what they do when they stop), then the captured walk on top of it
+  dampPose(f.pose, f.target, 5, dt);
   applyPose(j, f.pose);
   j.phone.visible = activity === 'phone' || activity === 'call' || activity === 'sitPhone';
+  const moving = k > 0.02;
+  const turning = walker && !moving && st.turn > 0.3;
+  const want = moving ? 1 : turning ? 0.4 : 0;
+  f.walk += (want - f.walk) * Math.min(1, dt * (want > f.walk ? 6 : 4));
+  const rolling = !!j.suitcase && walker && moving;
+  let stanceL = 1;
+  let stanceR = 1;
+  if (f.walk > 0.01) {
+    // shorter steps when slower: the cycle advances by distance with a stride to match (crowd.ts)
+    const amount = f.walk * (moving ? strideAmplitude(b.kind === 'scroll' ? SCROLL_PACE : st.speed) : 1);
+    const w = applyWalk(j, st.phase, amount, { holdR: rolling });
+    stanceL = w.stanceL;
+    stanceR = w.stanceR;
+  }
+  f.pose.stanceL = stanceL;
+  f.pose.stanceR = stanceR;
   if (j.suitcase) {
-    if (walker && k > 0.02) {
-      // rolled behind on its wheels
+    if (rolling) {
+      // rolled behind on its wheels, the right arm back holding the handle
       j.suitcase.position.set(0.24, 0, -0.5);
       j.suitcase.rotation.set(0.42, 0, 0);
-      f.pose.shRp = 0.45;
-      f.pose.elR = -0.08;
-      applyPose(j, f.pose);
+      j.shR.rotation.set(0.45, 0, 0.07);
+      j.elR.rotation.set(-0.08, 0, 0);
     } else {
       j.suitcase.position.set(0.36, 0, 0.06);
       j.suitcase.rotation.set(0, 0, 0);

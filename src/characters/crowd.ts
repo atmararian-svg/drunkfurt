@@ -1,7 +1,8 @@
 import { clamp } from '../core/math';
 import type { Look } from './figure';
 import { Nav, PERSON_RADIUS, clearance } from './nav';
-import { START_PHASE, STRIDE_M, type Activity } from './pose';
+import type { Activity } from './pose';
+import { START_PHASE, strideFor } from './walkClip';
 
 /**
  * A small, purposeful crowd. Every movement has a reason and stays on walkable
@@ -152,6 +153,8 @@ export function validateCrowd(defs: PersonDef[], nav: Nav) {
 }
 
 const MAX_TURN = 2.6; // rad/s while turning in place
+/** Scroll-driven walkers have no pace of their own: their steps are sized for an easy 1.2 m/s. */
+export const SCROLL_PACE = 1.2;
 const ACCEL = 1.6; // m/s²
 const AHEAD = 1.25; // metres of personal space ahead
 const LATERAL = 0.62;
@@ -253,11 +256,11 @@ export function stepCrowd(c: Crowd, dt: number, scrollT: number, visitor: { x: n
     if (b.kind === 'scroll') st.speed = moved / Math.max(dt, 1e-4);
     // setting off from standing: the first step is taken with the weight on the foot under the hips
     if (wasStill && moved > 1e-4 && b.kind === 'lane') st.phase = START_PHASE;
-    st.phase += (moved / STRIDE_M) * Math.PI * 2;
+    st.phase += (moved / strideFor(st.speed)) * Math.PI * 2;
     // scroll walkers: the cycle is a pure function of how far along the route they are
     if (b.kind === 'scroll' && path) {
       const u = clamp((scrollT - b.t0) / (b.t1 - b.t0), 0, 1);
-      st.phase = START_PHASE + ((u * u * (3 - 2 * u) * path.length) / STRIDE_M) * Math.PI * 2;
+      st.phase = START_PHASE + ((u * u * (3 - 2 * u) * path.length) / strideFor(SCROLL_PACE)) * Math.PI * 2;
     }
     const turned = Math.abs(lerpAngle(prevYaw, st.yaw, 1) - prevYaw);
     st.turn = turned / Math.max(dt, 1e-4);
