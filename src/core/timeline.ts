@@ -189,7 +189,9 @@ function turnPage() {
   const p = timeline.progress;
   for (const z of pageTurns()) {
     if (p <= z.from || p >= z.to) continue;
-    const forward = timeline.target !== p ? timeline.target > p : lastDirection > 0;
+    // the way the visitor is going; a target a hair from the progress (scroll rounding) is no direction,
+    // and then the way the progress was last moving decides (into a transition the launch carried it to)
+    const forward = Math.abs(timeline.target - p) > 0.002 ? timeline.target > p : lastDirection > 0;
     if (forward && gateLimit() < z.to) return;
     chapterTurn.run(z, forward);
     return;
@@ -260,7 +262,9 @@ export function readScroll() {
     return;
   }
   let raw = max > 0 ? clamp(window.scrollY / max, 0, 1) : 0;
-  // a page turn ends exactly on its edge: the scroll position's rounding must not land back inside it
-  for (const z of pageTurns()) for (const edge of [z.from, z.to]) if (Math.abs(raw - edge) < 0.0015) raw = edge;
+  // a chapter starts exactly on its opening shot: the scroll position's rounding (a fraction of a
+  // pixel below it) must not land back inside the transition and turn the chapter back. Only that
+  // edge: snapping to where a transition begins would make one entered going forward look backward.
+  for (const z of pageTurns()) if (raw < z.to && z.to - raw < 0.0015) raw = z.to;
   timeline.target = Math.min(raw, gateLimit());
 }
