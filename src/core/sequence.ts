@@ -33,6 +33,11 @@ export interface CameraPose {
   fov?: number;
   /** 0 on foot … 1 sitting in a vehicle: no footsteps, and the head moves only a little. */
   seated?: number;
+  /**
+   * 0 … 1 the camera holds exactly the composed pose: no look-around, no head
+   * movement, no breathing (a framing that has to match something exactly).
+   */
+  still?: number;
 }
 
 /** Time-driven shots (for later scripted beats such as the slow-motion sequence). */

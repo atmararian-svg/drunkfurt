@@ -382,3 +382,89 @@ body { cursor: pointer; }
   .cue i,
   .act.is-on .act-hint { animation: none; }
 }
+
+/* --- episode 4: the credits in the room, and the hand-over to the site ---- */
+.credits {
+  position: absolute;
+  right: max(22px, env(safe-area-inset-right, 0px));
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  margin: 0;
+  max-width: min(520px, calc(100vw - 44px));
+  text-align: right;
+  font: 500 9px/1.5 var(--mono);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--grey);
+  opacity: 0;
+  transition: opacity 0.8s var(--ease);
+}
+.credits.is-on { opacity: 1; pointer-events: auto; }
+.credits a { color: inherit; }
+
+/* once the screen is clicked, the page's printed matter steps back */
+.site-handoff .caption,
+.site-handoff .rail,
+.site-handoff .sound,
+.site-handoff .credits { opacity: 0 !important; transition: opacity 0.35s var(--ease); }
+
+/* the screen's picture laid over the page (cover-fit and centred, as the camera frames it) */
+.handoff {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: transparent;
+  opacity: 0;
+  transition: opacity 0.3s linear;
+  pointer-events: none;
+  cursor: default;
+}
+.handoff.is-on { opacity: 1; pointer-events: auto; }
+.handoff-shot {
+  display: block;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: 50% 50%;
+}
+.handoff-stuck {
+  position: absolute;
+  left: 50%;
+  bottom: max(9vh, 48px);
+  transform: translateX(-50%);
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  width: min(420px, calc(100vw - 40px));
+  padding: 18px 22px 20px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 2px solid var(--ink);
+  box-shadow: 6px 6px 0 var(--ink);
+  text-align: center;
+}
+.handoff-stuck p { margin: 0; font: 500 13px/1.4 var(--mono); }
+.handoff-open {
+  font: 400 22px/1 var(--display);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink);
+  background: var(--yellow);
+  padding: 10px 16px 8px;
+  border: 2px solid var(--ink);
+  text-decoration: none;
+  cursor: pointer;
+}
+.handoff-back {
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: none;
+  color: var(--ink);
+  font: 500 10px/1 var(--mono);
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  padding: 4px 0;
+  cursor: pointer;
+}
+.handoff-open:focus-visible,
+.handoff-back:focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }

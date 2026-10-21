@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense, useEffect } from 'react';
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 import { useStory } from './core/store';
-import { EpisodeId, TOTAL_LENGTH, autoplay, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
+import { EpisodeId, TOTAL_LENGTH, autoplay, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
@@ -66,6 +66,7 @@ export function App() {
       (window as unknown as Record<string, unknown>).__drunkfurt = {
         timeline,
         autoplay,
+        gates,
         rigPose,
         locate,
         EPISODES,

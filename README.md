@@ -3,11 +3,12 @@
 A scroll-driven, first-person 3D comic set in Frankfurt am Main at night.
 DRUNKFURT is the name of the experience and its fictional world; Frankfurt am Main is the real
 setting, so real places and railway signage keep their real names.
-Three episodes are built:
+Four episodes are built:
 
 - **Episode 01, Arrival**: Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
 - **Episode 02, City**: out of the station, down the boulevard towards the towers, and a stranger who wants your bag.
 - **Episode 03, Getaway**: past the man on the pavement to a Mercedes at the kerb, into the driver's seat, and away (hold D to rev).
+- **Episode 04, Home**: a back room full of surveillance screens; sit down at the big one and click it to go through to the real site, arianatmar.com.
 
 ![Arrival](docs/screens/01-arrival.png)
 
@@ -322,7 +323,7 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   through the hinge. Each wheel and tyre is its own node at its hub and rolls about the axle by
   distance / 0.325 m. The headlights' lamp materials glow and two spot lights throw the beams.
 - **The instrument cluster** (`carCluster.ts`) is the supplied dial illustration ("car
-  dashboard UI illustration" by Vecteezy, free licence, credited on the closing card), adapted
+  dashboard UI illustration" by Vecteezy, free licence, credited in the room at the end), adapted
   by `tools/cluster_svg.py` into `src/assets/cluster.svg` and printed on the car's own cluster
   screen: the model's `w206_gauges` panel, 30.8 × 10.4 cm behind the steering wheel, tilted
   15° towards the driver. The graphic sits on a plane 3 mm in front of it, so it is seen in
@@ -360,8 +361,7 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   one timeline: the car pulls out about its rear axle along an S into the driving lane and
   accelerates (about 11 m/s² off the line, easing through the gears, with the gear changes on
   the recording's), then the rush: the speed builds towards 180 km/h, comic speed lines stream
-  in from the edges and the view widens; then the ink closes and the next page (the closing card, until Episode 04 is
-  built) opens. The car's place is only ever set from that progress, by one component.
+  in from the edges and the view widens; then the ink closes and the next page (Episode 04, the room) opens. The car's place is only ever set from that progress, by one component.
   Checked in a node test along the whole route: it clears the kerb by at least 10 cm and the
   parked cars by 36 cm. The car that would turn into its lane is kept off the street.
 - **Why it used to stall**, fixed: (1) the launch's scripted move ended exactly on the first
@@ -402,6 +402,71 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
     steps aside while a recording plays. The central locking, the doors and the starter remain
     synthesised; recordings can be set as `src` on `carUnlock`, `carDoorOpen`, `carDoorClose`
     and `engineStart` in `src/audio/AudioDirector.ts`.
+
+## Episode 04: Home
+
+The getaway's page turn opens on a dark back room: a curved wall of monitors on pillars, two
+operator chairs, a desk, cables everywhere. You cross the room, sit down in the central chair,
+and the one large screen in the middle of the wall shows the portfolio site. Clicking it takes
+you into the screen and out of the story, onto the real site.
+
+- **The room** is the supplied "Surveillance room" (Sketchfab, by wa_rouk), converted by
+  `tools/room2glb.mjs`:
+  - every node transform is baked into the geometry (metres, y up);
+  - the six central screens (the middle three columns of the two middle rows), their housings,
+    arms and the cables in that block are cut out (a box, x 1.42–3.24, y −1.80…−0.70,
+    z −0.15…0.60 in the model's frame); the pillars behind stay;
+  - the model's single screens mesh is split into one mesh per screen (`screen_00`…`screen_21`),
+    each with its own planar texture coordinates, so each can dim and glow on its own; the small
+    glowing bits become `leds`;
+  - the three baked-light atlases are replaced by grey ones (`tools/room_textures.py`: luminance,
+    levels stretched, gamma 1.15), and the normals are dropped (computed on load);
+  - the cables (whose material also covers the chairs' steel) lose their texture coordinates and
+    atlas, so the simplifier can weld and thin them;
+  - then `gltf-transform weld`, `simplify --ratio 0.35 --error 0.004` and `quantize`:
+    29.2 MB → 3.2 MB (`src/assets/room.glb`). No mesh compression extension, because its decoder
+    needs WebAssembly, which a strict content policy may refuse.
+- **Printed like the rest**: the baked light drives the comic bands as emission (black base
+  colour, the grey atlas as emissive map, mono), so the room keeps the model's own light pools and
+  shadows without lights of its own; pillars and equipment hatch their dark transitions. The
+  cables and chair frames take a flat steel tone lit by the big screen's glow and a lamp above.
+  Nothing is yellow except the tiny LEDs, the REC dots on the camera feeds and the display's
+  status lamp.
+- **The big display** (`RoomScene.tsx`, `layout.ts`) replaces the six screens on the same
+  footprint and centre: 1.68 × 0.945 m (16:9), a dark housing with a 3.5 cm bezel, a VESA plate,
+  an arm to the middle pillar and a cross bar to the pillars either side, 4° tipped towards the
+  chair. Its picture is a screenshot of the real home page of
+  [arianatmar.com](https://www.arianatmar.com/) (`src/assets/portfolio.webp`, 2000 × 1125,
+  supplied by the project owner, no browser chrome), shown unlit at 84 % brightness.
+- **The other 22 screens** (`roomScreens.ts`) show grey canvas pictures (camera feeds with time
+  codes, log text, a scope trace, a floor plan, snow). Each runs its own seeded schedule: every
+  2.5–10 s a new level (mostly a dim glow, sometimes bright, sometimes nearly dark), eased in at
+  its own slow rate, now and then with a short stutter. Per frame that is one colour per screen,
+  in `useFrame`; React never re-renders for it.
+- **Camera** (`episode.ts`, local progress): 0–0.12 the ink opens on the way in; to 0.42 across
+  the room, right of the chair; 0.5 at its side; 0.5–0.66 turning in and lowering
+  (1.65 → 1.155 m); 0.66–0.72 the settle (a 3.5 cm dip, then upright, eyes up to the screen).
+  At 0.76 the story waits (a gate that never opens: the story ends here) with one caption,
+  "Click the big screen", and the credits.
+- **Hover**: each frame the pointer is picked against the picture's own plane (not the bezel or
+  the room). Over it, the camera leans 30 cm towards the screen and narrows 3°, and the picture
+  comes up to 97 %; away, it eases back (damped, about a second either way).
+- **Click** (`monitor.ts`): only on the picture (a click on the room does nothing; Enter also
+  works). From then on: the page is pinned (`pinScroll`: wheel, touch and scroll keys are
+  swallowed, the scroll position is held), the prompt and the printed matter go, the
+  look-around and head motion let go (`CameraPose.still`), and the camera moves 1.8 s straight
+  into the screen, square to it, to the distance where the picture covers the viewport exactly
+  (cover-fit at a 40° field of view: its height fills the frame, or on a viewport wider than
+  16:9 its width). Repeated clicks are ignored.
+- **Hand-over** (`src/ui/siteHandoff.ts`): as the camera arrives, the same image is laid over the
+  whole page as a plain `<img>` (object-fit: cover, centred: the same crop the camera has) and
+  faded in over 0.3 s, then the browser goes to `https://www.arianatmar.com/`. No iframe of the
+  site is used. Opened as a page of its own, that is a normal navigation. Inside a frame that may
+  not navigate the window (a sandboxed embed), the top window is tried and, if the site has not
+  taken over after 1.4 s (5 s for a normal page), a panel offers "Open arianatmar.com" (a real
+  link, new tab) and "Back to the room" (the camera moves back out, the prompt returns). Coming
+  back to the page from the browser's history restores the room as before the click.
+- **Sound**: the city's rumble, low and muffled, as if through walls.
 
 ## What is in Episode 1
 
@@ -458,6 +523,8 @@ src/
   scenes/station/         Episode 1: episode.ts (track, captions, beats) + the world
   scenes/city/            Episode 2: the street, the stranger, the encounter
   scenes/car/             Episode 3: the Mercedes (carRig.ts), its beats, rev and launch (getaway.ts)
+  scenes/home/            Episode 4: the room, the big display, the click into the site (monitor.ts)
+  ui/siteHandoff.ts       the picture laid over the page, then the navigation to the site
 tools/                    asset conversion (FBX → GLB, textures) and the walk-cycle bake
 ```
 
@@ -485,7 +552,12 @@ wipe opens.
   (`src/assets/knife.glb`, 0.15 MB), the Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`,
   2.2 MB) and the instrument-cluster illustration (`src/assets/cluster.svg`, adapted from
   "car dashboard UI illustration" by Vecteezy, free licence, which asks for the credit
-  "Vecteezy.com": it is on the closing card), all supplied by the project owner (see Episode 03).
+  "Vecteezy.com": it is in the credits), all supplied by the project owner (see Episode 03).
+- **Episode 04**: the room is "Surveillance room" by wa_rouk
+  (https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304), under
+  the Sketchfab Standard licence according to the file's own metadata; it was supplied by the
+  project owner, and is credited in the room. The screen picture is a screenshot of
+  arianatmar.com, also supplied by the owner.
   - `tools/fbx2glb.mjs` converts the FBX (FBXLoader + GLTFExporter in node) without his
     glasses and hair. FBXLoader makes one bone per skin cluster, so a joint shared by several
     meshes arrives as a chain of same-named bones of which only one is animated; the converter

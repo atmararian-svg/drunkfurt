@@ -25,6 +25,7 @@ export const EPISODE_SPANS: EpisodeSpan[] = [
   { id: 'station', length: 9 },
   { id: 'city', length: 11 },
   { id: 'car', length: 8, seamless: true },
+  { id: 'home', length: 7 },
 ];
 /** Scroll after the last episode, for the "to be continued" card. */
 export const OUTRO_LENGTH = 1.2;
@@ -83,8 +84,14 @@ export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, l
  */
 let holdUntil = 0;
 
+/** A cinematic that is not a progress move (episode 4's way into the screen) holds the page where it is. */
+let pinned = false;
+export function pinScroll(on: boolean) {
+  pinned = on;
+}
+
 /** A locked move owns the scroll (while it plays, and for a moment after): the visitor's scrolling is swallowed. */
-export const scriptOwnsScroll = () => (autoplay.active && autoplay.locked) || (!autoplay.active && performance.now() < holdUntil);
+export const scriptOwnsScroll = () => pinned || (autoplay.active && autoplay.locked) || (!autoplay.active && performance.now() < holdUntil);
 
 /** `locked`: the visitor's scrolling does not stop it (a page turn always completes). */
 export function playProgress(from: number, to: number, seconds: number, locked = false) {

@@ -7,6 +7,7 @@ import { PLANNED, builtEpisodes } from '../episodes';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
+import { enterSite, monitor, onScreen } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 
 /** An episode that picks up the previous one's last shot, with no page turn between them. */
@@ -57,6 +58,7 @@ export function Overlay() {
     const fill = el.querySelector<HTMLElement>('.rail-fill')!;
     const cue = el.querySelector<HTMLElement>('.cue')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
+    const credits = el.querySelector<HTMLElement>('.credits')!;
     const wipe = el.querySelector<HTMLCanvasElement>('.wipe')!;
     const hit = el.querySelector<HTMLCanvasElement>('.impact')!;
     const wctx = wipe.getContext('2d')!;
@@ -96,6 +98,7 @@ export function Overlay() {
       fill.style.transform = `scaleY(${p})`;
       cue.classList.toggle('is-on', p < 0.004);
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
+      credits.classList.toggle('is-on', id === 'home' && monitor.armed && !monitor.entering);
 
       const ink = inkAt(p);
       const key = `${ink.w.toFixed(3)}${ink.mode}${wipe.width}`;
@@ -134,7 +137,13 @@ export function Overlay() {
       audio.unlock();
       audio.setEnabled(story.getState().sound);
     };
-    const next = () => {
+    const next = (e?: MouseEvent) => {
+      // the last scene: only a click on the big screen does anything (Enter takes you in as well)
+      if (monitor.entering) return;
+      if (story.getState().prompt === 'monitor') {
+        if (!e || onScreen(e.clientX, e.clientY)) enterSite();
+        return;
+      }
       if (story.getState().prompt === 'defend') {
         defend();
         return;
@@ -157,8 +166,8 @@ export function Overlay() {
     };
     const onClick = (e: MouseEvent) => {
       unlock();
-      if ((e.target as HTMLElement).closest('a,button,.rev-prompt')) return;
-      next();
+      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.handoff')) return;
+      next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
     let settle = 0;
@@ -261,6 +270,17 @@ export function Overlay() {
       <button type="button" className="sound" onClick={toggleSound} aria-pressed={sound}>
         Sound {sound ? 'on' : 'off'}
       </button>
+
+      <p className="credits">
+        Room: “Surveillance room” by{' '}
+        <a href="https://sketchfab.com/wa_rouk" target="_blank" rel="noreferrer">
+          wa_rouk
+        </a>{' '}
+        · Instrument cluster graphic:{' '}
+        <a href="https://www.vecteezy.com" target="_blank" rel="noreferrer">
+          Vecteezy.com
+        </a>
+      </p>
 
       <section className="outro">
         <span className="title-brand">DRUNKFURT</span>

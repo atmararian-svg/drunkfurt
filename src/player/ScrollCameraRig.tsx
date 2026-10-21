@@ -56,6 +56,7 @@ export function ScrollCameraRig() {
     const ep = id === 'outro' ? builtEpisodes().slice(-1)[0] : EPISODES[id];
     const pose = rigPose;
     pose.seated = 0;
+    pose.still = 0;
     if (!cameraDirector.update(dt, pose) && ep) {
       const l = id === 'outro' ? 1 : local;
       ep.track.sample(l, pose);
@@ -80,14 +81,15 @@ export function ScrollCameraRig() {
     const seated = clamp(pose.seated ?? 0, 0, 1);
     const k = clamp(st.speed / 1.4, 0, 1) * (1 - seated);
     st.phase += (st.speed / 0.74) * Math.PI * dt;
-    const bobY = (Math.cos(st.phase * 2) - 1) * 0.012 * k + Math.sin(clock.elapsedTime * 1.25) * 0.004 * (1 - k);
-    const bobX = Math.sin(st.phase) * 0.012 * k;
+    const loose = 1 - clamp(pose.still ?? 0, 0, 1);
+    const bobY = ((Math.cos(st.phase * 2) - 1) * 0.012 * k + Math.sin(clock.elapsedTime * 1.25) * 0.004 * (1 - k)) * loose;
+    const bobX = Math.sin(st.phase) * 0.012 * k * loose;
 
     const sin = Math.sin(pose.yaw);
     const cos = Math.cos(pose.yaw);
     // head offset inside the ellipsoid (the pointer already lies in -1..1, so the point stays inside)
     // not while lying on the ground, and only a little in a seat
-    const free = clamp(1 - Math.abs(pose.roll) / 0.6, 0, 1) * (1 - 0.7 * seated);
+    const free = clamp(1 - Math.abs(pose.roll) / 0.6, 0, 1) * (1 - 0.7 * seated) * loose;
     const r = st.leanX * HEAD.side * free;
     const u = st.leanY * HEAD.up * free;
     const f = Math.hypot(st.leanX, st.leanY * 0.5) * HEAD.fwd * free;
@@ -100,7 +102,7 @@ export function ScrollCameraRig() {
       pose.position.y + st.off.y + bobY,
       pose.position.z + st.off.z - sin * bobX,
     );
-    camera.rotation.set(pose.pitch + st.lookPitch, pose.yaw + st.lookYaw, pose.roll + Math.sin(st.phase) * 0.003 * k);
+    camera.rotation.set(pose.pitch + st.lookPitch * loose, pose.yaw + st.lookYaw * loose, pose.roll + Math.sin(st.phase) * 0.003 * k * loose);
     const fov = pose.fov ?? 54;
     if (Math.abs(camera.fov - fov) > 0.01) {
       camera.fov = fov;

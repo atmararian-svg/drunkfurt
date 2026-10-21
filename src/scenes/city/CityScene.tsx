@@ -28,12 +28,17 @@ const timeScale = () => {
 function Soundscape({ active }: { active: boolean }) {
   const st = useMemo(() => ({ cutoff: 20000 }), []);
   useEffect(() => {
-    if (!active) {
+    const quiet = () => {
       audio.setAmbience(0, 1.5);
       audio.setHeartbeat(0);
       audio.setWorldMuffle(20000, 0.8);
       st.cutoff = 20000;
-    }
+    };
+    if (!active) quiet();
+    // unmounted while on screen (the page turn into episode 4 takes the street away): fall silent too
+    return () => {
+      if (active) quiet();
+    };
   }, [active, st]);
   useFrame(() => {
     if (!active || !audio.running) return;
