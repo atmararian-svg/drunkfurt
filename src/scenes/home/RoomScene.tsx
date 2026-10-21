@@ -24,6 +24,7 @@ import { clamp, damp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
 import { Gate, gates, localProgress } from '../../core/timeline';
 import { input } from '../../player/input';
+import { postFx } from '../../render/Stylizer';
 import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
 import { flyAt, monitor, onScreen, resetMonitor } from './monitor';
 import { buildWallScreens } from './roomScreens';
@@ -188,6 +189,7 @@ function Room({ active }: { active: boolean }) {
   }, []);
   useEffect(() => {
     if (active) return;
+    postFx.clean = 0;
     if (monitor.armed) {
       monitor.armed = false;
       if (story.getState().prompt === 'monitor') story.setState({ prompt: null });
@@ -223,6 +225,8 @@ function Room({ active }: { active: boolean }) {
     const f = flyAt();
     const lit = REST + (0.97 - REST) * smoothstep(clamp(monitor.hover, 0, 1));
     display.glass.color.setScalar(lit + (1 - lit) * smoothstep(clamp(f * 1.4, 0, 1)));
+    // in the last part of the move the print treatment lifts, so the picture is the plain image
+    postFx.clean = smoothstep(clamp((f - 0.55) / 0.4, 0, 1));
     // indoors: the city's rumble, far off and muffled through the walls
     if (audio.running) {
       audio.startCityAmbience();

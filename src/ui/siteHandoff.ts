@@ -73,6 +73,11 @@ export function openHandoff(url: string, onBack: () => void) {
   };
   timers.push(
     window.setTimeout(() => {
+      // inspection only: the dev build can be told to stop short of leaving
+      if (import.meta.env.DEV && (window as unknown as { __holdNavigation?: boolean }).__holdNavigation) {
+        timers.push(window.setTimeout(showStuck, 5000));
+        return;
+      }
       let framed = true;
       try {
         framed = window.top !== window.self;

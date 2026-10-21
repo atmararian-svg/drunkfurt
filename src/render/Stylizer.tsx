@@ -1,9 +1,16 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Color, HalfFloatType, Material, Mesh, MeshBasicMaterial, Object3D } from 'three';
 import { applyComic } from './comic';
 import { INK_LAYER, INK_SILHOUETTE_LAYER, InkEffect, OCCLUDER_LAYER, createInkBufferMaterial, createInkTarget } from './ink';
+
+/**
+ * 0 … 1: how far the print treatment (ink lines, paper, vignette) is lifted
+ * off the frame. Episode 4 lifts it as the camera arrives on the screen, so
+ * the screen's picture matches the plain image laid over the page after it.
+ */
+export const postFx = { clean: 0 };
 
 /**
  * Turns the lit scene into a printed page:
@@ -22,6 +29,7 @@ export function Stylizer({ version }: { version: unknown }) {
   const inkMat = useMemo(() => createInkBufferMaterial(1), []);
   const silMat = useMemo(() => createInkBufferMaterial(0.5), []);
   const effect = useMemo(() => new InkEffect(target.texture), [target]);
+  const vignette = useRef<{ darkness: number } | null>(null);
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     (window as unknown as Record<string, unknown>).__ink = effect;
@@ -57,6 +65,8 @@ export function Stylizer({ version }: { version: unknown }) {
   const clear = useMemo(() => new Color(0, 0, 0), []);
   useFrame(({ clock }) => {
     effect.uniforms.get('uTime')!.value = clock.elapsedTime;
+    effect.uniforms.get('uClean')!.value = postFx.clean;
+    if (vignette.current) vignette.current.darkness = 0.6 * (1 - postFx.clean);
     const bg = scene.background;
     const fog = scene.fog;
     const mask = camera.layers.mask;
@@ -91,7 +101,7 @@ export function Stylizer({ version }: { version: unknown }) {
     <EffectComposer multisampling={4} frameBufferType={HalfFloatType} enableNormalPass={false}>
       <primitive object={effect} />
       <Bloom mipmapBlur luminanceThreshold={1.15} luminanceSmoothing={0.1} intensity={0.35} radius={0.55} />
-      <Vignette offset={0.32} darkness={0.6} />
+      <Vignette ref={vignette as never} offset={0.32} darkness={0.6} />
     </EffectComposer>
   );
 }

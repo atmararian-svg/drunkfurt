@@ -426,6 +426,9 @@ body { cursor: pointer; }
   max-width: none;
   object-fit: cover;
   object-position: 50% 50%;
+  /* the camera stops 0.5 % short of the exact cover distance (so no bezel can show at the edge):
+     the image is scaled by the same amount */
+  transform: scale(1.005025);
 }
 .handoff-stuck {
   position: absolute;

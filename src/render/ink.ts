@@ -72,6 +72,7 @@ export class InkEffect extends Effect {
         ['uFar', new Uniform(1300)],
         ['uDebug', new Uniform(0)],
         ['uTime', new Uniform(0)],
+        ['uClean', new Uniform(0)],
       ]),
     });
   }
@@ -88,6 +89,8 @@ uniform float uWidth;
 uniform float uFar;
 uniform float uDebug;
 uniform float uTime;
+// 0 … 1: the frame as rendered, without lines or paper (a picture that has to match an image exactly)
+uniform float uClean;
 
 float h21(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
 float n21(vec2 p) {
@@ -127,7 +130,7 @@ void mainImage(const in vec4 inputColor, const in vec2 uv0, out vec4 outputColor
   s[4] = S(uv + o);               s[5] = S(uv - o);
   s[6] = S(uv + vec2(o.x, -o.y)); s[7] = S(uv + vec2(-o.x, o.y));
 
-  if (empty || c.b < 0.25) { outputColor = vec4(paper(inputColor.rgb, px), inputColor.a); return; }
+  if (empty || c.b < 0.25) { outputColor = vec4(mix(paper(inputColor.rgb, px), inputColor.rgb, uClean), inputColor.a); return; }
   float sil = 0.0;
   float crease = 0.0;
   vec3 n = vec3(c.rg * 2.0 - 1.0, 0.0);
@@ -148,6 +151,6 @@ void mainImage(const in vec4 inputColor, const in vec2 uv0, out vec4 outputColor
   // dry ink: the odd gap where the pen skipped
   float dry = smoothstep(0.12, 0.3, n21(px / 9.0 + frame * 0.7));
   float ink = max(sil, crease * 0.75) * fade * mix(0.55, 1.0, dry);
-  outputColor = vec4(paper(mix(inputColor.rgb, uInk, ink), px), inputColor.a);
+  outputColor = vec4(mix(paper(mix(inputColor.rgb, uInk, ink), px), inputColor.rgb, uClean), inputColor.a);
 }
 `;
