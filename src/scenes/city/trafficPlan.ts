@@ -16,7 +16,8 @@ export const PARKED: [number, number, number, number][] = [
   [-3.95, -30, Math.PI, 0],
   [-3.95, -66, Math.PI, 2],
   [-3.95, -122, 0, 1],
-  [3.95, -48, 0, 3],
+  // (the Mercedes of episode 3 stands at the kerb at z = -41.5; this one leaves it room to pull out)
+  [3.95, -64, 0, 3],
   [3.95, -86, Math.PI, 1],
   [3.95, -142, 0, 0],
 ];

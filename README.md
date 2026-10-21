@@ -7,7 +7,7 @@ Three episodes are built:
 
 - **Episode 01, Arrival**: Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
 - **Episode 02, City**: out of the station, down the boulevard towards the towers, and a stranger who wants your bag.
-- **Episode 03, Getaway**: from where the fight ended, a few steps to a Mercedes at the kerb, into the driver's seat, and away (hold D to rev).
+- **Episode 03, Getaway**: past the man on the pavement to a Mercedes at the kerb, into the driver's seat, and away (hold D to rev).
 
 ![Arrival](docs/screens/01-arrival.png)
 
@@ -213,7 +213,7 @@ built from.
   into the stop.
 - **The encounter** (`encounter.ts`) is drawn as a function of the scroll progress. The
   only thing it remembers is the visitor's decision at the gate. `encounterAt(local)` gives the
-  stranger, the camera, the bag, the overlay and the soundscape everything they draw
+  stranger, the camera, the overlay and the soundscape everything they draw
   from. Intervals (local progress, `beats.ts`):
 
   | Interval | What happens |
@@ -287,71 +287,102 @@ built from.
 ## Episode 03: Getaway
 
 `src/scenes/car/`. It starts exactly where Episode 02's last shot is (you, crouched by the man
-on the pavement, your bag beside him) and plays on the same street: the episode declares
-`sharesWorld: 'city'` and its span is `seamless`, so there is no page turn between them and the
-city keeps drawing and running behind it. The man and the bag stay where they fell, behind you.
+on the pavement) and plays on the same street: the episode declares `sharesWorld: 'city'` and
+its span is `seamless`, so there is no page turn between them and the city keeps drawing and
+running behind it. The thief tried for your bag and failed: it never leaves your shoulder, and
+nothing of yours is left on the pavement. He stays where he fell, behind you.
 
 | Beat (local progress, `getaway.ts`) | What happens |
 | --- | --- |
 | 0–0.06 | the last shot of Episode 02 holds; the EPISODE 03 / GETAWAY title comes up over it |
-| 0.06–0.13 | you get up and turn your back on him |
-| 0.13–0.40 | about seven steps: round the Mercedes' bonnet, off the kerb, to the driver's door on the road side |
-| 0.27–0.31 | as you come round the front, its headlights come up and the central locking clacks |
+| 0.06–0.13 | you get up and look on down the street: the Mercedes stands at the kerb ahead |
+| 0.13–0.40 | about ten steps: past him (more than a metre from him and his knife), off the kerb and along the car to the driver's door on the road side |
+| 0.27–0.31 | as you reach it, its lights come up and the central locking clacks |
 | 0.40–0.47 | the driver's door opens |
 | 0.47–0.60 | into the car: you duck under the roof line, through the door opening, and sit, turning to face the windscreen |
-| 0.60–0.64 | the door shuts; 0.645 the cluster lights and the engine starts |
+| 0.60–0.66 | the door shuts; 0.645 the cluster lights and the engine starts; your eyes drop to the cluster |
 | 0.66 | the story waits: hold D to rev |
-| 0.66–0.955 | the launch, played by itself once the revs reach 6,000 |
+| after 6,000 rpm | by itself, without stopping: the launch (3.4 s), the rush (1.8 s), the ink closing, the next page |
 
 - **The car** is the supplied Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`, 2.2 MB),
   converted from the supplied FBX by `tools/mercedes2glb.mjs`, then welded, simplified and
   quantised with glTF Transform. The conversion keeps the body, the four doors, wheels and
-  tyres, lights, glass and the complete cabin (seats, dash, steering wheel, instrument cluster
-  with its tachometer needle). It drops what is never seen (engine, suspension, underbody), the
-  duplicate variants (panoramic roof, AMG skirts, a second headlight set), the inner faces of
-  the glass and every texture. `scenes/car/carRig.ts` prints it in the city's tones by material
-  name (black paint, steel, tinted glass, dark leather) with ink lines on the body.
+  tyres, lights, glass and the complete cabin (seats, dash, steering wheel, instrument cluster).
+  It drops what is never seen (engine, suspension, underbody), the duplicate variants
+  (panoramic roof, AMG skirts, a second headlight set), the inner faces of the glass and every
+  texture. `scenes/car/carRig.ts` prints it in the city's tones by material name (black paint,
+  steel, tinted glass, dark leather) with ink lines on the body.
+- **Where it stands**: in the parking lane on the right at z = -41.5, its tail about 3 m beyond
+  where the man falls, so you only reach it after the fight. (A plain parked car that stood
+  there moved down the street to leave it room to pull out.)
 - **What the model has, and how it is driven** (inspected in the FBX, not assumed): its one
   animation is a single static frame of the four door rotations, so nothing in it moves. Each
   door is its own node placed at its hinge, with its panel, glass and mirror as children; the
   driver's door (front left, `w206_door_FL`) opens by turning that node 62° about the vertical
   through the hinge. Each wheel and tyre is its own node at its hub and rolls about the axle by
-  distance / 0.325 m. The headlights' lamp materials glow and two spot lights throw the beams;
-  the cluster's screens light at ignition, and the model's own tachometer needle follows the revs.
+  distance / 0.325 m. The headlights' lamp materials glow and two spot lights throw the beams.
+- **The instrument cluster** (`carCluster.ts`) is the supplied dial illustration ("car
+  dashboard UI illustration" by Vecteezy, free licence, credited on the closing card), adapted
+  by `tools/cluster_svg.py` into `src/assets/cluster.svg` and printed on the car's own cluster
+  screen: the model's `w206_gauges` panel, 30.8 × 10.4 cm behind the steering wheel, tilted
+  15° towards the driver. The graphic sits on a plane 3 mm in front of it, so it is seen in
+  perspective through the wheel, lit like a screen, and moves with the car.
+  - The original has three dials. The left one is a tachometer (0–10 × 1,000 rpm, red from
+    6): it stays a tachometer, and its red zone starts where the launch happens. The right one
+    (0–100, fuel) is kept. The middle one is a speedometer labelled 0–160 (mph), with uneven
+    labels (140 and 160 squeezed into the bottom) and a grey panel in its centre ("12.24v", a
+    battery icon, two lines and a small triangle): the panel and those parts are removed, and
+    the speedometer's ticks, labels and ring are rebuilt as 0–300 km/h (ticks every 10, major
+    ticks and labels every 50, a 270° sweep), not relabelled. The decorative cowl arc is
+    dropped (the car has a real one).
+  - Colours go from cyan to an AMG-like cluster: near-black face, white and grey markings, red
+    accents (the tachometer's red zone, the needles).
+  - The needles are drawn live: the tachometer from the engine's rpm, the speedometer from the
+    car's road speed. Revving on the spot moves only the tachometer; the speedometer stays at 0
+    until the car moves, and reaches about 200 km/h in the rush.
+  - The model's own tiny tachometer needle is hidden in favour of the new dials.
 - **The walk and the entry** are camera keys on the scroll (`episode.ts`), worked out from the
-  car's own frame: they pass the bonnet's corner at 0.4 m, stand clear of the door's swing, and
-  pass under the door opening's top below the roof line. All of it, door and lights included,
-  is a function of the scroll, so scrolling back plays it backwards.
-- **The rev** (`getaway.ts`, the tachometer in `ui/Tachometer.tsx`): once you sit and the engine
-  idles at 800 rpm, the page holds at a gate and a tachometer comes up where the driver's
-  display is, black with a white 0–6 scale, the revs in yellow and the reading large. Hold D:
-  the revs climb about 1,500 + 0.35 × rpm per second (about two seconds to the line, on the
-  wall clock, so it is the same at any frame rate). Let go and they fall back to idle
-  smoothly. At 6,000 the car launches, once: the gate opens and the page plays the launch by
-  itself. The key is handled once (a single listener set while the episode is active, removed
-  when it leaves); it is released when the window loses focus or the page is hidden; D does
-  nothing else and is not passed to scrolling. On a touch screen, press and hold the
-  tachometer.
-- **The launch** moves the car, not the camera: about 9.5 m/s² off the line, easing through
-  three gears (the needle drops at each shift), 44 m in 3.6 s. It steers out of the parking lane
-  about its rear axle along an S into the driving lane, then runs straight; the camera rides in
-  the driver's seat with a little push back into the seat, a fine road shudder and the view
-  widening with speed. Checked in a node test along the whole route: it clears the kerb by at
-  least 10 cm (13 cm parked) and the parked cars by 36 cm. The car that would turn into its lane
-  is kept off the street for the episode.
+  car's own frame: they keep clear of the man, stand clear of the door's swing, and pass under
+  the door opening's top below the roof line. All of it, door and lights included, is a
+  function of the scroll, so scrolling back plays it backwards.
+- **The rev** (`getaway.ts`): once you sit and the engine idles at 800 rpm, the page holds at a
+  gate, your eyes drop to the cluster (the camera tilts down and narrows its view so the dials
+  read through the wheel), and a small card says what to do: hold D. The revs climb about
+  1,500 + 0.35 × rpm per second (two seconds to the line on the wall clock, the same at any
+  frame rate); let go and they fall back to idle smoothly. One listener pair (keydown, keyup)
+  is set while the episode is active and removed when it leaves; the key is released when the
+  window loses focus or the page is hidden; D does nothing else. On a touch screen, press and
+  hold the card.
+- **The launch** (at 6,000 rpm, once): `launch()` clears `armed` (so it cannot fire again and D
+  is ignored from then on), opens the gate, and starts one scripted move of the page, locked,
+  from the gate through the page turn to the next page. Everything after the threshold is that
+  one timeline: the car pulls out about its rear axle along an S into the driving lane and
+  accelerates (about 9.5 m/s² off the line, the revs dropping at each gear change), then the
+  rush: the speed builds towards 200 km/h, comic speed lines stream in from the edges and the
+  view widens; then the ink closes and the next page (the closing card, until Episode 04 is
+  built) opens. The car's place is only ever set from that progress, by one component.
+  Checked in a node test along the whole route: it clears the kerb by at least 10 cm and the
+  parked cars by 36 cm. The car that would turn into its lane is kept off the street.
+- **Why it used to stall**, fixed: (1) the launch's scripted move ended exactly on the first
+  frame of the page turn, and a page turn only starts when the progress is inside it, so after
+  3.6 s the car stopped and nothing more happened; (2) the scripted move could be cancelled by
+  any wheel or touch event, and people keep scrolling (or a trackpad keeps coasting) while the
+  story waits at a gate. Now one locked move runs from the gate to the next page.
 - **State, and rewinding**: everything you see is a function of the scroll, except the revs
   while you hold the key. `getaway.launched` is the one remembered fact. Scroll back into the
   launch and the car is where it was at that point; scroll back out of the seat (before
   0.63) and the launch is forgotten: the gate closes, the engine stops and you rev again next
   time. Nothing before the rev reads `launched`, so no earlier position can show a launched car.
-- **Sound**: the engine is one continuous voice whose pitch and timbre follow the rpm (a
-  four-cylinder's firing frequency, its half order, intake noise and a little saturation), so
-  pressing and releasing never stacks sounds; the central locking, the door opening and
-  shutting, and the starter are cues fired as the scroll crosses them (going back plays the
-  reverse action). All of them are synthesised until recordings are supplied: set `src` on
-  `carUnlock`, `carDoorOpen`, `carDoorClose`, `engineStart` and `engineLoop` in
-  `src/audio/AudioDirector.ts` (`engineLoop` is a seamless loop recorded at
-  `ENGINE_LOOP_RPM`, 3,000 rpm, and is pitched by the revs).
+- **Sound**: no engine recording has been supplied yet, so the engine is synthesised: one
+  continuous voice whose pitch and timbre follow the rpm (a four-cylinder's firing frequency,
+  its half order, intake noise and a little saturation), so pressing and releasing never stacks
+  sounds. The central locking, the door and the starter are synthesised cues fired as the
+  scroll crosses them. To use recordings, set `src` on `carUnlock`, `carDoorOpen`,
+  `carDoorClose`, `engineStart` and `engineLoop` in `src/audio/AudioDirector.ts`: `engineLoop`
+  should be a seamless loop recorded at `ENGINE_LOOP_RPM` (3,000 rpm); it is then pitched by
+  the revs (playbackRate = rpm / 3,000) and its level follows the throttle. Every sound call of
+  the episode is wrapped so that a failing audio device can never hold up the launch or the
+  page.
 
 ## What is in Episode 1
 
@@ -404,7 +435,7 @@ src/
     ink.ts                ink buffer material + ink line effect
     Stylizer.tsx          classifies meshes, renders the ink buffer, composer
   ui/Overlay.tsx          title panel, captions, episode rail, wipe, outro
-  ui/Tachometer.tsx       episode 3's driver display (hold D)
+  ui/RevPrompt.tsx        episode 3's one instruction (hold D); the dials are on the car's cluster
   scenes/station/         Episode 1: episode.ts (track, captions, beats) + the world
   scenes/city/            Episode 2: the street, the stranger, the encounter
   scenes/car/             Episode 3: the Mercedes (carRig.ts), its beats, rev and launch (getaway.ts)
@@ -432,8 +463,10 @@ wipe opens.
 ## Assets and placeholders
 
 - **Supplied assets**: the walking man (`src/assets/man.glb`, 1.4 MB), the knife
-  (`src/assets/knife.glb`, 0.15 MB) and the Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`,
-  2.2 MB; see Episode 03), all supplied by the project owner.
+  (`src/assets/knife.glb`, 0.15 MB), the Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`,
+  2.2 MB) and the instrument-cluster illustration (`src/assets/cluster.svg`, adapted from
+  "car dashboard UI illustration" by Vecteezy, free licence, which asks for the credit
+  "Vecteezy.com": it is on the closing card), all supplied by the project owner (see Episode 03).
   - `tools/fbx2glb.mjs` converts the FBX (FBXLoader + GLTFExporter in node) without his
     glasses and hair. FBXLoader makes one bone per skin cluster, so a joint shared by several
     meshes arrives as a chain of same-named bones of which only one is animated; the converter

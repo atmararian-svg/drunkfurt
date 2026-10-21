@@ -5,8 +5,9 @@ import { story, useStory } from '../core/store';
 import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { PLANNED, builtEpisodes } from '../episodes';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
-import { drawBrushWipe, drawHits, drawKnockout } from './brush';
-import { Tachometer } from './Tachometer';
+import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
+import { launchAt } from '../scenes/car/getaway';
+import { RevPrompt } from './RevPrompt';
 
 /** An episode that picks up the previous one's last shot, with no page turn between them. */
 const seamless = (id: string) => !!EPISODE_SPANS.find((e) => e.id === id)?.seamless;
@@ -107,11 +108,15 @@ export function Overlay() {
       // knocked out, a flash, then the lights go out as you fall
       const v = id === 'city' ? encounterAt(local) : null;
       const hitT = !v || v.t < 0 || local >= BEAT.aftermath ? -1 : v.t;
-      const hitKey = hitT < 0 ? '' : `${v!.outcome}${hitT.toFixed(3)}${hit.width}`;
+      // episode 3: the rush at the end of the launch, in speed lines
+      const run = id === 'car' ? launchAt(local) : null;
+      const rush = run && run.rpm >= 0 ? run.rush : 0;
+      const hitKey = hitT >= 0 ? `${v!.outcome}${hitT.toFixed(3)}${hit.width}` : rush > 0 ? `rush${rush.toFixed(2)}${Math.floor(run!.t * 24)}${hit.width}` : '';
       if (hitKey !== lastHit) {
         hctx.clearRect(0, 0, hit.width, hit.height);
         if (hitT >= 0 && v!.outcome === 'knockedOut') drawKnockout(hctx, hit.width, hit.height, hitT, KO.dark);
         else if (hitT >= 0) drawHits(hctx, hit.width, hit.height, hitT, BLOCK);
+        else if (rush > 0) drawSpeedLines(hctx, hit.width, hit.height, rush, run!.t);
         lastHit = hitKey;
       }
       raf = requestAnimationFrame(loop);
@@ -152,7 +157,7 @@ export function Overlay() {
     };
     const onClick = (e: MouseEvent) => {
       unlock();
-      if ((e.target as HTMLElement).closest('a,button,.tach')) return;
+      if ((e.target as HTMLElement).closest('a,button,.rev-prompt')) return;
       next();
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -230,7 +235,7 @@ export function Overlay() {
 
       <canvas className="impact" aria-hidden />
 
-      <Tachometer prompt={prompt} />
+      <RevPrompt prompt={prompt} />
 
       <div className="cue">
         <span>Scroll</span>
@@ -260,6 +265,12 @@ export function Overlay() {
       <section className="outro">
         <span className="title-brand">DRUNKFURT</span>
         <h2 className="title-name">To be continued</h2>
+        <p className="credit">
+          Instrument cluster graphic:{' '}
+          <a href="https://www.vecteezy.com" target="_blank" rel="noreferrer">
+            Vecteezy.com
+          </a>
+        </p>
       </section>
     </div>
   );

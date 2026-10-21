@@ -3,7 +3,7 @@ import { suspend } from 'suspend-react';
 import manUrl from '../../assets/man.glb?url';
 import knifeUrl from '../../assets/knife.glb?url';
 import { Component, ReactNode, useMemo, useRef } from 'react';
-import { CatmullRomCurve3, Group, Object3D, PointLight, SpotLight, TubeGeometry, Vector3 } from 'three';
+import { Object3D, PointLight, SpotLight, Vector3 } from 'three';
 import { loadGlb } from '../../characters/inlineModel';
 import { buildMan } from '../../characters/manRig';
 import { START_PHASE } from '../../characters/walkClip';
@@ -11,13 +11,11 @@ import { lerpAngle } from '../../characters/crowd';
 import { smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
 import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
-import { cityMaterials } from './cityMaterials';
 import { EYE, VISITOR_STOP } from './layout';
 import { ramp, routeAt, routeS, walkPace } from './strangerRoute';
 
 /** Where he ends up afterwards: on his back on the pavement (his feet here, his head towards the shops). */
 const DOWN = { x: 7.0, z: -36.3, yaw: 0.9 };
-export const BAG_SPOT = { x: 6.1, z: -35.3, yaw: 0.7 };
 /** Your eyes when he comes at you (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
 const UP = new Vector3(0, 1, 0);
@@ -155,44 +153,20 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
   );
 }
 
-/** The visitor's bag, dropped in the struggle: dark canvas with the yellow strap. */
-export function Bag({ active }: { active: boolean }) {
-  const m = cityMaterials();
-  const strap = useMemo(() => {
-    const c = new CatmullRomCurve3([
-      new Vector3(-0.2, 0.05, 0.05),
-      new Vector3(-0.5, 0.02, 0.3),
-      new Vector3(-0.2, 0.015, 0.75),
-      new Vector3(0.35, 0.015, 0.7),
-      new Vector3(0.5, 0.02, 0.35),
-      new Vector3(0.2, 0.05, 0.05),
-    ]);
-    return new TubeGeometry(c, 40, 0.018, 6, false);
-  }, []);
-  const ref = useMemo(() => Object.assign(new Group(), { name: 'bag' }), []);
+/**
+ * The light from the laundry window that falls across the man once he is on
+ * the pavement (from the moment the page goes black, so scrolling back before
+ * it leaves the street as it was). Your bag never leaves your shoulder: he
+ * tried for it and failed.
+ */
+export function LaundryLight({ active }: { active: boolean }) {
   const light = useRef<PointLight>(null);
   useFrame(() => {
-    // dropped in the struggle (under the black), and back on your shoulder if you scroll back before it
     const t = encounterAt(localProgress('city')).t;
-    const dropped = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.dark;
-    ref.visible = active && t >= dropped;
-    if (light.current) light.current.visible = ref.visible;
+    const down = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.dark;
+    if (light.current) light.current.visible = active && t >= down;
   });
-  return (
-    <>
-      {/* light from the laundry window, falling across the man on the pavement */}
-      <pointLight ref={light} position={[9.1, 2.0, -37.2]} color="#f1ece0" intensity={9} distance={7} decay={2} visible={false} />
-      <primitive object={ref} position={[BAG_SPOT.x, 0, BAG_SPOT.z]} rotation={[0, BAG_SPOT.yaw, 0]}>
-        <mesh material={m.bag} position={[0, 0.07, 0]} rotation={[0, 0, 0.08]} castShadow>
-          <boxGeometry args={[0.42, 0.13, 0.32]} />
-        </mesh>
-        <mesh material={m.bag} position={[0.02, 0.15, 0.03]} rotation={[0.05, 0, 0.1]} scale={[0.22, 0.03, 0.17]}>
-          <sphereGeometry args={[1, 16, 8]} />
-        </mesh>
-        <mesh material={m.bagStrap} geometry={strap} />
-      </primitive>
-    </>
-  );
+  return <pointLight ref={light} position={[9.1, 2.0, -37.2]} color="#f1ece0" intensity={9} distance={7} decay={2} visible={false} />;
 }
 
 /**

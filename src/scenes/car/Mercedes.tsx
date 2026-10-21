@@ -9,7 +9,7 @@ import { useStory } from '../../core/store';
 import { loadGlb } from '../../characters/inlineModel';
 import { ROAD_Y } from '../city/layout';
 import { buildCar } from './carRig';
-import { CAR_BEAT, carAt, doorAt, getaway, ignitedAt, launchAt, leaveGetaway, lightsAt, setThrottle, updateGetaway } from './getaway';
+import { CAR_BEAT, quietly, carAt, doorAt, getaway, ignitedAt, launchAt, leaveGetaway, lightsAt, setThrottle, updateGetaway } from './getaway';
 
 /** Headlamp positions in the car's frame (m): left and right, at the lamp units. */
 const LAMPS = [new Vector3(0.66, 0.67, 1.98), new Vector3(-0.66, 0.67, 1.98)];
@@ -81,9 +81,9 @@ export function Mercedes() {
     const lit = lightsAt(local);
     car.lights(lit);
     car.door(doorAt(local));
-    car.cluster(ignitedAt(local) ? 1 : 0);
     if (active) updateGetaway(dt);
-    car.tacho(getaway.rpm);
+    // the cluster: rpm from the engine (your revs, or the launch's gears), km/h from the road speed
+    car.cluster(getaway.rpm, run.v * 3.6, ignitedAt(local) ? 1 : 0);
     car.root.updateMatrixWorld(true);
     LAMPS.forEach((p, i) => {
       const s = spots.current[i];
@@ -99,12 +99,16 @@ export function Mercedes() {
     // the beats' sounds, as the scroll crosses them (going back plays the reverse action)
     if (active && audio.running && last.current >= 0) {
       const crossed = (b: number) => (last.current < b && local >= b ? 1 : last.current >= b && local < b ? -1 : 0);
-      if (crossed(CAR_BEAT.lightsOn) === 1) audio.carUnlock();
+      const unlock = crossed(CAR_BEAT.lightsOn) === 1;
       const o = crossed(CAR_BEAT.doorOpen);
-      if (o) audio.carDoor(o > 0);
       const c = crossed(CAR_BEAT.doorClosed - 0.008);
-      if (c) audio.carDoor(c < 0);
-      if (crossed(CAR_BEAT.ignition) === 1) audio.engineStart();
+      const start = crossed(CAR_BEAT.ignition) === 1;
+      quietly(() => {
+        if (unlock) audio.carUnlock();
+        if (o) audio.carDoor(o > 0);
+        if (c) audio.carDoor(c < 0);
+        if (start) audio.engineStart();
+      });
     }
     last.current = active ? local : -1;
   });

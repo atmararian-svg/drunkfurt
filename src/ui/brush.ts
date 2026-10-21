@@ -227,3 +227,37 @@ export function drawKnockout(ctx: CanvasRenderingContext2D, W: number, H: number
     ctx.fillRect(0, 0, W, H);
   }
 }
+
+/**
+ * Speed lines, as a comic draws them: tapered ink streaks radiating from a
+ * clear centre (the vanishing point of the road ahead) out to the edges of the
+ * frame. `k` (0..1) is how strong the rush is; `t` (seconds) moves the streaks
+ * along, a new set every 1/24 s like hand-drawn frames.
+ */
+export function drawSpeedLines(ctx: CanvasRenderingContext2D, W: number, H: number, k: number, t: number, cx = 0.5, cy = 0.42) {
+  if (k <= 0) return;
+  const rnd = mulberry32(1 + Math.floor(t * 24));
+  const ox = W * cx;
+  const oy = H * cy;
+  const reach = Math.hypot(W, H) * 0.62;
+  const count = Math.round(26 + 34 * k);
+  ctx.save();
+  ctx.fillStyle = '#101010';
+  for (let i = 0; i < count; i++) {
+    const a = rnd() * Math.PI * 2;
+    // streaks hug the edges; the centre of the frame (the road) stays clear
+    const inner = reach * (0.5 - 0.16 * k + rnd() * 0.22);
+    const outer = reach * 1.05;
+    const w = (0.004 + rnd() * 0.012) * reach * (0.6 + 0.6 * k);
+    const ca = Math.cos(a);
+    const sa = Math.sin(a);
+    ctx.globalAlpha = (0.35 + 0.5 * rnd()) * k;
+    ctx.beginPath();
+    ctx.moveTo(ox + ca * inner, oy + sa * inner);
+    ctx.lineTo(ox + ca * outer - sa * w, oy + sa * outer + ca * w);
+    ctx.lineTo(ox + ca * outer + sa * w, oy + sa * outer - ca * w);
+    ctx.closePath();
+    ctx.fill();
+  }
+  ctx.restore();
+}

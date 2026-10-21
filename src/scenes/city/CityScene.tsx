@@ -13,7 +13,7 @@ import { cityNav } from './nav';
 import { BEAT, cityTimeScale, disarm, encounter, updateEncounter } from './encounter';
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
-import { Bag, Stranger, StrangerBoundary } from './Stranger';
+import { LaundryLight, Stranger, StrangerBoundary } from './Stranger';
 import { Street } from './Street';
 import { StreetFurniture } from './StreetFurniture';
 
@@ -98,7 +98,7 @@ export function CityScene({ active }: { active: boolean }) {
       <StrangerBoundary>
         <Stranger active={active} timeScale={timeScale} />
       </StrangerBoundary>
-      <Bag active={active} />
+      <LaundryLight active={active} />
       {/* the getaway car stands at the kerb from the start; episode 3 is played with it */}
       <Mercedes />
       <Soundscape active={active} />

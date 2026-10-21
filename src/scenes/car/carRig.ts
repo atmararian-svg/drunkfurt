@@ -1,6 +1,6 @@
-import { Color, DoubleSide, Group, Material, Mesh, MeshBasicMaterial, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
+import { Color, DoubleSide, Group, Material, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { palette } from '../../config/palette';
+import { buildCluster } from './carCluster';
 
 /**
  * The supplied Mercedes-Benz W206 C220 (tools/mercedes2glb.mjs), set up to be
@@ -16,8 +16,10 @@ import { palette } from '../../config/palette';
  *  - the headlights are separate meshes; their lamp materials ("headlight",
  *    "lights_29", the DRL strips) are switched on by the episode, and two spot
  *    lights throw their beams;
- *  - the cabin is complete (seats, dash, steering wheel, instrument cluster with
- *    its own tachometer needle), so the camera can sit in the driver's seat.
+ *  - the cabin is complete (seats, dash, steering wheel, instrument cluster),
+ *    so the camera can sit in the driver's seat. The cluster's screen carries
+ *    the supplied dial graphic with live needles (carCluster.ts); the model's
+ *    own small tachometer needle is hidden in favour of it.
  *
  * The model is in centimetres, facing +z, its left (driver's) side on +x.
  */
@@ -27,12 +29,10 @@ export interface CarRig {
   door(open: number): void;
   /** Headlights and DRLs, 0 off … 1 on. */
   lights(on: number): void;
-  /** Instrument cluster backlight, 0 off … 1 on (ignition). */
-  cluster(on: number): void;
+  /** Instrument cluster: engine rpm, road speed (km/h), screens on (0 off … 1 on, the ignition). */
+  cluster(rpm: number, kmh: number, on: number): void;
   /** Rolls the wheels by a distance travelled (m). */
   roll(distance: number): void;
-  /** Tachometer needle (rpm). */
-  tacho(rpm: number): void;
   /** A point in the car's own frame (m, facing +z, driver on +x) to world space. */
   toWorld(local: Vector3, out?: Vector3): Vector3;
 }
@@ -70,7 +70,6 @@ function palette3() {
     lamp: std({ color: '#3b3b3a', emissive: new Color('#f4f2ea'), emissiveIntensity: 0, roughness: 0.3 }, false),
     tail: std({ color: '#2e2d2c', emissive: new Color('#d8d4cc'), emissiveIntensity: 0, roughness: 0.4 }, false),
     screen: std({ color: '#0d0d0e', emissive: new Color('#c9cbd0'), emissiveIntensity: 0, roughness: 0.2 }, false),
-    needle: new MeshBasicMaterial({ color: new Color(palette.yellow) }),
   };
 }
 
@@ -85,7 +84,6 @@ function pick(name: string, mesh: string, m: Mats): Material {
   if (/^tyr/.test(n)) return m.tyre;
   if (/^(chrome|lettering|badge|metallic$|gray_glossy|59)/.test(n)) return /wheel/.test(mesh) ? m.rim : m.chrome;
   if (/^(screen|gauges|gauges_screen)$/.test(n)) return m.screen;
-  if (n === 'needle') return m.needle;
   if (/mirror/.test(n)) return m.mirror;
   if (/^(trim|plast_rgb|grill|grille|bonnetback)/.test(n)) return m.trim;
   if (/^(leather|cinture|airbag|perf)/.test(n)) return m.leather;
@@ -140,11 +138,10 @@ export function buildCar(gltf: GLTF): CarRig {
   const X = new Vector3(1, 0, 0);
   const qw = new Quaternion();
 
-  // tachometer needle: turns in the cluster's face plane
-  const needle = node('w206_needle_tacho');
-  const needleRest = needle.quaternion.clone();
-  const needleAxis = new Vector3(0, 0, 1).applyQuaternion(needleRest); // the dial's normal, in the model's frame
-  const qn = new Quaternion();
+  // the cluster: the supplied dials on the car's own cluster screen; the model's needle gives way to them
+  node('w206_needle_tacho').visible = false;
+  const dials = buildCluster();
+  root.add(dials.mesh);
 
   const toWorld = (local: Vector3, out = new Vector3()) => root.localToWorld(out.copy(local));
 
@@ -159,17 +156,13 @@ export function buildCar(gltf: GLTF): CarRig {
       m.lamp.emissiveIntensity = 2.4 * on;
       m.tail.emissiveIntensity = 0.9 * on;
     },
-    cluster(on) {
+    cluster(rpm, kmh, on) {
       m.screen.emissiveIntensity = 0.55 * on;
+      dials.set(rpm, kmh, on);
     },
     roll(distance) {
       const a = distance / WHEEL_RADIUS;
       for (const w of wheels) w.o.quaternion.copy(qw.setFromAxisAngle(X, a)).multiply(w.rest);
-    },
-    tacho(rpm) {
-      // 0 … 6000 rpm over about 240° of dial
-      const a = -(Math.min(rpm, 7000) / 6000) * ((240 * Math.PI) / 180);
-      needle.quaternion.copy(qn.setFromAxisAngle(needleAxis, a)).multiply(needleRest);
     },
   };
 }

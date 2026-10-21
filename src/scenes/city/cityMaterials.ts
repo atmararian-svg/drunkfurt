@@ -51,8 +51,6 @@ function build() {
     ],
     carGlass: std({ color: '#121314', roughness: 0.1, metalness: 0.3 }, { halftone: 0 }),
     tyre: std({ color: '#121212', roughness: 0.9 }, { halftone: 0 }),
-    bag: std({ color: '#3d3c39', roughness: 0.85 }, { halftone: 0.5 }),
-    bagStrap: std({ color: palette.yellow, roughness: 0.6 }, { halftone: 0 }),
   };
 }
 

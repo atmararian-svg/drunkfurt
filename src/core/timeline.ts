@@ -120,6 +120,11 @@ function pageTurns(): PageTurn[] {
   return turns;
 }
 
+/** The page turn that starts at (or first after) a global progress, if any. */
+export function pageTurnFrom(p: number) {
+  return pageTurns().find((z) => z.from >= p - 1e-6) ?? null;
+}
+
 /** Starts a page turn if the progress has just moved into one. */
 function turnPage() {
   const p = timeline.progress;
