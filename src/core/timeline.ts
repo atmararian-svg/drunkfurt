@@ -78,9 +78,13 @@ export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, l
 /**
  * After a locked move ends, the page holds its final position for a moment
  * (performance.now() until which it does), so a scroll already in flight
- * (an inertial flick begun before it) cannot drag the story back off it.
+ * (a trackpad's inertia from a flick begun before it) cannot drag the story
+ * back off it.
  */
 let holdUntil = 0;
+
+/** A locked move owns the scroll (while it plays, and for a moment after): the visitor's scrolling is swallowed. */
+export const scriptOwnsScroll = () => (autoplay.active && autoplay.locked) || (!autoplay.active && performance.now() < holdUntil);
 
 /** `locked`: the visitor's scrolling does not stop it (a page turn always completes). */
 export function playProgress(from: number, to: number, seconds: number, locked = false) {
@@ -156,7 +160,7 @@ export function stepTimeline(dt: number) {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo({ top: p * max, behavior: 'auto' });
     if (u >= 1) {
-      if (autoplay.locked) holdUntil = performance.now() + 600;
+      if (autoplay.locked) holdUntil = performance.now() + 1000;
       autoplay.active = autoplay.locked = false;
     }
     timeline.velocity = damp(timeline.velocity, (p - prev) / Math.max(dt, 1e-4), 8, dt);
@@ -203,7 +207,7 @@ export function gateLimit() {
 export function readScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
   // a locked move (and the moment after one) owns the position: put the page back on it
-  if ((autoplay.active && autoplay.locked) || (!autoplay.active && performance.now() < holdUntil)) {
+  if (scriptOwnsScroll()) {
     window.scrollTo({ top: timeline.target * max, behavior: 'auto' });
     return;
   }

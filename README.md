@@ -370,8 +370,8 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   story waits at a gate; (3) even when it was not cancelled, the wheel still scrolled the page
   underneath it, so when it ended the story slid back to where the page had been scrolled.
   Now one locked move runs from the gate to the next page; while a locked move plays (this one,
-  or a page turn), wheel, touch and scroll keys are swallowed, and for 0.6 s after it the page
-  is held on its final position.
+  or a page turn), and for 1 s after it, wheel, touch and scroll keys are swallowed and the
+  page is held on its final position, so a trackpad's inertia cannot carry the story back.
 - **State, and rewinding**: everything you see is a function of the scroll, except the revs
   while you hold the key. `getaway.launched` is the one remembered fact. Scroll back into the
   launch and the car is where it was at that point; scroll back out of the seat (before
