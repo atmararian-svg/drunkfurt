@@ -26,7 +26,7 @@ import { Gate, gates, localProgress } from '../../core/timeline';
 import { input } from '../../player/input';
 import { postFx } from '../../render/Stylizer';
 import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
-import { flyAt, monitor, onScreen, resetMonitor } from './monitor';
+import { SCREEN_LINKS, flyAt, monitor, pick, resetMonitor } from './monitor';
 import { buildWallScreens } from './roomScreens';
 
 /** The last gate of the story: in the chair, the screen waits for the click. It never opens; the click leaves the story. */
@@ -155,7 +155,14 @@ function buildDisplay(picture: Texture) {
   const screen = add(new PlaneGeometry(DISPLAY.width, DISPLAY.height), glass, 0, 0, 0.002);
   screen.name = 'portfolio-screen';
   screen.userData.ink = false;
-  return { group: g, screen, glass };
+  // the link under the pointer, marked on the picture: a faint wash and a thin yellow edge over its card
+  const markMat = new MeshBasicMaterial({ color: new Color('#f5d21a'), transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+  markMat.userData.comic = false;
+  const mark = add(new PlaneGeometry(1, 1), markMat, 0, 0, 0.004);
+  mark.name = 'portfolio-link-mark';
+  mark.userData.ink = false;
+  mark.visible = false;
+  return { group: g, screen, glass, mark, markMat };
 }
 
 /** The picture's brightness: a little below full in the room, full when you lean in, exactly full on arrival. */
@@ -225,11 +232,24 @@ function Room({ active }: { active: boolean }) {
       monitor.armed = waiting;
       if (!monitor.entering) story.setState({ prompt: waiting ? 'monitor' : null });
     }
-    // the pointer over the picture (only the picture: the frame and the room around it do nothing)
-    const p = input.pointer;
-    monitor.over =
-      monitor.armed && !monitor.entering && p.active && onScreen(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight);
-    monitor.hover = damp(monitor.hover, monitor.over ? 1 : 0, 2.6, dt);
+    // the pointer over the picture (only the picture: the frame and the room around it do nothing), and the
+    // link under it; once the click is taken, the lean is held where it was, so the move in owns the camera
+    if (!monitor.entering) {
+      const p = input.pointer;
+      const at = monitor.armed && p.active ? pick(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight) : null;
+      monitor.over = !!at;
+      monitor.link = at ? at.link : -1;
+      monitor.hover = damp(monitor.hover, monitor.over ? 1 : 0, 2.6, dt);
+    }
+    const l = !monitor.entering ? SCREEN_LINKS[monitor.link] : undefined;
+    display.mark.visible = !!l;
+    if (l) {
+      // picture pixels → the plane's metres (its centre is the picture's centre)
+      display.mark.scale.set(((l.x1 - l.x0) / 2000) * DISPLAY.width, ((l.y1 - l.y0) / 1125) * DISPLAY.height, 1);
+      display.mark.position.x = (((l.x0 + l.x1) / 2) / 2000 - 0.5) * DISPLAY.width;
+      display.mark.position.y = (0.5 - ((l.y0 + l.y1) / 2) / 1125) * DISPLAY.height;
+      display.markMat.opacity = 0.14;
+    }
     const f = flyAt();
     const lit = REST + (0.97 - REST) * smoothstep(clamp(monitor.hover, 0, 1));
     display.glass.color.setScalar(lit + (1 - lit) * smoothstep(clamp(f * 1.4, 0, 1)));

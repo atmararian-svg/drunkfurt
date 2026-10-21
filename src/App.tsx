@@ -1,7 +1,7 @@
 import { Canvas } from '@react-three/fiber';
 import { Component, ReactNode, Suspense, useEffect } from 'react';
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
-import { useStory } from './core/store';
+import { story, useStory } from './core/store';
 import { EpisodeId, TOTAL_LENGTH, autoplay, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
@@ -129,6 +129,7 @@ export function App() {
         timeline,
         autoplay,
         gates,
+        story,
         rigPose,
         locate,
         EPISODES,

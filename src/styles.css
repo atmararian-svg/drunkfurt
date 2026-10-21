@@ -404,28 +404,14 @@ body { cursor: pointer; }
 .site-handoff .sound,
 .site-handoff .credits { opacity: 0 !important; transition: opacity 0.35s var(--ease); }
 
-/* the screen's picture laid over the page (cover-fit and centred, as the camera frames it) */
-.handoff {
+/* the white the camera enters at the end of the move into the screen (siteHandoff.ts), over everything */
+.whiteout {
   position: fixed;
   inset: 0;
   z-index: 50;
-  background: transparent;
+  background: #fff;
   opacity: 0;
-  transition: opacity 0.3s linear;
   pointer-events: none;
-  cursor: default;
-}
-.handoff.is-on { opacity: 1; pointer-events: auto; }
-.handoff-shot {
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  object-position: 50% 50%;
-  /* the camera stops 0.5 % short of the exact cover distance (so no bezel can show at the edge):
-     the image is scaled by the same amount */
-  transform: scale(1.005025);
 }
 .handoff-stuck {
   position: absolute;

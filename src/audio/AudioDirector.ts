@@ -29,6 +29,8 @@ interface CueDef {
 
 /** Planned cues for the station. Fill `src` once licensed/recorded assets exist. */
 export const cues = {
+  // the station at night: no recording in the project yet; until one is set here (a seamless loop of
+  // a large station hall at night), stationBed() synthesises it
   stationAmbience: { src: null, bus: 'ambience', loop: true, gain: 0.6 },
   trainIdleHum: { src: null, bus: 'ambience', loop: true, gain: 0.35 },
   footstepPlatform: { src: null, bus: 'sfx', gain: 0.5 },
@@ -245,6 +247,198 @@ class AudioDirector {
     hiss.start(ctx.currentTime + 0.37);
     lfo.start();
     this.ambience = out;
+  }
+
+  // -------------------------------------------------------------------------
+  // the station at night (chapter 1)
+
+  private station: { out: GainNode; stop: () => void } | null = null;
+
+  /**
+   * The night station's sound, restrained: the air of a big glass hall (two
+   * bands of soft noise, slowly breathing), the mains hum of its lights (50 Hz
+   * and its harmonics, very quiet), and now and then, far off and smeared by
+   * the hall's echo, the station gong and an announcement nobody could make
+   * out (band-passed voice-like noise, syllable-paced), or a train's air
+   * brakes sighing on another platform. A recorded loop set as
+   * `stationAmbience` is used instead when present. Idempotent; `level`
+   * fades it in and out.
+   */
+  stationBed(level: number, seconds = 1.5) {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return;
+    if (!this.station) this.station = this.buffers.has('stationAmbience') ? this.recordedStation() : this.synthStation();
+    this.station.out.gain.setTargetAtTime(level, ctx.currentTime, seconds / 3);
+  }
+
+  /** The station's sound is faded out and released (the chapter is left). */
+  stationStop(seconds = 1.2) {
+    const ctx = this.ctx;
+    const st = this.station;
+    if (!ctx || !st) return;
+    this.station = null;
+    st.out.gain.setTargetAtTime(0, ctx.currentTime, seconds / 3);
+    window.setTimeout(() => st.stop(), seconds * 1000 + 300);
+  }
+
+  private recordedStation() {
+    const ctx = this.ctx!;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    out.connect(this.buses.get('ambience')!);
+    const src = ctx.createBufferSource();
+    src.buffer = this.buffers.get('stationAmbience')!;
+    src.loop = true;
+    const g = ctx.createGain();
+    g.gain.value = (cues.stationAmbience as CueDef).gain ?? 1;
+    src.connect(g).connect(out);
+    src.start();
+    return { out, stop: () => src.stop() };
+  }
+
+  private synthStation() {
+    const ctx = this.ctx!;
+    const out = ctx.createGain();
+    out.gain.value = 0;
+    out.connect(this.buses.get('ambience')!);
+    const nodes: AudioScheduledSourceNode[] = [];
+    // the hall's echo: a long, dark impulse response (3.5 s), for the distant events
+    const len = Math.floor(ctx.sampleRate * 3.5);
+    const ir = ctx.createBuffer(2, len, ctx.sampleRate);
+    for (let c = 0; c < 2; c++) {
+      const d = ir.getChannelData(c);
+      for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 2.6);
+    }
+    const hall = ctx.createConvolver();
+    hall.buffer = ir;
+    const wet = ctx.createGain();
+    wet.gain.value = 0.55;
+    const dark = ctx.createBiquadFilter();
+    dark.type = 'lowpass';
+    dark.frequency.value = 2400;
+    hall.connect(dark).connect(wet).connect(out);
+    // the air: a low roar and a faint high wash, each slowly breathing
+    const air = (type: BiquadFilterType, f: number, q: number, level: number, rate: number) => {
+      const n = this.noiseSource(true);
+      const flt = ctx.createBiquadFilter();
+      flt.type = type;
+      flt.frequency.value = f;
+      flt.Q.value = q;
+      const g = ctx.createGain();
+      g.gain.value = level;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = rate;
+      const depth = ctx.createGain();
+      depth.gain.value = level * 0.3;
+      lfo.connect(depth).connect(g.gain);
+      n.connect(flt).connect(g).connect(out);
+      n.start();
+      lfo.start();
+      nodes.push(n, lfo);
+    };
+    air('lowpass', 260, 0.7, 0.32, 0.05);
+    air('bandpass', 1900, 0.6, 0.018, 0.031);
+    // the lights' mains hum
+    [50, 100, 150].forEach((f, i) => {
+      const o = ctx.createOscillator();
+      o.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.value = [0.012, 0.007, 0.003][i];
+      o.connect(g).connect(out);
+      o.start();
+      nodes.push(o);
+    });
+    // distant events, now and then, into the hall's echo
+    let timer = 0;
+    let alive = true;
+    const gong = (t: number) => {
+      // the station gong: three soft bell tones, falling
+      [659.3, 523.3, 392].forEach((f, i) => {
+        const o = ctx.createOscillator();
+        o.type = 'sine';
+        o.frequency.value = f;
+        const g = ctx.createGain();
+        const at = t + i * 0.42;
+        g.gain.setValueAtTime(0.0001, at);
+        g.gain.exponentialRampToValueAtTime(0.045, at + 0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001, at + 1.6);
+        o.connect(g).connect(hall);
+        o.start(at);
+        o.stop(at + 1.7);
+      });
+    };
+    const announcement = (t: number, seconds: number) => {
+      // a voice through a tannoy, too far to understand: noise shaped by two formants, syllable-paced
+      const n = this.noiseSource(true);
+      const f1 = ctx.createBiquadFilter();
+      f1.type = 'bandpass';
+      f1.frequency.value = 650;
+      f1.Q.value = 5;
+      const f2 = ctx.createBiquadFilter();
+      f2.type = 'bandpass';
+      f2.frequency.value = 1500;
+      f2.Q.value = 6;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      // syllables: an uneven 4–6 per second, in phrases
+      for (let x = 0; x < seconds; x += 0.12 + Math.random() * 0.12) {
+        const pause = Math.random() < 0.08;
+        g.gain.linearRampToValueAtTime(pause ? 0 : 0.05 + Math.random() * 0.05, t + x + 0.04);
+        f1.frequency.linearRampToValueAtTime(500 + Math.random() * 350, t + x + 0.05);
+        f2.frequency.linearRampToValueAtTime(1200 + Math.random() * 700, t + x + 0.05);
+      }
+      g.gain.linearRampToValueAtTime(0, t + seconds + 0.1);
+      n.connect(f1).connect(g);
+      n.connect(f2).connect(g);
+      g.connect(hall);
+      n.start(t);
+      n.stop(t + seconds + 0.3);
+    };
+    const brakes = (t: number) => {
+      // air brakes on a far platform: a long sigh of filtered noise
+      const n = this.noiseSource(true);
+      const f = ctx.createBiquadFilter();
+      f.type = 'bandpass';
+      f.frequency.value = 3200;
+      f.Q.value = 1.2;
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0, t);
+      g.gain.linearRampToValueAtTime(0.03, t + 0.25);
+      g.gain.exponentialRampToValueAtTime(0.0005, t + 2.4);
+      n.connect(f).connect(g).connect(hall);
+      n.start(t);
+      n.stop(t + 2.6);
+    };
+    const next = (first = false) => {
+      if (!alive) return;
+      timer = window.setTimeout(() => {
+        if (!alive) return;
+        const t = ctx.currentTime + 0.05;
+        const r = Math.random();
+        if (r < 0.45) {
+          gong(t);
+          announcement(t + 1.6, 4 + Math.random() * 3);
+        } else if (r < 0.75) brakes(t);
+        else announcement(t, 2.5 + Math.random() * 2);
+        next();
+      }, (first ? 2.5 : 14 + Math.random() * 16) * 1000);
+    };
+    next(true);
+    return {
+      out,
+      stop: () => {
+        alive = false;
+        window.clearTimeout(timer);
+        for (const n of nodes) {
+          try {
+            n.stop();
+          } catch {
+            // already stopped
+          }
+        }
+        out.disconnect();
+      },
+    };
   }
 
   /** 0..1 loudness of the city bed (ramped). */

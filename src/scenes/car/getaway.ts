@@ -264,6 +264,16 @@ const holds = { key: false, pointer: false };
 export function setThrottle(on: boolean, source: keyof typeof holds = 'key') {
   holds[source] = on;
   getaway.held = getaway.armed && (holds.key || holds.pointer);
+  // a press starts the sequence at once, on the event itself, however short the press and however
+  // long the next frame takes (a tap shorter than a frame is not lost)
+  if (on && getaway.armed) startRevs();
+}
+
+/** The one rev sequence: started by the first press while the story waits; later presses do nothing. */
+function startRevs() {
+  if (getaway.revStart >= 0 || getaway.launched || !getaway.armed) return;
+  getaway.revStart = performance.now();
+  quietly(() => audio.revSequence());
 }
 const releaseAll = () => {
   holds.key = holds.pointer = false;
@@ -338,11 +348,8 @@ export function updateGetaway(dt: number) {
     getaway.revStart = -1;
     quietly(() => audio.revStop(0.25));
   }
-  // the first press of D (while the story waits for it) starts the one rev sequence
-  if (getaway.held && getaway.revStart < 0 && !getaway.launched && ignited) {
-    getaway.revStart = performance.now();
-    quietly(() => audio.revSequence());
-  }
+  // D already held when the story arrives at the wait starts the sequence too
+  if (getaway.held && ignited) startRevs();
   if (launch_.rpm >= 0) {
     getaway.rpm = launch_.rpm;
     getaway.pedal = 1;

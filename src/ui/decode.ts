@@ -192,10 +192,10 @@ export function hoverDecode(el: HTMLElement, opts: { radius?: number } = {}): ()
   };
   let last = 0;
   const frame = (now: number) => {
-    const dt = Math.min(0.1, last ? (now - last) / 1000 : 0.016);
+    const dt = Math.min(0.4, last ? (now - last) / 1000 : 0.016);
     last = now;
     let any = false;
-    const tick = Math.floor(now / 65);
+    const tick = Math.floor(now / 90);
     chars.forEach((c, i) => {
       let w = 0;
       if (inside && rects[i]) {
@@ -212,8 +212,9 @@ export function hoverDecode(el: HTMLElement, opts: { radius?: number } = {}): ()
         return;
       }
       any = true;
-      // stronger influence: more of the time a stand-in, the rest the true letter
-      show(c, hash(i, tick) < live[i] * 0.85 ? glyph(i, tick) : null);
+      // stronger influence: more of the time a stand-in, but even under the pointer the true letter
+      // shows through about half the time, so the word stays readable
+      show(c, hash(i, tick) < live[i] * 0.5 ? glyph(i, tick) : null);
     });
     raf = any || inside ? requestAnimationFrame(frame) : 0;
     if (!raf) last = 0;

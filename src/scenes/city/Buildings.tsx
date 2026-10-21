@@ -9,6 +9,7 @@ const TILE_W = 12; // metres per facade texture repeat (4 bays)
 const FLOOR = 3.4;
 const GROUND = 4.2;
 const SHOP_W = 80; // metres per shopfront texture repeat (10 shops)
+const BLOCK_DEPTH = 16; // metres from the boulevard front to the back of its blocks
 
 /** Box with UVs scaled so `tileW`×`tileH` metres map to one texture repeat on every face. */
 function facadeBox(w: number, h: number, d: number, tileW: number, tileH: number) {
@@ -81,9 +82,12 @@ function addBuilding(b: GeoBatch, x0: number, x1: number, z0: number, z1: number
   b.add(shops ? `shops${variant % 2}` : 'plaster', facadeBox(w, GROUND, d, SHOP_W, GROUND), compose([cx, GROUND / 2, cz], lean));
   b.add(`facade${variant}`, facadeBox(w, upperH, d, TILE_W, (FLOOR * 5)), compose([cx, GROUND + upperH / 2, cz], lean));
   const top = GROUND + upperH;
-  // cornice
-  b.box('cornice', [w + 0.7, 0.45, d + 0.7], [cx, top + 0.22, cz], lean);
-  b.box('cornice', [w + 0.4, 0.25, d + 0.4], [cx, GROUND + 0.1, cz], lean);
+  // cornices: they stand out from the front and the back, not past the ends along the street, where
+  // the next block's cornice continues them (overhanging there, two cornices at the same height
+  // overlapped in the same planes at every junction and flickered)
+  const along = frontAxis === 'x' ? [0.7, 0] : [0, 0.7];
+  b.box('cornice', [w + along[0], 0.45, d + along[1]], [cx, top + 0.22, cz], lean);
+  b.box('cornice', [w + along[0] * 0.57, 0.25, d + along[1] * 0.57], [cx, GROUND + 0.1, cz], lean);
   // mansard roof along the street-facing length
   const roofH = 3 + rnd() * 1.4;
   if (frontAxis === 'x') {
@@ -138,15 +142,22 @@ export function Buildings() {
     const b = new GeoBatch();
     const rnd = mulberry32(77);
     stationFront(b);
-    // blocks facing the boulevard (front faces at x = ±9.5)
-    for (const k of planBlocks()) {
+    // blocks facing the boulevard (front faces at x = ±9.5, 16 m deep)
+    const blocks = planBlocks();
+    for (const k of blocks) {
       const x0 = k.side * STREET.curbOuter;
-      const x1 = k.side * (STREET.curbOuter + 16);
+      const x1 = k.side * (STREET.curbOuter + BLOCK_DEPTH);
       addBuilding(b, x0, x1, k.z0, k.z1, k.floors, k.variant, 'x', rnd);
     }
-    // corner blocks facing the square across the cross street
+    // corner blocks facing the square across the cross street. They stand behind the first
+    // boulevard blocks, not in them: these used to start at the kerb line too, so their fronts,
+    // shopfronts and cornices lay in the same planes as the boulevard blocks' (x = ±9.5) over
+    // z -25…-41, and the two surfaces z-fought, flickering right ahead of the camera as the
+    // chapter opened. Their roofline differs from the neighbour's, so no cornice is coplanar either.
     for (const side of [-1, 1] as const) {
-      addBuilding(b, side * STREET.curbOuter, side * 70, CROSS.z0 - 3, CROSS.z0 - 19, 5, side > 0 ? 2 : 1, 'z', rnd);
+      const neighbour = blocks.find((k) => k.side === side)!;
+      const floors = neighbour.floors === 5 ? 6 : 5;
+      addBuilding(b, side * (STREET.curbOuter + BLOCK_DEPTH), side * 70, CROSS.z0 - 3, CROSS.z0 - 19, floors, side > 0 ? 2 : 1, 'z', rnd);
       // the square's flanks
       addBuilding(b, side * 31, side * 46, STATION_FACE_Z - 1, CROSS.z1 + 0.5, 4, side > 0 ? 3 : 0, 'z', rnd, false);
     }

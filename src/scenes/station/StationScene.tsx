@@ -2,6 +2,8 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { useEffect, useRef } from 'react';
 import { Group } from 'three';
 import { clamp, smoothstep } from '../../core/math';
+import { audio } from '../../audio/AudioDirector';
+import { chapterReadiness } from '../../core/chapters';
 import { story } from '../../core/store';
 import { localProgress } from '../../core/timeline';
 import { Concourse } from './Concourse';
@@ -43,6 +45,26 @@ const TRAIN_B: TrainSpec = {
 const DUST_LAMPS = MAST_Z.filter((z) => z > -35 && z < 20);
 
 /**
+ * The night station's sound (AudioDirector.stationBed): it rises when the
+ * chapter is on screen and the visitor has let sound start, thins towards the
+ * way out at the chapter's end, and is released when the chapter is left, so
+ * revisiting it never starts a second one.
+ */
+function StationSound({ active }: { active: boolean }) {
+  useFrame(() => {
+    if (!active || !audio.running) return;
+    const t = localProgress('station');
+    audio.stationBed(0.55 * (1 - 0.5 * smoothstep(clamp((t - 0.8) / 0.2, 0, 1))));
+  });
+  useEffect(() => {
+    if (active) return;
+    audio.stationStop();
+  }, [active]);
+  useEffect(() => () => audio.stationStop(0.4), []);
+  return null;
+}
+
+/**
  * Episode 1 world — Frankfurt (Main) Hbf, Gleis 7, a few minutes before midnight.
  * The camera belongs to the episode track; this component only builds the
  * world and runs the scroll-driven events inside it.
@@ -59,7 +81,10 @@ export function StationScene({ active = true }: { active?: boolean }) {
     const tick = () => {
       if (cancelled) return;
       if (++frames < 3) requestAnimationFrame(tick);
-      else story.setState({ phase: 'ready' });
+      else {
+        story.setState({ phase: 'ready' });
+        chapterReadiness.set(1, true);
+      }
     };
     requestAnimationFrame(tick);
     return () => {
@@ -94,6 +119,7 @@ export function StationScene({ active = true }: { active?: boolean }) {
       <Passengers />
       <Pigeon home={[3.4, -7.2]} />
       <Dust lampZ={DUST_LAMPS} />
+      <StationSound active={active} />
     </>
   );
 }

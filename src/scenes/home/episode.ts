@@ -100,7 +100,7 @@ export const homeEpisode: EpisodeDef = {
   },
   captions: [
     { from: 0.16, to: 0.38, place: 'tl', text: 'Nobody followed me. The screens were still on.' },
-    { from: 0.74, to: 1, place: 'bl', tone: 'yellow', text: 'Click the big screen.', when: () => monitor.armed && !monitor.entering },
+    { from: 0.74, to: 1, place: 'bl', tone: 'yellow', text: 'Click the screen, or a project on it.', when: () => monitor.armed && !monitor.entering },
   ],
   beats: [0, HOME_BEAT.opened, 0.32, HOME_BEAT.atChair, HOME_BEAT.gate],
 };

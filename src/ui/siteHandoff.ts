@@ -1,20 +1,20 @@
-import portfolioUrl from '../assets/portfolio.webp?url';
-
 /**
- * The hand-over from the story to the real site. When the camera has moved
- * into the screen, the screen's own picture (the same image, the site's home
- * page) is laid over the page, framed exactly as the camera frames it
- * (cover-fit, centred), so the cut is not seen. Then the browser is sent to
- * the site.
+ * The hand-over from the story to the real site. As the camera moves into
+ * the screen, the whole view goes white (`whiteOut`, driven by the move; fully
+ * white by 80% of it), and then the browser is sent to the page the visitor
+ * clicked (`navigateTo`), with the white kept up while it goes. No frame of
+ * the site is embedded, and nothing of it is read: the address comes from the
+ * link that was clicked on the screen's picture.
  *
- * Opened as the page itself, that is a plain navigation, in the same tab.
- * Inside a frame (an embed, a sandboxed preview), which may not send the
- * whole window anywhere, the site opens in a new tab on the strength of the
- * visitor's click, and the page moves back into the room behind it. Only if
- * the browser refuses that too are a link to the site and a way back into
- * the room shown, so nobody is left looking at a picture of a website.
+ * Opened as the page itself, that is a plain navigation in the same tab: the
+ * white stays until the site paints. Inside a frame (an embed, a sandboxed
+ * preview), which may not send the whole window anywhere, the site opens in
+ * a new tab on the strength of the visitor's click, and this page fades back
+ * from white into the room behind it. Only if the browser refuses that too
+ * is a link to the page shown on the white, with a way back into the room,
+ * so nobody is left on a blank page.
  */
-let el: HTMLDivElement | null = null;
+let white: HTMLDivElement | null = null;
 let timers: number[] = [];
 let leaving = false;
 
@@ -22,21 +22,37 @@ const onPageHide = () => {
   leaving = true;
 };
 
-function build(url: string, onBack: () => void) {
-  const root = document.createElement('div');
-  root.className = 'handoff';
-  root.setAttribute('role', 'dialog');
-  root.setAttribute('aria-label', 'Opening arianatmar.com');
-  const shot = document.createElement('img');
-  shot.className = 'handoff-shot';
-  shot.src = portfolioUrl;
-  shot.alt = 'arianatmar.com, home page';
-  shot.decoding = 'sync';
-  const stuck = document.createElement('div');
-  stuck.className = 'handoff-stuck';
-  stuck.hidden = true;
+function layer() {
+  if (white) return white;
+  white = document.createElement('div');
+  white.className = 'whiteout';
+  white.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(white);
+  return white;
+}
+
+/**
+ * Schedules the white: it begins `delay` ms from now and is complete `duration`
+ * ms later, eased in (slow at first, so it reads as the screen's light
+ * flooding the view, not a flash).
+ */
+export function whiteOutAt(delay: number, duration: number) {
+  const el = layer();
+  el.style.pointerEvents = 'auto';
+  if (typeof el.animate === 'function') {
+    el.animate([{ opacity: 0 }, { opacity: 1 }], { delay, duration, easing: 'cubic-bezier(0.55, 0, 0.45, 1)', fill: 'forwards' });
+  } else {
+    window.setTimeout(() => (el.style.opacity = '1'), delay + duration);
+  }
+}
+
+function showStuck(url: string, onBack: () => void) {
+  if (leaving || !white) return;
+  const panel = document.createElement('div');
+  panel.className = 'handoff-stuck';
+  panel.setAttribute('role', 'dialog');
   const note = document.createElement('p');
-  note.textContent = 'The site could not open in this window.';
+  note.textContent = 'The page could not open in this window.';
   const open = document.createElement('a');
   open.className = 'handoff-open';
   open.href = url;
@@ -51,87 +67,79 @@ function build(url: string, onBack: () => void) {
     e.stopPropagation();
     onBack();
   });
-  stuck.append(note, open, back);
-  root.append(shot, stuck);
-  return root;
+  panel.append(note, open, back);
+  white.append(panel);
+  open.focus({ preventScroll: true });
 }
 
-/** Lays the picture over the page (a short fade), then opens the site. */
-export function openHandoff(url: string, onBack: () => void) {
-  closeHandoff(true);
+/** Sends the browser to `url` (once the view is white). */
+export function navigateTo(url: string, onBack: () => void) {
   leaving = false;
+  // the white is complete by now (on the same clock); make sure it is, whatever the frames did
+  if (white) {
+    white.getAnimations?.().forEach((a) => a.finish());
+    white.style.opacity = '1';
+  }
   window.addEventListener('pagehide', onPageHide);
-  el = build(url, onBack);
-  document.body.appendChild(el);
-  // a frame later, so the fade runs
-  requestAnimationFrame(() => requestAnimationFrame(() => el?.classList.add('is-on')));
-  const root = el;
-  const showStuck = () => {
-    if (leaving || el !== root) return;
-    const stuck = root.querySelector<HTMLElement>('.handoff-stuck')!;
-    stuck.hidden = false;
-    root.querySelector<HTMLElement>('.handoff-open')!.focus({ preventScroll: true });
-  };
-  timers.push(
-    window.setTimeout(() => {
-      // inspection only: the dev build can be told to stop short of leaving
-      if (import.meta.env.DEV && (window as unknown as { __holdNavigation?: boolean }).__holdNavigation) {
-        timers.push(window.setTimeout(showStuck, 5000));
-        return;
-      }
-      let framed = true;
-      try {
-        framed = window.top !== window.self;
-      } catch {
-        framed = true;
-      }
-      if (!framed) {
-        window.location.assign(url);
-        // a navigation that has not happened after a few seconds (offline, blocked) gets the way out
-        timers.push(window.setTimeout(showStuck, 5000));
-        return;
-      }
-      // in a frame (an embed such as a sandboxed preview, which may not send the whole window
-      // anywhere): the site opens in a new tab, still on the visitor's click (a browser lets a page
-      // open one shortly after a click), and this page goes quietly back into the room behind it
-      let opened: Window | null = null;
-      try {
-        opened = window.open(url, '_blank');
-      } catch {
-        opened = null;
-      }
-      if (opened) {
-        try {
-          opened.opener = null;
-        } catch {
-          // a cross-origin window: nothing to cut
-        }
-        timers.push(window.setTimeout(onBack, 1200));
-        return;
-      }
-      try {
-        // allowed only where the embedding page lets this frame navigate it
-        window.top!.location.href = url;
-      } catch {
-        // refused as well: the link below is the way left
-      }
-      timers.push(window.setTimeout(showStuck, 1400));
-    }, 300),
-  );
+  const stuck = () => showStuck(url, onBack);
+  // inspection only: the dev build can be told to stop short of leaving
+  if (import.meta.env.DEV && (window as unknown as { __holdNavigation?: boolean }).__holdNavigation) {
+    timers.push(window.setTimeout(stuck, 5000));
+    return;
+  }
+  let framed = true;
+  try {
+    framed = window.top !== window.self;
+  } catch {
+    framed = true;
+  }
+  if (!framed) {
+    window.location.assign(url);
+    // a navigation that has not happened after a few seconds (offline, blocked) gets the way out
+    timers.push(window.setTimeout(stuck, 6000));
+    return;
+  }
+  let opened: Window | null = null;
+  try {
+    opened = window.open(url, '_blank');
+  } catch {
+    opened = null;
+  }
+  if (opened) {
+    try {
+      opened.opener = null;
+    } catch {
+      // a cross-origin window: nothing to cut
+    }
+    timers.push(window.setTimeout(onBack, 900));
+    return;
+  }
+  try {
+    // allowed only where the embedding page lets this frame navigate it
+    window.top!.location.href = url;
+  } catch {
+    // refused as well: the link is the way left
+  }
+  timers.push(window.setTimeout(stuck, 1400));
 }
 
-/** Takes the picture away again (fading, or at once). */
+/** Takes the white away again (fading, or at once). */
 export function closeHandoff(now = false) {
   timers.forEach((t) => window.clearTimeout(t));
   timers = [];
   window.removeEventListener('pagehide', onPageHide);
-  const old = el;
-  el = null;
+  const old = white;
+  white = null;
   if (!old) return;
   if (now) {
     old.remove();
     return;
   }
-  old.classList.remove('is-on');
-  window.setTimeout(() => old.remove(), 400);
+  old.style.pointerEvents = 'none';
+  const from = getComputedStyle(old).opacity;
+  old.getAnimations?.().forEach((a) => a.cancel());
+  old.style.opacity = from;
+  old.style.transition = 'opacity 0.6s linear';
+  requestAnimationFrame(() => (old.style.opacity = '0'));
+  window.setTimeout(() => old.remove(), 700);
 }

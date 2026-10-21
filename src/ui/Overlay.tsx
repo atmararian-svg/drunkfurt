@@ -9,7 +9,7 @@ import { hoverDecode } from './decode';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
-import { enterSite, monitor, onScreen } from '../scenes/home/monitor';
+import { enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 
 /**
@@ -138,7 +138,12 @@ export function Overlay() {
       // the last scene: only a click on the big screen does anything (Enter takes you in as well)
       if (monitor.entering) return;
       if (story.getState().prompt === 'monitor') {
-        if (!e || onScreen(e.clientX, e.clientY)) enterSite();
+        // the page under the click: a project, About, All works, or the home page; Enter: the one under the pointer
+        if (!e) enterSite(monitor.link);
+        else {
+          const at = pick(e.clientX, e.clientY);
+          if (at) enterSite(at.link);
+        }
         return;
       }
       if (story.getState().prompt === 'defend') {
@@ -163,7 +168,7 @@ export function Overlay() {
     };
     const onClick = (e: MouseEvent) => {
       unlock();
-      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.handoff,.preloader')) return;
+      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.whiteout,.preloader')) return;
       next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
