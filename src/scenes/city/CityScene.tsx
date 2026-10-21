@@ -4,7 +4,7 @@ import { audio } from '../../audio/AudioDirector';
 import { createCrowd } from '../../characters/crowd';
 import { People } from '../../characters/People';
 import { clamp, smoothstep } from '../../core/math';
-import { localProgress } from '../../core/timeline';
+import { localProgress, locate, timeline } from '../../core/timeline';
 import { Mercedes } from '../car/Mercedes';
 import { Buildings } from './Buildings';
 import { Cars } from './Cars';
@@ -37,6 +37,12 @@ function Soundscape({ active }: { active: boolean }) {
   }, [active, st]);
   useFrame(() => {
     if (!active || !audio.running) return;
+    // the closing card after the getaway: the street falls silent under it
+    if (locate(timeline.progress).id === 'outro') {
+      audio.setAmbience(0, 1.2);
+      audio.setHeartbeat(0);
+      return;
+    }
     audio.startCityAmbience();
     const local = localProgress('city');
     // all from the progress: tension builds as he walks up, breaks once the fight is decided
