@@ -1,3 +1,9 @@
+import accel1Url from '../assets/audio/accel-1.mp3?url';
+import accel2Url from '../assets/audio/accel-2.mp3?url';
+import accel3Url from '../assets/audio/accel-3.mp3?url';
+import gearShiftUrl from '../assets/audio/gear-shift.mp3?url';
+import wheelsUrl from '../assets/audio/wheels.mp3?url';
+
 /**
  * Audio foundation. Recorded cues are declared with `src: null` and silently
  * skipped until real recordings are added to /public/audio. Until then the city
@@ -32,7 +38,15 @@ export const cues = {
   fightKnockout: { src: null, bus: 'body', gain: 1 },
   fightRing: { src: null, bus: 'body', gain: 0.6 },
   fightFall: { src: null, bus: 'body', gain: 0.9 },
-  // the getaway (episode 3). Each is synthesised until a recording is set here:
+  // the getaway (episode 3): the supplied recordings. Revving on the spot plays one of the three
+  // accel recordings per press (one-shots: a blip of throttle and its fall); the launch plays the
+  // wheels (tyres breaking traction) and the gear-shift recording from 3.00 s into the file.
+  accel1: { src: accel1Url, bus: 'body', gain: 0.95 },
+  accel2: { src: accel2Url, bus: 'body', gain: 0.95 },
+  accel3: { src: accel3Url, bus: 'body', gain: 0.95 },
+  wheels: { src: wheelsUrl, bus: 'body', gain: 0.8 },
+  gearShift: { src: gearShiftUrl, bus: 'body', gain: 0.95 },
+  // the rest of the getaway is synthesised until a recording is set here:
   // carUnlock (central locking, two clacks), carDoorOpen, carDoorClose (a heavy, damped shut),
   // engineStart (starter and catch, ~1 s), and engineLoop: a seamless loop of the engine
   // recorded at ENGINE_LOOP_RPM under load; it is pitched by rpm (playbackRate = rpm / ENGINE_LOOP_RPM).
@@ -46,6 +60,23 @@ export const cues = {
 export type CueId = keyof typeof cues;
 /** The rpm the engineLoop recording (if one is supplied) was made at. */
 export const ENGINE_LOOP_RPM = 3000;
+
+/**
+ * The bytes of an audio file. A data URL (the single-file build, where every
+ * asset is inlined) is decoded in memory: a page with a strict content policy
+ * refuses to fetch even its own data URLs. Any other URL is fetched.
+ */
+async function bytesOf(src: string): Promise<ArrayBuffer> {
+  if (src.startsWith('data:')) {
+    const raw = atob(src.slice(src.indexOf(',') + 1));
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bytes.buffer;
+  }
+  const res = await fetch(src);
+  if (!res.ok) throw new Error(`${res.status} for ${src}`);
+  return res.arrayBuffer();
+}
 
 class AudioDirector {
   private ctx: AudioContext | null = null;
@@ -90,8 +121,7 @@ class AudioDirector {
         const src = (cues[id] as CueDef).src;
         if (!src) return;
         try {
-          const res = await fetch(src);
-          this.buffers.set(id, await ctx.decodeAudioData(await res.arrayBuffer()));
+          this.buffers.set(id, await ctx.decodeAudioData(await bytesOf(src)));
         } catch (err) {
           console.warn(`[audio] could not load cue "${id}"`, err);
         }
@@ -591,6 +621,140 @@ class AudioDirector {
     };
   }
 
+
+  // -------------------------------------------------------------------------
+  // the getaway's recordings
+
+  private rev: { src: AudioBufferSourceNode; gain: GainNode; id: CueId } | null = null;
+  private revBag: CueId[] = [];
+  private revLast: CueId | null = null;
+  private launch: { src: AudioBufferSourceNode; gain: GainNode }[] = [];
+
+  /** Is the recording for this cue decoded and ready? */
+  has(id: CueId) {
+    return this.buffers.has(id);
+  }
+
+  /**
+   * The next of the three accel recordings: a shuffled bag, refilled when
+   * empty, never starting with the one that just played, so the order changes
+   * and the same recording never plays twice in a row.
+   */
+  private nextRev(): CueId | null {
+    const all = (['accel1', 'accel2', 'accel3'] as CueId[]).filter((id) => this.buffers.has(id));
+    if (!all.length) return null;
+    if (!this.revBag.length) {
+      const bag = [...all];
+      for (let i = bag.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [bag[i], bag[j]] = [bag[j], bag[i]];
+      }
+      if (bag.length > 1 && bag[0] === this.revLast) bag.push(bag.shift()!);
+      this.revBag = bag;
+    }
+    return this.revBag.shift()!;
+  }
+
+  private fadeOut(node: { src: AudioBufferSourceNode; gain: GainNode }, seconds: number) {
+    const ctx = this.ctx!;
+    const t = ctx.currentTime;
+    node.gain.gain.cancelScheduledValues(t);
+    node.gain.gain.setValueAtTime(node.gain.gain.value, t);
+    node.gain.gain.linearRampToValueAtTime(0, t + seconds);
+    try {
+      node.src.stop(t + seconds + 0.02);
+    } catch {
+      // already stopped
+    }
+  }
+
+  /**
+   * D goes down: one accel recording, from the start (or a little into it if
+   * the revs are already up, so it picks up where the engine is). Whatever
+   * was playing is faded out quickly first: never two at once. Returns the
+   * cue played, or null when none is ready (the synthesised engine covers it).
+   */
+  revPress(rpm: number): CueId | null {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running') return null;
+    if (this.rev) this.fadeOut(this.rev, 0.06);
+    this.rev = null;
+    const id = this.nextRev();
+    if (!id) return null;
+    const buffer = this.buffers.get(id)!;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    const level = (cues[id] as CueDef).gain ?? 1;
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(level, t + 0.03);
+    src.connect(gain).connect(this.buses.get('body')!);
+    const offset = Math.min(buffer.duration * 0.4, Math.max(0, ((rpm - 800) / 5200) * 0.9));
+    src.start(t, offset);
+    const node = { src, gain, id };
+    src.onended = () => {
+      if (this.rev === node) this.rev = null;
+    };
+    this.rev = node;
+    this.revLast = id;
+    return id;
+  }
+
+  /** D comes up before the launch: the recording falls away with the revs (about as fast as the needle). */
+  revRelease() {
+    if (!this.ctx || !this.rev) return;
+    this.fadeOut(this.rev, 0.45);
+    this.rev = null;
+  }
+
+  /** An accel recording is sounding now (the synthesised idle stays out of its way). */
+  get revving() {
+    return !!this.rev;
+  }
+
+  /**
+   * The launch, once: the wheels (tyres breaking traction) and the gear-shift
+   * recording from `offset` seconds into the file. `late` is how long ago the
+   * launch actually began (if the sound starts after it), so the recording is
+   * started further in and its gear changes stay on the launch's own clock.
+   * Never throws, never waits: if a recording is not ready it is skipped.
+   */
+  launchStart(offset: number, late = 0) {
+    const ctx = this.ctx;
+    if (!ctx || ctx.state !== 'running' || this.launch.length) return false;
+    if (this.rev) this.fadeOut(this.rev, 0.12);
+    this.rev = null;
+    const t = ctx.currentTime;
+    for (const [id, from] of [['wheels', 0], ['gearShift', offset]] as [CueId, number][]) {
+      const buffer = this.buffers.get(id);
+      if (!buffer) continue;
+      const at = from + late;
+      if (at >= buffer.duration) continue;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime((cues[id] as CueDef).gain ?? 1, t);
+      src.connect(gain).connect(this.buses.get('body')!);
+      src.start(t, at);
+      this.launch.push({ src, gain });
+    }
+    return this.launch.length > 0;
+  }
+
+  /** The scene is over (or was rewound): the launch's recordings and any rev fade out. */
+  carStop(seconds = 0.6) {
+    if (!this.ctx) return;
+    for (const n of this.launch) this.fadeOut(n, seconds);
+    this.launch = [];
+    if (this.rev) this.fadeOut(this.rev, Math.min(seconds, 0.3));
+    this.rev = null;
+  }
+
+  /** The launch's recordings are playing. */
+  get launching() {
+    return this.launch.length > 0;
+  }
 }
 
 export const audio = new AudioDirector();

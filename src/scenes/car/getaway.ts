@@ -61,14 +61,25 @@ export const CAR_BEAT = {
 export const IDLE_RPM = 800;
 export const LAUNCH_RPM = 6000;
 /**
- * Seconds of the launch (REV → LAUNCH_END) when it plays by itself: off the
- * line and up through the gears for 3.4 s, then the rush (1.8 s) as the city
- * streams past and the page goes.
+ * The launch's sound and its gear changes, on one clock. The gear-shift
+ * recording is started 3.00 s into the file at the moment of the launch, and
+ * the gear changes heard in it (at 4.30, 7.30 and 10.45 s of the file) fall
+ * at these times after the launch: the instrument cluster changes gear at
+ * exactly these times, read from the same launch clock (seconds since the
+ * launch, which is also the scroll position the launch plays).
  */
-export const LAUNCH_SECONDS = 5.2;
-const PULL_AWAY = 3.4;
-/** Top of the rush (m/s): just over 200 km/h on the speedometer. */
-const RUSH_SPEED = 57;
+export const SHIFT_AUDIO_OFFSET = 3.0;
+export const SHIFTS_IN_RECORDING = [4.3, 7.3, 10.45];
+export const SHIFT_TIMES = SHIFTS_IN_RECORDING.map((t) => +(t - SHIFT_AUDIO_OFFSET).toFixed(3)); // 1.30, 4.30, 7.45
+
+/**
+ * Seconds of the launch (REV → LAUNCH_END) when it plays by itself: off the
+ * line and up through three gear changes (the last at 7.45 s), the rush of
+ * speed in the last two seconds, then the ink closes and the page goes.
+ */
+export const LAUNCH_SECONDS = 8.6;
+/** When the rush builds (s into the launch). */
+const RUSH_FROM = 6.6;
 
 export const getaway = {
   /** Live engine speed while you rev (rpm). */
@@ -79,6 +90,8 @@ export const getaway = {
   armed: false,
   /** The car has launched (on this pass through the episode). */
   launched: false,
+  /** The gear the cluster shows (0 parked; 1–4 on the launch). */
+  gear: 0,
 };
 
 const gate: Gate = { episode: 'car', at: CAR_BEAT.rev, open: false };
@@ -94,11 +107,14 @@ export const lightsAt = (local: number) => smoothstep(ramp(local, CAR_BEAT.light
 /** Engine on (the cluster lights). */
 export const ignitedAt = (local: number) => local >= CAR_BEAT.ignition;
 
-/** Road speed (m/s) t seconds into the launch: hard off the line, then the rush. */
+/**
+ * Road speed (m/s) t seconds into the launch: a hard launch that eases as the
+ * gears go up (about 11 m/s² off the line, 150 km/h by the end), and a little
+ * more in the rush.
+ */
 function speedAt(t: number) {
-  if (t <= PULL_AWAY) return 9.5 * t * (1 - 0.12 * t);
-  const v0 = 9.5 * PULL_AWAY * (1 - 0.12 * PULL_AWAY);
-  return v0 + (RUSH_SPEED - v0) * smoothstep(clamp((t - PULL_AWAY) / (LAUNCH_SECONDS - PULL_AWAY), 0, 1));
+  const rush = smoothstep(clamp((t - RUSH_FROM) / 2, 0, 1));
+  return 48 * (1 - Math.exp(-t / 4.4)) + 9 * rush;
 }
 /** Distance travelled by t (m), integrated once into a table. */
 const STEP = 0.01;
@@ -108,24 +124,40 @@ const distanceAt = (t: number) => {
   const i = Math.min(DIST.length - 2, Math.floor(t / STEP));
   return DIST[i] + (DIST[i + 1] - DIST[i]) * (t / STEP - i);
 };
-/** Gear changes (s into the launch): the revs drop at each and climb again. */
-const SHIFTS = [0, 1.15, 2.5, 3.6, 4.4, 99];
+
+/** The gear at t seconds into the launch (1 off the line, up one at each SHIFT_TIMES). */
+export const gearAt = (t: number) => 1 + SHIFT_TIMES.filter((s) => t >= s).length;
+
+/**
+ * Engine rpm t seconds into the launch, for the tachometer: the clutch takes
+ * up at the 6,000 you launched at; in each gear the revs climb to about 6,300;
+ * at each gear change the needle drops to about 4,200 in 0.18 s and climbs
+ * again.
+ */
+function rpmAt(t: number) {
+  const g = gearAt(t);
+  const from = g === 1 ? 0 : SHIFT_TIMES[g - 2];
+  const to = g <= SHIFT_TIMES.length ? SHIFT_TIMES[g - 1] : LAUNCH_SECONDS * 1.25;
+  const since = t - from;
+  if (g === 1) return 6000 + 300 * clamp(since / to, 0, 1);
+  const top = g > SHIFT_TIMES.length ? 5800 : 6300;
+  const climb = 4200 + (top - 4200) * Math.pow(clamp(since / (to - from), 0, 1), 0.8);
+  // the drop itself: from the previous gear's top down to 4,200
+  const drop = smoothstep(clamp(since / 0.18, 0, 1));
+  return 6300 + (climb - 6300) * drop;
+}
 
 /**
  * The launch at a local progress: seconds into it, distance from the kerb
  * along its route (m), road speed (m/s, for the speedometer), the rpm (for the
- * tachometer and the engine), and the rush (0..1, the speed effect at its end).
+ * tachometer), the gear, and the rush (0..1, the speed effect at its end).
  * Before the launch (or without one) the car stands where it was parked.
  */
 export function launchAt(local: number) {
-  if (!getaway.launched || local <= CAR_BEAT.rev) return { t: 0, s: 0, v: 0, rpm: -1, rush: 0 };
+  if (!getaway.launched || local <= CAR_BEAT.rev) return { t: 0, s: 0, v: 0, rpm: -1, gear: 0, rush: 0 };
   const u = clamp((local - CAR_BEAT.rev) / (CAR_BEAT.launchEnd - CAR_BEAT.rev), 0, 1.25);
   const t = u * LAUNCH_SECONDS;
-  let g = 0;
-  while (t > SHIFTS[g + 1]) g++;
-  const inGear = clamp((t - SHIFTS[g]) / Math.min(1.3, SHIFTS[g + 1] - SHIFTS[g]), 0, 1);
-  const rpm = g === 0 ? 6000 + 400 * inGear : 4100 + 2300 * Math.sqrt(inGear);
-  return { t, s: distanceAt(t), v: speedAt(t), rpm, rush: smoothstep(clamp((t - (PULL_AWAY - 0.4)) / 1.2, 0, 1)) };
+  return { t, s: distanceAt(t), v: speedAt(t), rpm: rpmAt(t), gear: gearAt(t), rush: smoothstep(clamp((t - RUSH_FROM) / 1.6, 0, 1)) };
 }
 
 /**
@@ -196,7 +228,17 @@ function launch() {
   // through the page turn that follows the launch, to where the next page has opened
   const to = pageTurnFrom(end)?.to ?? globalProgress('car', 1);
   playProgress(from, to, (LAUNCH_SECONDS * (to - from)) / (end - from), true);
+  // and its sound, on the same clock (started now; if a recording is not decoded yet, it is
+  // started on a later frame, further into the file by however late it is)
+  sound.launchPending = true;
+  sound.launchAt = performance.now();
+  quietly(() => {
+    if (audio.launchStart(SHIFT_AUDIO_OFFSET)) sound.launchPending = false;
+  });
 }
+
+/** The getaway's sound state: what has been started, so nothing starts twice. */
+const sound = { wasHeld: false, launchPending: false, launchAt: 0 };
 
 /** Forget a launch (scrolled back out of the car, or left the episode backwards). */
 export function resetGetaway() {
@@ -204,6 +246,9 @@ export function resetGetaway() {
   getaway.armed = false;
   releaseAll();
   gate.open = false;
+  sound.launchPending = false;
+  sound.wasHeld = false;
+  quietly(() => audio.carStop(0.3));
   if (story.getState().prompt === 'rev') story.setState({ prompt: null });
 }
 
@@ -223,6 +268,7 @@ export function updateGetaway(dt: number) {
   getaway.held = getaway.armed && (holds.key || holds.pointer);
   const ignited = ignitedAt(local);
   const launch_ = launchAt(local);
+  getaway.gear = launch_.gear;
   if (launch_.rpm >= 0) {
     getaway.rpm = launch_.rpm;
   } else if (!ignited) {
@@ -236,9 +282,30 @@ export function updateGetaway(dt: number) {
     const target = IDLE_RPM;
     getaway.rpm = getaway.rpm < target ? Math.min(target, getaway.rpm + dt * 1600) : target + (getaway.rpm - target) * Math.exp(-dt * 2.2);
   }
-  if (getaway.armed && getaway.rpm >= LAUNCH_RPM) launch();
-  // sound follows; it can never hold the story up
-  quietly(() => audio.engine(ignited ? getaway.rpm : 0, launch_.rpm >= 0 ? 1 : getaway.held ? 1 : 0.15));
+  // the revving recordings: one per press of D (not per frame), released with the key
+  const pressed = getaway.held && !sound.wasHeld;
+  const released = !getaway.held && sound.wasHeld;
+  sound.wasHeld = getaway.held;
+  if (getaway.armed && getaway.rpm >= LAUNCH_RPM) {
+    launch();
+  } else {
+    if (pressed) quietly(() => audio.revPress(getaway.rpm));
+    if (released) quietly(() => audio.revRelease());
+  }
+  // the launch's recordings, if they could not start at the launch itself (not decoded yet):
+  // only while the launch is still playing, and further into the file by the delay
+  if (sound.launchPending) {
+    const late = (performance.now() - sound.launchAt) / 1000;
+    if (!autoplay.active || late > SHIFT_TIMES[SHIFT_TIMES.length - 1]) sound.launchPending = false;
+    else quietly(() => {
+      if (audio.launchStart(SHIFT_AUDIO_OFFSET, late)) sound.launchPending = false;
+    });
+  }
+  // the synthesised engine is only the idle (and a stand-in for any recording that is not there):
+  // it steps aside while an accel recording or the launch's recordings play
+  const synth = ignited && !audio.revving && !audio.launching;
+  quietly(() => audio.engine(synth ? getaway.rpm : 0, launch_.rpm >= 0 ? 1 : getaway.held ? 1 : 0.15));
+  // sound follows all of this; none of it can hold the story up
 }
 
 /** Runs a sound call; a failure there (no audio device, a closed context) is ignored. */
@@ -259,8 +326,11 @@ export function leaveGetaway() {
     getaway.armed = false;
     story.setState({ prompt: null });
   }
-  quietly(() => audio.engine(0, 0));
+  // the scene is over (the page has turned, or you went back to the city): everything fades out
+  sound.launchPending = false;
+  sound.wasHeld = false;
+  quietly(() => {
+    audio.engine(0, 0);
+    audio.carStop(0.8);
+  });
 }
-
-/** Is the page playing the launch right now (sounds follow it only then). */
-export const launching = () => getaway.launched && autoplay.active;

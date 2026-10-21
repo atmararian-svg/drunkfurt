@@ -9,7 +9,7 @@ import { useStory } from '../../core/store';
 import { loadGlb } from '../../characters/inlineModel';
 import { ROAD_Y } from '../city/layout';
 import { buildCar } from './carRig';
-import { CAR_BEAT, quietly, carAt, doorAt, getaway, ignitedAt, launchAt, leaveGetaway, lightsAt, setThrottle, updateGetaway } from './getaway';
+import { CAR_BEAT, SHIFT_TIMES, quietly, carAt, doorAt, getaway, ignitedAt, launchAt, leaveGetaway, lightsAt, setThrottle, updateGetaway } from './getaway';
 
 /** Headlamp positions in the car's frame (m): left and right, at the lamp units. */
 const LAMPS = [new Vector3(0.66, 0.67, 1.98), new Vector3(-0.66, 0.67, 1.98)];
@@ -35,7 +35,7 @@ export function Mercedes() {
   const last = useRef(-1);
   const tmp = useMemo(() => new Vector3(), []);
   useEffect(() => {
-    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__getaway = { getaway, setThrottle, car };
+    if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__getaway = { getaway, setThrottle, car, audio };
   }, [car]);
 
   // hold D to rev; the key is released if the window loses focus or the page is hidden
@@ -83,7 +83,10 @@ export function Mercedes() {
     car.door(doorAt(local));
     if (active) updateGetaway(dt);
     // the cluster: rpm from the engine (your revs, or the launch's gears), km/h from the road speed
-    car.cluster(getaway.rpm, run.v * 3.6, ignitedAt(local) ? 1 : 0);
+    // the gear and its changes come from the launch clock, the same one the gear-shift recording is on
+    const lastShift = run.gear > 1 ? SHIFT_TIMES[run.gear - 2] : -1;
+    const shift = lastShift >= 0 ? Math.max(0, 1 - (run.t - lastShift) / 0.4) : 0;
+    car.cluster(getaway.rpm, run.v * 3.6, ignitedAt(local) ? 1 : 0, run.gear, shift);
     car.root.updateMatrixWorld(true);
     LAMPS.forEach((p, i) => {
       const s = spots.current[i];

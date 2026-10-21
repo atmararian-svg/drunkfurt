@@ -26,8 +26,12 @@ const SIZE = { w: 0.308, h: 0.104 };
 
 export interface Cluster {
   mesh: Mesh;
-  /** Draws the dials: engine rpm, road speed (km/h), and the screen's brightness (0 off … 1 on). */
-  set(rpm: number, kmh: number, on: number): void;
+  /**
+   * Draws the dials: engine rpm, road speed (km/h), the screen's brightness
+   * (0 off … 1 on), the gear (0 parked, 1–4 driving) and how fresh the last
+   * gear change is (1 at the change, fading to 0).
+   */
+  set(rpm: number, kmh: number, on: number, gear?: number, shift?: number): void;
 }
 
 export function buildCluster(): Cluster {
@@ -84,8 +88,8 @@ export function buildCluster(): Cluster {
   let last = '';
   return {
     mesh,
-    set(rpm, kmh, on) {
-      const key = `${Math.round(rpm / 10)}|${Math.round(kmh * 2)}|${on.toFixed(2)}|${ready}`;
+    set(rpm, kmh, on, gear = 0, shift = 0) {
+      const key = `${Math.round(rpm / 10)}|${Math.round(kmh * 2)}|${on.toFixed(2)}|${ready}|${gear}|${shift.toFixed(2)}`;
       if (key === last) return;
       last = key;
       // the screen lights with the ignition, a little below full so it sits in the dim cabin
@@ -95,6 +99,14 @@ export function buildCluster(): Cluster {
       ctx.fillRect(0, 0, VIEW.w, VIEW.h);
       if (ready) ctx.drawImage(face, 0, 0, VIEW.w, VIEW.h);
       needle(TACHO.x, TACHO.y, START + (TACHO.per1000 * Math.min(rpm, 10000)) / 1000, TACHO.len, 11);
+      // the gear, in the speedometer under its hub (P parked, D1–D4 on the move); at a change it
+      // flashes red and settles back to white
+      ctx.font = '600 34px Arial, Helvetica, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const w = Math.max(0, Math.min(1, shift));
+      ctx.fillStyle = w > 0 ? `rgb(${241 - 29 * w},${240 - 207 * w},${233 - 190 * w})` : '#f1f0e9';
+      ctx.fillText(gear > 0 ? `D${gear}` : 'P', SPEEDO.x - VIEW.x, SPEEDO.y - VIEW.y + 52);
       needle(SPEEDO.x, SPEEDO.y, START + SPEEDO.perKmh * Math.min(kmh, 300), SPEEDO.len, 15);
       tex.needsUpdate = true;
     },

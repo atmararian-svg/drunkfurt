@@ -302,7 +302,7 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
 | 0.47–0.60 | into the car: you duck under the roof line, through the door opening, and sit, turning to face the windscreen |
 | 0.60–0.66 | the door shuts; 0.645 the cluster lights and the engine starts; your eyes drop to the cluster |
 | 0.66 | the story waits: hold D to rev |
-| after 6,000 rpm | by itself, without stopping: the launch (3.4 s), the rush (1.8 s), the ink closing, the next page |
+| after 6,000 rpm | by itself, without stopping: the launch through three gear changes (8.6 s, the rush in its last two seconds), the ink closing, the next page |
 
 - **The car** is the supplied Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`, 2.2 MB),
   converted from the supplied FBX by `tools/mercedes2glb.mjs`, then welded, simplified and
@@ -339,7 +339,8 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
     accents (the tachometer's red zone, the needles).
   - The needles are drawn live: the tachometer from the engine's rpm, the speedometer from the
     car's road speed. Revving on the spot moves only the tachometer; the speedometer stays at 0
-    until the car moves, and reaches about 200 km/h in the rush.
+    until the car moves, and reaches about 180 km/h in the rush. Under the speedometer's hub the gear shows: P parked, D1–D4
+    on the launch, flashing red at each change.
   - The model's own tiny tachometer needle is hidden in favour of the new dials.
 - **The walk and the entry** are camera keys on the scroll (`episode.ts`), worked out from the
   car's own frame: they keep clear of the man, stand clear of the door's swing, and pass under
@@ -357,9 +358,9 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   is ignored from then on), opens the gate, and starts one scripted move of the page, locked,
   from the gate through the page turn to the next page. Everything after the threshold is that
   one timeline: the car pulls out about its rear axle along an S into the driving lane and
-  accelerates (about 9.5 m/s² off the line, the revs dropping at each gear change), then the
-  rush: the speed builds towards 200 km/h, comic speed lines stream in from the edges and the
-  view widens; then the ink closes and the next page (the closing card, until Episode 04 is
+  accelerates (about 11 m/s² off the line, easing through the gears, with the gear changes on
+  the recording's), then the rush: the speed builds towards 180 km/h, comic speed lines stream
+  in from the edges and the view widens; then the ink closes and the next page (the closing card, until Episode 04 is
   built) opens. The car's place is only ever set from that progress, by one component.
   Checked in a node test along the whole route: it clears the kerb by at least 10 cm and the
   parked cars by 36 cm. The car that would turn into its lane is kept off the street.
@@ -377,16 +378,30 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   launch and the car is where it was at that point; scroll back out of the seat (before
   0.63) and the launch is forgotten: the gate closes, the engine stops and you rev again next
   time. Nothing before the rev reads `launched`, so no earlier position can show a launched car.
-- **Sound**: no engine recording has been supplied yet, so the engine is synthesised: one
-  continuous voice whose pitch and timbre follow the rpm (a four-cylinder's firing frequency,
-  its half order, intake noise and a little saturation), so pressing and releasing never stacks
-  sounds. The central locking, the door and the starter are synthesised cues fired as the
-  scroll crosses them. To use recordings, set `src` on `carUnlock`, `carDoorOpen`,
-  `carDoorClose`, `engineStart` and `engineLoop` in `src/audio/AudioDirector.ts`: `engineLoop`
-  should be a seamless loop recorded at `ENGINE_LOOP_RPM` (3,000 rpm); it is then pitched by
-  the revs (playbackRate = rpm / 3,000) and its level follows the throttle. Every sound call of
-  the episode is wrapped so that a failing audio device can never hold up the launch or the
-  page.
+- **Sound**: the supplied recordings (`src/assets/audio/`, used as they are):
+  - `accel-1.mp3` (3.1 s), `accel-2.mp3` (6.3 s), `accel-3.mp3` (4.1 s): single throttle blips,
+    each a rise and its fall. They are one-shots, not loops: each press of D plays one of them
+    once (not per frame), a little into the file if the revs are already up. They come from a
+    shuffled bag, refilled when empty and never starting with the one that just played, so the
+    order changes and the same one never plays twice in a row. A new press fades the previous
+    one out in 60 ms first (never two at once); letting go fades it with the needle (0.45 s).
+  - At the launch, once: `wheels.mp3` (2.3 s, the tyres breaking traction) and
+    `gear-shift.mp3` (35.5 s) from 3.00 s into the file. Its gear changes (4.30, 7.30 and
+    10.45 s in the file) fall 1.30, 4.30 and 7.45 s after the launch, and the launch is timed on
+    those (`SHIFT_TIMES` in `getaway.ts`): the cluster changes gear (D1 to D4, the gear flashing
+    red), the tachometer drops from 6,300 to about 4,200 and climbs again, all read from the
+    one launch clock that also moves the car and the page. The launch lasts 8.6 s (up to 180
+    km/h), so all three changes are seen and heard before the ink closes; the recordings fade
+    out (0.8 s) when the page has turned.
+  - Each recording is decoded in memory from the inlined file (a strict content policy refuses
+    to fetch even a data URL). If one is not decoded yet when it is needed, the revs fall back to
+    the synthesised engine and the launch's recordings start on a later frame, further into the
+    file by the delay, so the gear changes stay on time; if they never decode, the launch and the
+    page turn run regardless. No sound call can throw into the scene or hold it up.
+  - Between revs the engine idles on the synthesised voice (one continuous voice, quiet), which
+    steps aside while a recording plays. The central locking, the doors and the starter remain
+    synthesised; recordings can be set as `src` on `carUnlock`, `carDoorOpen`, `carDoorClose`
+    and `engineStart` in `src/audio/AudioDirector.ts`.
 
 ## What is in Episode 1
 
