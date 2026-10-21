@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { audio } from '../audio/AudioDirector';
 import { clamp } from '../core/math';
 import { story, useStory } from '../core/store';
-import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
+import { EPISODE_SPANS, cut, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { PLANNED, builtEpisodes } from '../episodes';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
@@ -13,6 +13,18 @@ import { RevPrompt } from './RevPrompt';
 /** An episode that picks up the previous one's last shot, with no page turn between them. */
 const seamless = (id: string) => !!EPISODE_SPANS.find((e) => e.id === id)?.seamless;
 const nextOf = (id: string) => EPISODE_SPANS[EPISODE_SPANS.findIndex((e) => e.id === id) + 1];
+
+/** Seconds the ink takes to open after a cut (going back into an episode at an earlier point). */
+const CUT_OPEN = 0.9;
+
+/** Ink coverage of the frame: the progress's own, and over it the opening after a cut. */
+function inkNow(p: number): { w: number; mode: 'close' | 'open' } {
+  const own = inkAt(p);
+  const since = (performance.now() - cut.at) / 1000;
+  if (since >= CUT_OPEN) return own;
+  const w = 1 - since / CUT_OPEN;
+  return w > own.w ? { w, mode: 'open' } : own;
+}
 
 /** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
 function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
@@ -100,7 +112,7 @@ export function Overlay() {
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
       credits.classList.toggle('is-on', id === 'home' && monitor.armed && !monitor.entering);
 
-      const ink = inkAt(p);
+      const ink = inkNow(p);
       const key = `${ink.w.toFixed(3)}${ink.mode}${wipe.width}`;
       if (key !== last) {
         drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, id === 'city' && local > 0.5 ? 13 : 7);

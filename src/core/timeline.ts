@@ -18,13 +18,21 @@ export interface EpisodeSpan {
    * closes over the previous episode's end or opens over this one's start.
    */
   seamless?: boolean;
+  /**
+   * Where the episode starts again (local progress) when the visitor goes back
+   * into it from the next one: the page turn back does not land on its last
+   * shot but cuts, under the ink, to this point. Without it, going back lands
+   * on the episode's end.
+   */
+  reentry?: number;
 }
 
 /** Built episodes, in order. Add the next ones here as they are made. */
 export const EPISODE_SPANS: EpisodeSpan[] = [
   { id: 'station', length: 9 },
   { id: 'city', length: 11 },
-  { id: 'car', length: 8, seamless: true },
+  // back from the room, the getaway starts again from the seat (CAR_BEAT.seated), not after the launch
+  { id: 'car', length: 8, seamless: true, reentry: 0.6 },
   { id: 'home', length: 7 },
 ];
 /** Scroll after the last episode, for the "to be continued" card. */
@@ -75,7 +83,9 @@ export function localProgress(id: EpisodeId, p = timeline.progress) {
  * downstream still reads the one progress value. Wall-clock timed, so a slow
  * frame rate cannot stretch it. Any input from the visitor stops it where it is.
  */
-export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, locked: false };
+export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, locked: false, then: null as number | null };
+/** When the last cut happened (performance.now()): a jump under closed ink, which the overlay then opens. */
+export const cut = { at: -1e9 };
 /**
  * After a locked move ends, the page holds its final position for a moment
  * (performance.now() until which it does), so a scroll already in flight
@@ -94,8 +104,9 @@ export function pinScroll(on: boolean) {
 export const scriptOwnsScroll = () => pinned || (autoplay.active && autoplay.locked) || (!autoplay.active && performance.now() < holdUntil);
 
 /** `locked`: the visitor's scrolling does not stop it (a page turn always completes). */
-export function playProgress(from: number, to: number, seconds: number, locked = false) {
-  Object.assign(autoplay, { active: true, from, to, seconds, start: performance.now(), locked });
+/** `then`: when it arrives (under closed ink), cut straight to this progress. */
+export function playProgress(from: number, to: number, seconds: number, locked = false, then: number | null = null) {
+  Object.assign(autoplay, { active: true, from, to, seconds, start: performance.now(), locked, then });
 }
 
 /** Stops a scripted move, unless it is a page turn. */
@@ -104,6 +115,7 @@ export function stopAutoplay(force = false) {
   if (force) holdUntil = 0;
   autoplay.active = false;
   autoplay.locked = false;
+  autoplay.then = null;
 }
 
 /**
@@ -114,7 +126,13 @@ export function stopAutoplay(force = false) {
  * forward, back to the last shot going back), and scrolling cannot stop it
  * halfway.
  */
-interface PageTurn { from: number; to: number; seconds: number }
+interface PageTurn {
+  from: number;
+  to: number;
+  seconds: number;
+  /** Going back: where the ink is fully closed (between the two episodes), and where to cut to from there. */
+  back?: { at: number; to: number };
+}
 let turns: PageTurn[] | null = null;
 function pageTurns(): PageTurn[] {
   if (turns) return turns;
@@ -132,7 +150,8 @@ function pageTurns(): PageTurn[] {
     }
     const close = start + len * (e.id === 'city' ? 0.978 : 0.955);
     const open = last ? next + (1 - next) * 0.2 : next + (EPISODE_SPANS[i + 1].length / TOTAL_LENGTH) * 0.12;
-    turns!.push({ from: close, to: open, seconds: last ? 2.2 : 3.4 });
+    const reentry = e.reentry;
+    turns!.push({ from: close, to: open, seconds: last ? 2.2 : 3.4, back: reentry !== undefined && !last ? { at: next, to: start + len * reentry } : undefined });
     start = next;
   });
   return turns;
@@ -151,8 +170,10 @@ function turnPage() {
     // the way the visitor is going; standing still inside one (a jump), the nearer side
     const forward = timeline.target !== p ? timeline.target > p : p - z.from > z.to - p;
     if (forward && gateLimit() < z.to) return;
-    const edge = forward ? z.to : z.from;
-    playProgress(p, edge, Math.max(0.35, (z.seconds * Math.abs(edge - p)) / (z.to - z.from)), true);
+    // back into an episode that restarts from an earlier point: close the ink, then cut there
+    const back = !forward && z.back && p > z.back.at ? z.back : null;
+    const edge = forward ? z.to : back ? back.at : z.from;
+    playProgress(p, edge, Math.max(0.35, (z.seconds * Math.abs(edge - p)) / (z.to - z.from)), true, back ? back.to : null);
     return;
   }
 }
@@ -167,6 +188,14 @@ export function stepTimeline(dt: number) {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo({ top: p * max, behavior: 'auto' });
     if (u >= 1) {
+      if (autoplay.then !== null) {
+        // the cut: straight to the new point, under the ink (the overlay opens it again)
+        const q = autoplay.then;
+        timeline.target = timeline.progress = q;
+        window.scrollTo({ top: q * max, behavior: 'auto' });
+        cut.at = performance.now();
+        autoplay.then = null;
+      }
       if (autoplay.locked) holdUntil = performance.now() + 1000;
       autoplay.active = autoplay.locked = false;
     }

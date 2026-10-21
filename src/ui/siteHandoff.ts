@@ -7,11 +7,12 @@ import portfolioUrl from '../assets/portfolio.webp?url';
  * (cover-fit, centred), so the cut is not seen. Then the browser is sent to
  * the site.
  *
- * Opened as the page itself, that is a plain navigation. Inside a frame
- * (an embed, a sandboxed preview) the frame may not be allowed to send the
- * whole window anywhere; if the site has not taken over after a moment, a
- * link to it and a way back into the room are shown, so nobody is left
- * looking at a picture of a website.
+ * Opened as the page itself, that is a plain navigation, in the same tab.
+ * Inside a frame (an embed, a sandboxed preview), which may not send the
+ * whole window anywhere, the site opens in a new tab on the strength of the
+ * visitor's click, and the page moves back into the room behind it. Only if
+ * the browser refuses that too are a link to the site and a way back into
+ * the room shown, so nobody is left looking at a picture of a website.
  */
 let el: HTMLDivElement | null = null;
 let timers: number[] = [];
@@ -90,14 +91,32 @@ export function openHandoff(url: string, onBack: () => void) {
         timers.push(window.setTimeout(showStuck, 5000));
         return;
       }
+      // in a frame (an embed such as a sandboxed preview, which may not send the whole window
+      // anywhere): the site opens in a new tab, still on the visitor's click (a browser lets a page
+      // open one shortly after a click), and this page goes quietly back into the room behind it
+      let opened: Window | null = null;
+      try {
+        opened = window.open(url, '_blank');
+      } catch {
+        opened = null;
+      }
+      if (opened) {
+        try {
+          opened.opener = null;
+        } catch {
+          // a cross-origin window: nothing to cut
+        }
+        timers.push(window.setTimeout(onBack, 1200));
+        return;
+      }
       try {
         // allowed only where the embedding page lets this frame navigate it
         window.top!.location.href = url;
       } catch {
-        // refused: the link below does it, as a new tab
+        // refused as well: the link below is the way left
       }
       timers.push(window.setTimeout(showStuck, 1400));
-    }, 340),
+    }, 300),
   );
 }
 

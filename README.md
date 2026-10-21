@@ -8,7 +8,7 @@ Four episodes are built:
 - **Episode 01, Arrival**: Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
 - **Episode 02, City**: out of the station, down the boulevard towards the towers, and a stranger who wants your bag.
 - **Episode 03, Getaway**: past the man on the pavement to a Mercedes at the kerb, into the driver's seat, and away (hold D to rev).
-- **Episode 04, Home**: a back room full of surveillance screens; sit down at the big one and click it to go through to the real site, arianatmar.com.
+- **Episode 04, My Cave**: a back room full of surveillance screens; sit down at the big one and click it to go through to the real site, arianatmar.com.
 
 ![Arrival](docs/screens/01-arrival.png)
 
@@ -403,7 +403,7 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
     synthesised; recordings can be set as `src` on `carUnlock`, `carDoorOpen`, `carDoorClose`
     and `engineStart` in `src/audio/AudioDirector.ts`.
 
-## Episode 04: Home
+## Episode 04: My Cave
 
 The getaway's page turn opens on a dark back room: a curved wall of monitors on pillars, two
 operator chairs, a desk, cables everywhere. You cross the room, sit down in the central chair,

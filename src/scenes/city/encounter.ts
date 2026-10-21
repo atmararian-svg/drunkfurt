@@ -106,9 +106,10 @@ export function cityTimeScale(local: number) {
 interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
-    { at: BLOCK.hit1 - 0.03, kind: 'exhale1' },
+    // each exhale lands with its hit, layered on it
+    { at: BLOCK.hit1, kind: 'exhale1' },
     { at: BLOCK.hit1, kind: 'block' },
-    { at: BLOCK.hit2 - 0.04, kind: 'exhale2' },
+    { at: BLOCK.hit2, kind: 'exhale2' },
     { at: BLOCK.hit2, kind: 'punch' },
   ],
   knockedOut: [

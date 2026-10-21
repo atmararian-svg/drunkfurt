@@ -88,7 +88,7 @@ function lookAtScreen(local: number, pose: CameraPose) {
 export const homeEpisode: EpisodeDef = {
   id: 'home',
   number: 4,
-  title: 'Home',
+  title: 'My Cave',
   subtitle: 'The back room · 00:31',
   World: RoomScene,
   track: homeTrack,

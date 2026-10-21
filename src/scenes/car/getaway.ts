@@ -301,10 +301,16 @@ export function updateGetaway(dt: number) {
       if (audio.launchStart(SHIFT_AUDIO_OFFSET, late)) sound.launchPending = false;
     });
   }
-  // the synthesised engine is only the idle (and a stand-in for any recording that is not there):
-  // it steps aside while an accel recording or the launch's recordings play
-  const synth = ignited && !audio.revving && !audio.launching;
-  quietly(() => audio.engine(synth ? getaway.rpm : 0, launch_.rpm >= 0 ? 1 : getaway.held ? 1 : 0.15));
+  // the idle: the engine-default recording, once the start recording has played through, whenever
+  // the engine is on and nobody is on the throttle; it steps aside while an accel recording or the
+  // launch's recordings play. The synthesised engine only stands in if that recording is not there.
+  const idling = ignited && !audio.revving && !audio.launching && !getaway.held && launch_.rpm < 0;
+  quietly(() => {
+    if (!ignited) audio.engineOff();
+    else audio.idle(idling);
+    const synth = !audio.hasIdle && ignited && !audio.revving && !audio.launching;
+    audio.engine(synth ? getaway.rpm : 0, launch_.rpm >= 0 ? 1 : getaway.held ? 1 : 0.15);
+  });
   // sound follows all of this; none of it can hold the story up
 }
 
@@ -331,6 +337,7 @@ export function leaveGetaway() {
   sound.wasHeld = false;
   quietly(() => {
     audio.engine(0, 0);
+    audio.engineOff();
     audio.carStop(0.8);
   });
 }

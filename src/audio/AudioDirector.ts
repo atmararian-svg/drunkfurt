@@ -1,6 +1,9 @@
 import accel1Url from '../assets/audio/accel-1.mp3?url';
 import accel2Url from '../assets/audio/accel-2.mp3?url';
 import accel3Url from '../assets/audio/accel-3.mp3?url';
+import doorOpenUrl from '../assets/audio/door-open.mp3?url';
+import engineDefaultUrl from '../assets/audio/engine-default.mp3?url';
+import engineStartUrl from '../assets/audio/engine-start.mp3?url';
 import gearShiftUrl from '../assets/audio/gear-shift.mp3?url';
 import wheelsUrl from '../assets/audio/wheels.mp3?url';
 
@@ -46,14 +49,17 @@ export const cues = {
   accel3: { src: accel3Url, bus: 'body', gain: 0.95 },
   wheels: { src: wheelsUrl, bus: 'body', gain: 0.8 },
   gearShift: { src: gearShiftUrl, bus: 'body', gain: 0.95 },
-  // the rest of the getaway is synthesised until a recording is set here:
-  // carUnlock (central locking, two clacks), carDoorOpen, carDoorClose (a heavy, damped shut),
-  // engineStart (starter and catch, ~1 s), and engineLoop: a seamless loop of the engine
-  // recorded at ENGINE_LOOP_RPM under load; it is pitched by rpm (playbackRate = rpm / ENGINE_LOOP_RPM).
+  // the driver's door opening, the engine starting, and the engine idling (the supplied recordings):
+  // engineStart plays once at the ignition; when it has played through, engineIdle takes over and
+  // runs, seamlessly looped, whenever the engine is on and nobody is on the throttle
+  carDoorOpen: { src: doorOpenUrl, bus: 'sfx', gain: 0.85 },
+  engineStart: { src: engineStartUrl, bus: 'body', gain: 0.85 },
+  engineIdle: { src: engineDefaultUrl, bus: 'body', gain: 0.75 },
+  // still synthesised until a recording is set here: carUnlock (central locking, two clacks),
+  // carDoorClose (a heavy, damped shut), and engineLoop: a seamless loop of the engine recorded at
+  // ENGINE_LOOP_RPM under load, pitched by rpm (playbackRate = rpm / ENGINE_LOOP_RPM).
   carUnlock: { src: null, bus: 'sfx', gain: 0.7 },
-  carDoorOpen: { src: null, bus: 'sfx', gain: 0.8 },
   carDoorClose: { src: null, bus: 'sfx', gain: 0.9 },
-  engineStart: { src: null, bus: 'body', gain: 0.9 },
   engineLoop: { src: null, bus: 'body', loop: true, gain: 0.8 },
 } satisfies Record<string, CueDef>;
 
@@ -492,7 +498,18 @@ class AudioDirector {
   /** The starter turns it over, then the engine catches (the engine voice takes over from there). */
   engineStart() {
     const ctx = this.ctx;
-    if (!ctx || this.play('engineStart')) return;
+    if (!ctx) return;
+    const rec = this.buffers.has('engineStart') ? this.play('engineStart') : null;
+    if (rec) {
+      // an idle already running (the frame's order) gives way: it comes back when the start has played
+      this.idle(false);
+      this.starter = rec;
+      this.starterEnds = ctx.currentTime + rec.buffer!.duration;
+      rec.onended = () => {
+        if (this.starter === rec) this.starter = null;
+      };
+      return;
+    }
     const t = ctx.currentTime;
     const out = this.buses.get('body')!;
     const osc = ctx.createOscillator();
@@ -621,6 +638,93 @@ class AudioDirector {
     };
   }
 
+
+  // -------------------------------------------------------------------------
+  // the engine's own recordings: the start, then the idle
+
+  private starter: AudioBufferSourceNode | null = null;
+  private starterEnds = 0;
+  private idleState: { out: GainNode; next: number; parts: AudioBufferSourceNode[] } | null = null;
+
+  /** The idle recording is decoded (otherwise the synthesised engine stands in for it). */
+  get hasIdle() {
+    return this.buffers.has('engineIdle');
+  }
+
+  /**
+   * The engine idling, the engineIdle recording: called every frame with whether it should sound
+   * (engine on, no throttle, no launch). It starts only once engineStart has played through, and
+   * loops without a seam: the file is laid end to end in overlapping copies, each faded in and
+   * out over 80 ms, scheduled half a second ahead. Off, it fades out over a quarter second.
+   */
+  idle(on: boolean) {
+    const ctx = this.ctx;
+    const buffer = this.buffers.get('engineIdle');
+    if (!ctx || !buffer || ctx.state !== 'running') return;
+    const t = ctx.currentTime;
+    if (!on) {
+      if (!this.idleState) return;
+      const st = this.idleState;
+      this.idleState = null;
+      st.out.gain.cancelScheduledValues(t);
+      st.out.gain.setValueAtTime(st.out.gain.value, t);
+      st.out.gain.linearRampToValueAtTime(0, t + 0.25);
+      for (const p of st.parts) {
+        try {
+          p.stop(t + 0.3);
+        } catch {
+          // already stopped
+        }
+      }
+      return;
+    }
+    if (!this.idleState) {
+      // after the starter (a moment's overlap, so there is no gap), or now
+      const at = Math.max(t, this.starter ? this.starterEnds - 0.08 : t);
+      const out = ctx.createGain();
+      out.gain.setValueAtTime(0, t);
+      out.gain.setValueAtTime(0, at);
+      out.gain.linearRampToValueAtTime((cues.engineIdle as CueDef).gain ?? 1, at + (this.starter ? 0.08 : 0.25));
+      out.connect(this.buses.get('body')!);
+      this.idleState = { out, next: at, parts: [] };
+    }
+    const st = this.idleState;
+    const TRIM = 0.03;
+    const FADE = 0.08;
+    const length = buffer.duration - 2 * TRIM - FADE;
+    while (st.next < t + 0.5) {
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const g = ctx.createGain();
+      const a = st.next;
+      g.gain.setValueAtTime(0, a);
+      g.gain.linearRampToValueAtTime(1, a + FADE);
+      g.gain.setValueAtTime(1, a + length);
+      g.gain.linearRampToValueAtTime(0, a + length + FADE);
+      src.connect(g).connect(st.out);
+      src.start(a, TRIM);
+      src.stop(a + length + FADE + 0.01);
+      src.onended = () => {
+        st.parts = st.parts.filter((p) => p !== src);
+      };
+      st.parts.push(src);
+      st.next = a + length;
+    }
+  }
+
+  /** The engine is off (the scroll went back before the ignition, or the scene ended): the starter and the idle stop. */
+  engineOff() {
+    if (!this.ctx) return;
+    this.idle(false);
+    if (this.starter) {
+      try {
+        this.starter.stop(this.ctx.currentTime + 0.05);
+      } catch {
+        // already stopped
+      }
+      this.starter = null;
+    }
+  }
 
   // -------------------------------------------------------------------------
   // the getaway's recordings
