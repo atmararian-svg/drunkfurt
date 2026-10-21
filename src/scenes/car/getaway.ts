@@ -114,21 +114,27 @@ export function launchAt(local: number) {
 export const PARK = { x: 3.95, z: -29.3 };
 /** The lane it pulls out into (the right-hand driving lane, as the city's traffic uses it). */
 export const LANE_X = 1.75;
-/** It is in the lane after this many metres (clear of the next parked car, 16.7 m ahead). */
-const PULL_OUT = 13;
+/** It is in the lane after this many metres (the next parked car is 16.7 m ahead). */
+const PULL_OUT = 15;
+/** The rear axle, behind the model's origin (m). */
+const REAR_AXLE = 1.46;
 
 /**
  * The car on the road after s metres of its launch: it pulls out of the
  * parking lane into the driving lane along a smooth S, then runs straight down
- * the boulevard. Heading 0 = towards the towers (-z).
+ * the boulevard. As a real car does, it steers about its rear axle: the S is
+ * the rear axle's path and the car points along it, so the tail does not swing
+ * out over the kerb. Heading: the model faces +z, so π is towards the towers.
  */
 export function carAt(s: number) {
   const u = clamp(s / PULL_OUT, 0, 1);
-  const k = smoothstep(u);
-  const x = PARK.x + (LANE_X - PARK.x) * k;
+  const x = PARK.x + (LANE_X - PARK.x) * smoothstep(u);
   // heading from the slope of the S (dx/ds), so it never slides sideways
   const slope = s < PULL_OUT ? ((LANE_X - PARK.x) * 6 * u * (1 - u)) / PULL_OUT : 0;
-  return { x, z: PARK.z - s, yaw: Math.PI - Math.atan(slope) };
+  const yaw = Math.PI - Math.atan(slope);
+  // the rear axle on the S; the model's origin is ahead of it along the heading
+  const zAxle = PARK.z + REAR_AXLE - s;
+  return { x: x + Math.sin(yaw) * REAR_AXLE, z: zAxle + Math.cos(yaw) * REAR_AXLE, yaw };
 }
 
 /** What is holding the throttle: the D key, a press on the tachometer. */

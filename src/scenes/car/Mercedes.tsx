@@ -64,9 +64,13 @@ export function Mercedes() {
     };
   }, [active]);
 
-  useFrame((_, rawDt) => {
+  const clock = useRef(0);
+  useFrame(() => {
     const local = localProgress('car');
-    const dt = Math.min(rawDt, 0.1);
+    // the revs run on the wall clock, so the climb takes the same time at any frame rate
+    const now = performance.now();
+    const dt = clock.current ? Math.min((now - clock.current) / 1000, 0.25) : 0;
+    clock.current = now;
     // where it is: parked, or on its launch
     const run = launchAt(local);
     const at = carAt(run.s);

@@ -59,8 +59,9 @@ function palette3() {
     chrome: std({ color: '#c4c3bd', roughness: 0.2, metalness: 0.85 }, { halftone: 0 }),
     tyre: std({ color: '#111111', roughness: 0.95 }, { halftone: 0 }),
     rim: std({ color: '#8e8d88', roughness: 0.3, metalness: 0.7 }, { halftone: 0.3 }),
-    glass: new MeshStandardMaterial({ color: '#16181b', roughness: 0.05, metalness: 0.4, transparent: true, opacity: 0.42, depthWrite: false, side: DoubleSide }),
-    lampGlass: new MeshStandardMaterial({ color: '#d9dbde', roughness: 0.05, transparent: true, opacity: 0.16, depthWrite: false }),
+    // tinted glass; rough enough that a street lamp does not print as a hard white dot on it
+    glass: new MeshStandardMaterial({ color: '#16181b', roughness: 0.45, metalness: 0.1, transparent: true, opacity: 0.4, depthWrite: false, side: DoubleSide }),
+    lampGlass: new MeshStandardMaterial({ color: '#d9dbde', roughness: 0.4, transparent: true, opacity: 0.14, depthWrite: false }),
     housing: std({ color: '#7d7d79', roughness: 0.25, metalness: 0.8 }, { halftone: 0 }),
     leather: std({ color: '#1d1c1b', roughness: 0.75 }, { halftone: 0.45 }),
     cabin: std({ color: '#2b2a29', roughness: 0.6 }, { halftone: 0.4 }),
