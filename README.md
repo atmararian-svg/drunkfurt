@@ -466,6 +466,10 @@ you into the screen and out of the story, onto the real site.
   taken over after 1.4 s (5 s for a normal page), a panel offers "Open arianatmar.com" (a real
   link, new tab) and "Back to the room" (the camera moves back out, the prompt returns). Coming
   back to the page from the browser's history restores the room as before the click.
+  What is matched is our side of the cut: the camera's last frame and the overlay image (the
+  print treatment lifts during the move, and the two measured 2/255 apart on average in a test
+  at 960 × 540). After that the browser loads the site, which opens on its own intro (a white
+  page with "Arian — Atmar") before its home page; that part is the site's, not this page's.
 - **Sound**: the city's rumble, low and muffled, as if through walls.
 
 ## What is in Episode 1
