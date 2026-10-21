@@ -3,12 +3,14 @@
 A scroll-driven, first-person 3D comic set in Frankfurt am Main at night.
 DRUNKFURT is the name of the experience and its fictional world; Frankfurt am Main is the real
 setting, so real places and railway signage keep their real names.
-Four episodes are built:
+Three chapters are built (four episodes):
 
-- **Episode 01, Arrival**: Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
-- **Episode 02, City**: out of the station, down the boulevard towards the towers, and a stranger who wants your bag.
-- **Episode 03, Getaway**: past the man on the pavement to a Mercedes at the kerb, into the driver's seat, and away (hold D to rev).
-- **Episode 04, My Cave**: a back room full of surveillance screens; sit down at the big one and click it to go through to the real site, arianatmar.com.
+- **Chapter 1, Arrival** (episode 01): Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
+- **Chapter 2, Night City** (episodes 02 and 03): out of the station, down the boulevard towards the
+  towers, a stranger who wants your bag; then past him to a Mercedes at the kerb, into the
+  driver's seat, and away (press D to rev).
+- **Chapter 3, The Cave** (episode 04): a back room full of surveillance screens; sit down at the
+  big one and click it, or a project on it, to go through to the real site, arianatmar.com.
 
 ![Arrival](docs/screens/01-arrival.png)
 
@@ -37,6 +39,61 @@ Progress is damped so scrolling feels like moving a dolly. Footstep bob appears 
 the camera is travelling. Scroll also drives events: in Episode 1 a traveller crosses in
 front of you and the train door slides shut behind you, both scrubbing backwards when you
 scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) runs on time.
+
+## Chapters, preloader and transitions
+
+Chapters (`src/core/chapters.ts`) are what the visitor sees: what the preloader loads, what the
+title cards announce, what going back restarts. Chapter 2 holds two episodes (the encounter and
+the getaway play on one street, without a cut). Titles and metadata are the Figma design's
+(file "Drunkfurt": Chapter-1…3).
+
+- **Preloader** (`src/ui/Preloader.tsx`, Figma Preloader-Start → Preloader-Final): top left
+  LOADING CHAPTERS (then READY); top right the chapters, the one loading at the right edge,
+  decoding, then resolving and stepping left when it is really ready; centre "Once upon a time
+  in" with its dots counting one, two, three; along the bottom FRANKFURT, revealed letter by
+  letter (a staggered, eased reveal with seeded irregularity, each letter rising and fading in
+  through a few stand-in glyphs), over which "Drunk" is written in red: the design's own brush
+  path (decoded from the .fig file's vector network, `src/ui/drunkStroke.ts`), five pen strokes
+  drawn on along their length (`stroke-dashoffset`) left to right, the pen speeding and slowing
+  and lifting between letters, as far as the loading has got. The page is the comic's print in
+  CSS: near-black with a fine halftone and paper grain, and under the pointer a denser screen
+  shows through a feathered circle (CSS variables, no re-render, gone when the pointer leaves).
+- **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
+  station no longer waits for the street's models) and a marker after it that reports when
+  everything in it has loaded and drawn twice; a world that fails is caught by its own error
+  boundary and its chapter reported as failed. Chapter 3's assets (the room and its picture)
+  start loading once chapter 2 is in, and are reused by its world. The preloader waits for
+  chapter 1 without limit (if it fails, it says so and stays); chapters 2 and 3 get 25 s after
+  chapter 1 before the story starts anyway (they go on loading behind it).
+- **Transitions between chapters** (`src/ui/chapterTransition.ts`, `src/ui/reveal.ts`), after
+  the supplied "parallax reveal" (Framer Motion variants, done with the Web Animations API):
+  when the progress reaches the end of a chapter, the frame on screen is copied (at the end of
+  the next frame, after the composer has drawn it: `render/FrameGrab.tsx`), the copy is laid
+  over the page, the next chapter is reset and cut to, and once its world has drawn a few frames
+  the copy drifts up 20% and shrinks to 95% while the new chapter is uncovered from the bottom
+  edge and slides up from half a screen below, on one curve (1.25 s, cubic-bezier(0.76, 0,
+  0.24, 1)). Going back the directions mirror. The preloader leaves into chapter 1 the same
+  way. It cannot be interrupted or started twice, every wait in it has a time limit, and clicks
+  are ignored while it plays.
+- **Going back restarts the chapter**: scrolling back across a chapter's start does not land on
+  the previous chapter's last shot but on its beginning, with every episode in it reset
+  (`EpisodeDef.reset`: the encounter, the getaway, the screen); entering a chapter forwards
+  resets it as well. Within a chapter, scrolling back works as before.
+- **Title cards** (`src/ui/titleCards.ts`, Figma Example-chapter-1…3): a frosted glass panel in
+  the bottom-left corner, tilted 6°, with the chapter's title and its two label lines. It slides
+  in from the left at the chapter's start (after the transition), holds 3.4 s from when it has
+  arrived, and slides back out; showing one stops any other.
+- **Fonts**: the design's Berthold Akzidenz Grotesk Bold Extended is not available as a web font;
+  Archivo at its widest and heaviest (Google Fonts) stands in for it. JetBrains Mono is the
+  design's own label face.
+- **Narration panels and decoding text** (`src/ui/decode.ts`): captions are printed panels now
+  (off-white, or charcoal with a thin yellow rule for the ones that matter, both with the print's
+  halftone and grain), no tape. Their text, the title cards' and the preloader's are split once
+  into words of grapheme clusters (Intl.Segmenter); moving the pointer over them decodes a small
+  zone: the letter nearest the pointer most, its neighbours less, by measured distance (variable
+  widths, wrapped lines); off the text everything resolves. Stand-in glyphs are drawn over each
+  letter while it stays in place, hidden, so the layout never moves; a hidden copy of the text is
+  what assistive technology reads. Touch pointers are ignored.
 
 ## People in the station
 
@@ -261,13 +318,18 @@ built from.
     waits until the entry is clear.
   - A third car comes up the boulevard and turns into the cross street, crossing one car's lane
     and merging into another's, so the junction gets real give-way traffic.
-- **Fight sounds** are distinct sounds, each timed to its contact:
+- **Fight sounds** are the supplied recordings for the defended fight: `hits.mp3` ("Удары": the
+  two hits, at 0.925 and 1.165 s of the file) and `exhales.mp3` ("Выдохи": two exhales, at 0.87
+  and 1.15 s). Each sound is played as its own slice of its file, started so its transient falls
+  30 ms after its cue; each exhale is cued with its hit, so the two land together. The first hit
+  is recorded much quieter and is raised to sit with the second. The knockout's sounds are still
+  synthesised. In detail:
   - in the dark of a defence, a dull, bony knock with BAM!, then a hard crack with a deep thump
     with WHAM!; each exhale is laid over its hit, at the same moment;
   - on a knockout: his exhale, a heavy hit, a ringing ear and the body hitting the ground.
 
-  Each is synthesised unless a recording is supplied: add files to `public/audio/` and set
-  `src` on the `fight*` cues in `src/audio/AudioDirector.ts`.
+  The knockout's sounds take a recording as `src` on their `fight*` cue in
+  `src/audio/AudioDirector.ts`.
 - **Looking around** with the mouse also moves your head a few centimetres, sideways and up or
   down, so nearby objects shift against the background. The head stays inside a small invisible
   ellipsoid, and each episode can clamp it further (`clampHead`), so the camera never clips into
@@ -277,13 +339,17 @@ built from.
     tyre noise from passing cars (panned), two impacts and a slow heartbeat at the climax.
   - The ambience thins and muffles (a low-pass sweep) as the stranger approaches.
   - A "Sound on/off" switch sits top right.
-- **Transitions**: brush-stroke wipes are drawn on a canvas (`ui/brush.ts`). They are ragged
-  black strokes with bristle tips, not a fade, and they close an episode, carry its title and
-  open the next one.
-  - The hand-over between episodes plays by itself (`pageTurns` in `core/timeline.ts`): once
-    the progress enters it, it is carried to the far side in the direction you were scrolling
-    (on to the next episode's first shot, or back to the last shot of the one before) in about
-    3 s, and scrolling cannot stop it halfway. You never have to scroll a wipe open or shut.
+- **Ink**: the brush-stroke black (`ui/brush.ts`) is used for the fight (the page goes dark
+  before the hits). Moving between chapters is the chapter transition (above).
+- **The flicker at the chapter's start**, fixed at its cause: the two corner blocks facing the
+  square were placed from the kerb line (x = ±9.5) like the boulevard's blocks, and overlapped
+  the first boulevard blocks over z −25…−41, so their fronts, shopfronts and cornices lay in the
+  same planes and z-fought, flickering right ahead of the camera as the chapter opened; and every
+  block's two cornices overhung its ends, so at each junction two cornices at the same height
+  overlapped in the same planes. The corner blocks now stand behind the boulevard blocks (from
+  x = ±25.5, with a different roofline from their neighbour), and the cornices stand out only to
+  the front and back. Measured frame to frame at the chapter's opening shot, the large solid
+  flickering area on the left-hand shopfront is gone; nothing else in the city was changed.
 
 ## Episode 03: Getaway
 
@@ -302,7 +368,7 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
 | 0.40–0.47 | the driver's door opens |
 | 0.47–0.60 | into the car: you duck under the roof line, through the door opening, and sit, turning to face the windscreen |
 | 0.60–0.66 | the door shuts; 0.645 the cluster lights and the engine starts; your eyes drop to the cluster |
-| 0.66 | the story waits: hold D to rev |
+| 0.66 | the story waits: press D to rev |
 | after 6,000 rpm | by itself, without stopping: the launch through three gear changes (8.6 s, the rush in its last two seconds), the ink closing, the next page |
 
 - **The car** is the supplied Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`, 2.2 MB),
@@ -347,21 +413,24 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   car's own frame: they keep clear of the man, stand clear of the door's swing, and pass under
   the door opening's top below the roof line. All of it, door and lights included, is a
   function of the scroll, so scrolling back plays it backwards.
-- **The rev** (`getaway.ts`): once you sit and the engine idles at 800 rpm, the page holds at a
-  gate, your eyes drop to the cluster (the camera tilts down and narrows its view so the dials
-  read through the wheel), and a small card says what to do: hold D. The revs climb about
-  1,500 + 0.35 × rpm per second (two seconds to the line on the wall clock, the same at any
-  frame rate); let go and they fall back to idle smoothly. One listener pair (keydown, keyup)
-  is set while the episode is active and removed when it leaves; the key is released when the
-  window loses focus or the page is hidden; D does nothing else. On a touch screen, press and
-  hold the card.
+- **The rev** (`getaway.ts`, `REV_SEQUENCE`): once you sit and the engine idles at 800 rpm, the
+  page holds at a gate, your eyes drop to the cluster, and a small card says: press D. The first
+  press starts one four-second sequence on the wall clock, on the key event itself (a tap shorter
+  than a frame is not lost): four presses of the throttle, one a second (at 0, 1, 2 and 3 s), the
+  pedal going down quickly and most of the way back up each time (the fourth stays down), the
+  needle climbing with each (peaks of about 3,000, 3,900 and 4,900, sagging between, eased in and
+  out), and at 4 s, at 6,000 rpm, the launch. Once started it plays to the end by itself:
+  letting go of D does not stop it, holding or pressing again does not start another (key
+  repeats are ignored). The card turns into four marks that light one a second and the pedal's
+  travel; the car's own throttle pedal moves, and each blip rocks the car a little on its
+  springs. Scrolling back off the seat cancels it. On a touch screen, press the card.
 - **The launch** (at 6,000 rpm, once): `launch()` clears `armed` (so it cannot fire again and D
   is ignored from then on), opens the gate, and starts one scripted move of the page, locked,
   from the gate through the page turn to the next page. Everything after the threshold is that
   one timeline: the car pulls out about its rear axle along an S into the driving lane and
   accelerates (about 11 m/s² off the line, easing through the gears, with the gear changes on
   the recording's), then the rush: the speed builds towards 180 km/h, comic speed lines stream
-  in from the edges and the view widens; then the ink closes and the next page (Episode 04, the room) opens. The car's place is only ever set from that progress, by one component.
+  in from the edges and the view widens; then the chapter transition to chapter 3. The car's place is only ever set from that progress, by one component.
   Checked in a node test along the whole route: it clears the kerb by at least 10 cm and the
   parked cars by 36 cm. The car that would turn into its lane is kept off the street.
 - **Why it used to stall**, fixed: (1) the launch's scripted move ended exactly on the first
@@ -379,12 +448,13 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   0.63) and the launch is forgotten: the gate closes, the engine stops and you rev again next
   time. Nothing before the rev reads `launched`, so no earlier position can show a launched car.
 - **Sound**: the supplied recordings (`src/assets/audio/`, used as they are):
-  - `accel-1.mp3` (3.1 s), `accel-2.mp3` (6.3 s), `accel-3.mp3` (4.1 s): single throttle blips,
-    each a rise and its fall. They are one-shots, not loops: each press of D plays one of them
-    once (not per frame), a little into the file if the revs are already up. They come from a
-    shuffled bag, refilled when empty and never starting with the one that just played, so the
-    order changes and the same one never plays twice in a row. A new press fades the previous
-    one out in 60 ms first (never two at once); letting go fades it with the needle (0.45 s).
+  - The rev sequence is only `aggressive-supercar-engine.mp3` (9.02 s, 48 kHz, stereo): four
+    throttle blips, the revs rising from about 0.62, 1.80, 2.70 and 3.85 s of the file (peaks at
+    1.30, 2.25, 3.35 and 4.30 s), then falling back to idle. Each blip is played as its own slice
+    of the file, started exactly on its press (0, 1, 2, 3 s) with 80 ms crossfades, so sound,
+    pedal and needle keep time; the last runs on into the launch, which fades it out (0.4 s) as
+    its own recordings take over. One sequence, never looped. (The earlier accel-1/2/3 recordings
+    are no longer used and were removed.)
   - At the launch, once: `wheels.mp3` (2.3 s, the tyres breaking traction) and
     `gear-shift.mp3` (35.5 s) from 3.00 s into the file. Its gear changes (4.30, 7.30 and
     10.45 s in the file) fall 1.30, 4.30 and 7.45 s after the launch, and the launch is timed on
@@ -402,15 +472,13 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
     recording (`engine-start.mp3`, 2.9 s) plays through; then the engine-default recording
     (`engine-default.mp3`) idles whenever the engine runs and nobody is on the throttle. It is
     looped without a seam (overlapping copies, 80 ms crossfades, scheduled half a second ahead),
-    gives way to the accel recordings and the launch and comes back after them, and stops if the
+    gives way to the rev sequence and the launch and comes back after them, and stops if the
     scroll goes back before the ignition. The synthesised engine is only a stand-in if the idle
     recording cannot be decoded. The central locking and the door shutting are still synthesised
     (`carUnlock`, `carDoorClose` in `src/audio/AudioDirector.ts` take a recording as `src`).
-  - Going back from Episode 04 does not land after the launch: the ink closes and the page cuts
-    back to the moment you sit in the car (`reentry` on the car's span in `core/timeline.ts`),
-    so the launch is played again, not rewound.
+  - Going back from chapter 3 restarts chapter 2 from its beginning (see Chapters above).
 
-## Episode 04: My Cave
+## Episode 04: The Cave (chapter 3)
 
 The getaway's page turn opens on a dark back room: a curved wall of monitors on pillars, two
 operator chairs, a desk, cables everywhere. You cross the room, sit down in the central chair,
@@ -454,34 +522,50 @@ you into the screen and out of the story, onto the real site.
   the room, right of the chair; 0.5 at its side; 0.5–0.66 turning in and lowering
   (1.65 → 1.155 m); 0.66–0.72 the settle (a 3.5 cm dip, then upright, eyes up to the screen).
   At 0.76 the story waits (a gate that never opens: the story ends here) with one caption,
-  "Click the big screen", and the credits.
+  "Click the screen, or a project on it", and the credits.
 - **Hover**: each frame the pointer is picked against the picture's own plane (not the bezel or
   the room). Over it, the camera leans 30 cm towards the screen and narrows 3°, and the picture
-  comes up to 97 %; away, it eases back (damped, about a second either way).
+  comes up to 97 %; away, it eases back (damped, about a second either way). Over a project card
+  (or About / All works in the picture's navigation) that link is marked with a faint yellow wash.
+- **Links** (`SCREEN_LINKS` in `monitor.ts`): the six project cards lead to their pages on the
+  real site (`/case/razed-mods`, `/case/som-power`, `/case/som`, `/case/the-performance-lab`,
+  `/case/kanoi`, `/case/the-luxe-week`, read from the site's own links), About and All works to
+  theirs; anywhere else on the picture leads to the home page. The address is taken from the
+  click's point on the picture (its texture coordinates), not from the site.
 - **Click** (`monitor.ts`): only on the picture (a click on the room does nothing; Enter also
   works). From then on: the page is pinned (`pinScroll`: wheel, touch and scroll keys are
   swallowed, the scroll position is held), the prompt and the printed matter go, the
   look-around and head motion let go (`CameraPose.still`), and the camera moves 1.8 s straight
   into the screen, square to it, to the distance where the picture covers the viewport exactly
   (cover-fit at a 40° field of view: its height fills the frame, or on a viewport wider than
-  16:9 its width). Repeated clicks are ignored.
-- **Hand-over** (`src/ui/siteHandoff.ts`): as the camera arrives, the same image is laid over the
-  whole page as a plain `<img>` (object-fit: cover, centred: the same crop the camera has) and
-  faded in over 0.3 s, then the browser goes to `https://www.arianatmar.com/`. No iframe of the
-  site is used. Opened as a page of its own, that is a normal navigation in the same tab. Inside a
-  frame that may not navigate the window (a sandboxed embed such as the artifact preview), the
-  site opens in a new tab at the end of the move (`window.open`, still counted as the visitor's
-  click) and the page goes back into the room behind it. Only if the browser refuses that as well
-  (some browsers allow it for about a second after a click only, and the move takes 1.8 s) does a
-  panel offer "Open arianatmar.com" (a real link) and "Back to the room". Coming
-  back to the page from the browser's history restores the room as before the click.
-  What is matched is our side of the cut: the camera's last frame and the overlay image (the
-  print treatment lifts during the move, and the two measured 2/255 apart on average in a test
-  at 960 × 540). After that the browser loads the site, which opens on its own intro (a white
-  page with "Arian — Atmar") before its home page; that part is the site's, not this page's.
+  16:9 its width). Repeated clicks are ignored; once clicked, the hover lean is held, so it
+  cannot pull against the move.
+- **White-out and hand-over** (`src/ui/siteHandoff.ts`): camera, white and navigation run on one
+  clock, the move's own (wall clock from the click). The white is an animation scheduled on it:
+  it begins at 50% of the move and is complete at 80% (eased, so it reads as the screen's light
+  flooding the view); at that 80% mark a timer sends the browser to the page that was clicked,
+  with the white forced complete first, and the white stays while the browser goes. Opened as a
+  page of its own, that is a normal navigation in the same tab. Inside a frame that may not
+  navigate the window (a sandboxed embed such as the artifact preview), the page opens in a new
+  tab at that moment (`window.open`, still counted as the visitor's click), and this page fades
+  back from white into the room. Only if the browser refuses that as well (some browsers allow it
+  for about a second after a click only, and the 80% mark is at 1.44 s) is a link to the page
+  shown on the white, with "Back to the room". Coming back from the browser's history restores
+  the room as before the click. No frame of the site is embedded and nothing of it is read.
+  After the navigation the browser loads the site, which opens on its own white intro ("Arian —
+  Atmar") before the page; that part is the site's.
 - **Sound**: the city's rumble, low and muffled, as if through walls.
 
 ## What is in Episode 1
+
+- **Sound**: the night station, restrained (`AudioDirector.stationBed`): the air of a big glass
+  hall (two bands of soft noise, slowly breathing), the mains hum of its lights (50 Hz and
+  harmonics, very quiet), and every 14–30 s, far off and smeared by a 3.5 s hall echo, the
+  station gong with an announcement nobody could make out, or a train's air brakes on another
+  platform. There is no station recording in the project, so this is synthesised; a recorded,
+  seamlessly looping ambience set as `src` on the `stationAmbience` cue replaces it. It rises
+  when the chapter is on screen and sound is allowed, thins towards the chapter's end, and is
+  released when the chapter is left (`stationStop`), so revisiting never starts a second one.
 
 - **Station**: a barrel-vaulted train shed modelled on the Hbf's 19th-century halls: lattice arch
   ribs on masonry piers, purlins, glazed vault, glazed gable apron at the open end, three halls
@@ -520,6 +604,7 @@ src/
     cameraTrack.ts        keyframed camera path (scroll- or time-driven)
     sequence.ts           camera key types, ShotPlayer for time-driven beats
     store.ts              coarse UI state (loading/ready, active episode)
+    chapters.ts           the three chapters (episodes, titles, metadata) and their readiness
     geometry.ts, math.ts  sweeps, batching, damping, easing, RNG
   episodes/
     types.ts              EpisodeDef: World, track, captions, beats
@@ -531,13 +616,20 @@ src/
     comic.ts              tonal bands, halftone, hatching (material patch)
     ink.ts                ink buffer material + ink line effect
     Stylizer.tsx          classifies meshes, renders the ink buffer, composer
-  ui/Overlay.tsx          title panel, captions, episode rail, wipe, outro
-  ui/RevPrompt.tsx        episode 3's one instruction (hold D); the dials are on the car's cluster
+    FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
+  ui/Overlay.tsx          title cards, captions, chapter rail, ink, prompts, credits
+  ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
+  ui/chapterTransition.ts chapter changes: copy, reset, cut, parallax reveal, title card
+  ui/reveal.ts            the parallax reveal (after the supplied transition code)
+  ui/titleCards.ts        the glass chapter cards, in and out
+  ui/decode.ts            decoding text: reveal, loading loop, pointer zone
+  ui/drunkStroke.ts       the "Drunk" brush path from the Figma file
+  ui/RevPrompt.tsx        the getaway's one instruction (press D) and its four throttle marks
   scenes/station/         Episode 1: episode.ts (track, captions, beats) + the world
   scenes/city/            Episode 2: the street, the stranger, the encounter
   scenes/car/             Episode 3: the Mercedes (carRig.ts), its beats, rev and launch (getaway.ts)
   scenes/home/            Episode 4: the room, the big display, the click into the site (monitor.ts)
-  ui/siteHandoff.ts       the picture laid over the page, then the navigation to the site
+  ui/siteHandoff.ts       the white-out and the navigation to the clicked page
 tools/                    asset conversion (FBX → GLB, textures) and the walk-cycle bake
 ```
 
@@ -566,6 +658,12 @@ wipe opens.
   2.2 MB) and the instrument-cluster illustration (`src/assets/cluster.svg`, adapted from
   "car dashboard UI illustration" by Vecteezy, free licence, which asks for the credit
   "Vecteezy.com": it is in the credits), all supplied by the project owner (see Episode 03).
+- **Supplied audio** (`src/assets/audio/`, all from the project owner): `hits.mp3` and
+  `exhales.mp3` (the fight), `aggressive-supercar-engine.mp3` (the rev sequence), `wheels.mp3`,
+  `gear-shift.mp3` (the launch), `door-open.mp3`, `engine-start.mp3`, `engine-default.mp3` (the
+  car). Not supplied: a night-station ambience (synthesised until one is added).
+- **Design** (Figma file "Drunkfurt", supplied): the preloader, the chapter cards and the handwritten
+  "Drunk" path were taken from it (decoded from the .fig with kiwi-schema).
 - **Episode 04**: the room is "Surveillance room" by wa_rouk
   (https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304), under
   the Sketchfab Standard licence according to the file's own metadata; it was supplied by the
