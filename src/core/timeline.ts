@@ -13,12 +13,18 @@ export interface EpisodeSpan {
   id: EpisodeId;
   /** Scroll length in viewport heights. */
   length: number;
+  /**
+   * Picks up the previous episode's last shot without a page turn: no ink
+   * closes over the previous episode's end or opens over this one's start.
+   */
+  seamless?: boolean;
 }
 
 /** Built episodes, in order. Add the next ones here as they are made. */
 export const EPISODE_SPANS: EpisodeSpan[] = [
   { id: 'station', length: 9 },
   { id: 'city', length: 11 },
+  { id: 'car', length: 8, seamless: true },
 ];
 /** Scroll after the last episode, for the "to be continued" card. */
 export const OUTRO_LENGTH = 1.2;
@@ -101,6 +107,11 @@ function pageTurns(): PageTurn[] {
     const next = start + len;
     const last = i === EPISODE_SPANS.length - 1;
     // where the ink starts to close (as in the overlay), and where it has opened on the next shot
+    if (!last && EPISODE_SPANS[i + 1].seamless) {
+      // the next episode continues this one's shot: no page to turn
+      start = next;
+      return;
+    }
     const close = start + len * (e.id === 'city' ? 0.978 : 0.955);
     const open = last ? next + (1 - next) * 0.2 : next + (EPISODE_SPANS[i + 1].length / TOTAL_LENGTH) * 0.12;
     turns!.push({ from: close, to: open, seconds: last ? 2.2 : 3.4 });

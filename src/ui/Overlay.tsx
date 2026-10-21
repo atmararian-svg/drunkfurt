@@ -6,6 +6,11 @@ import { EPISODE_SPANS, episodeRange, gateLimit, locate, scrollToProgress, timel
 import { PLANNED, builtEpisodes } from '../episodes';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout } from './brush';
+import { Tachometer } from './Tachometer';
+
+/** An episode that picks up the previous one's last shot, with no page turn between them. */
+const seamless = (id: string) => !!EPISODE_SPANS.find((e) => e.id === id)?.seamless;
+const nextOf = (id: string) => EPISODE_SPANS[EPISODE_SPANS.findIndex((e) => e.id === id) + 1];
 
 /** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
 function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
@@ -13,8 +18,8 @@ function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
   if (id === 'outro') return { w: 1, mode: 'close' };
   // the city's last shot (the aftermath) holds longer before the page turns
   const end = id === 'city' ? 0.978 : 0.955;
-  if (local > end) return { w: (local - end) / (1 - end), mode: 'close' };
-  const first = EPISODE_SPANS[0].id === id;
+  if (local > end && !nextOf(id)?.seamless) return { w: (local - end) / (1 - end), mode: 'close' };
+  const first = EPISODE_SPANS[0].id === id || seamless(id);
   if (!first && local < 0.045) return { w: 1, mode: 'open' };
   if (!first && local < 0.12) return { w: 1 - (local - 0.045) / 0.075, mode: 'open' };
   if (id === 'city' && encounter.outcome) {
@@ -81,9 +86,11 @@ export function Overlay() {
       titles.forEach((t) => {
         const i = episodes.findIndex((e) => e.id === t.dataset.ep);
         const own = t.dataset.ep === id && local < (i === 0 ? 0.09 : 0.13);
-        const handover = i > 0 && episodes[i - 1].id === id && local > 0.975;
+        // over the ink of a page turn; an episode that continues the last shot shows its title over the scene
+        const inked = i > 0 && !seamless(t.dataset.ep!);
+        const handover = inked && episodes[i - 1].id === id && local > 0.975;
         t.classList.toggle('is-on', own || handover);
-        t.classList.toggle('on-ink', i > 0);
+        t.classList.toggle('on-ink', inked);
       });
       fill.style.transform = `scaleY(${p})`;
       cue.classList.toggle('is-on', p < 0.004);
@@ -127,6 +134,8 @@ export function Overlay() {
         defend();
         return;
       }
+      // revving is done by holding D (or the tachometer), not by clicking on
+      if (story.getState().prompt === 'rev') return;
       const { id, local } = locate(timeline.target);
       const ep = episodes.find((e) => e.id === id);
       if (!ep) return;
@@ -143,7 +152,7 @@ export function Overlay() {
     };
     const onClick = (e: MouseEvent) => {
       unlock();
-      if ((e.target as HTMLElement).closest('a,button')) return;
+      if ((e.target as HTMLElement).closest('a,button,.tach')) return;
       next();
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -220,6 +229,8 @@ export function Overlay() {
       </button>
 
       <canvas className="impact" aria-hidden />
+
+      <Tachometer prompt={prompt} />
 
       <div className="cue">
         <span>Scroll</span>

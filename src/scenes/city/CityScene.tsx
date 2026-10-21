@@ -3,8 +3,9 @@ import { useEffect, useMemo } from 'react';
 import { audio } from '../../audio/AudioDirector';
 import { createCrowd } from '../../characters/crowd';
 import { People } from '../../characters/People';
-import { clamp } from '../../core/math';
+import { clamp, smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
+import { Mercedes } from '../car/Mercedes';
 import { Buildings } from './Buildings';
 import { Cars } from './Cars';
 import { CITY_PEOPLE } from './cast';
@@ -16,7 +17,12 @@ import { Bag, Stranger, StrangerBoundary } from './Stranger';
 import { Street } from './Street';
 import { StreetFurniture } from './StreetFurniture';
 
-const timeScale = () => cityTimeScale(localProgress('city'));
+/** The city's clock: the encounter's slow motion, then, as you walk to the car (episode 3), back to normal. */
+const timeScale = () => {
+  const car = localProgress('car');
+  if (car <= 0) return cityTimeScale(localProgress('city'));
+  return cityTimeScale(1) + (1 - cityTimeScale(1)) * smoothstep(clamp(car / 0.3, 0, 1));
+};
 
 /** The city's sound: a quiet bed that thins out and muffles as the stranger closes in. */
 function Soundscape({ active }: { active: boolean }) {
@@ -37,8 +43,10 @@ function Soundscape({ active }: { active: boolean }) {
     const decided = !!encounter.outcome && local >= BEAT.gate;
     const tension = decided ? 0 : clamp((local - BEAT.strangerMoves) / (BEAT.gate - BEAT.strangerMoves), 0, 1);
     const after = decided && local >= BEAT.cut;
-    audio.setAmbience(after ? 0.3 : 1 - 0.65 * tension, 0.8);
-    const cutoff = after ? 2600 : 20000 * Math.pow(650 / 20000, tension);
+    // walking away to the car (episode 3), the street comes back
+    const back = smoothstep(clamp(localProgress('car') / 0.3, 0, 1));
+    audio.setAmbience(after ? 0.3 + 0.45 * back : 1 - 0.65 * tension, 0.8);
+    const cutoff = after ? 2600 * Math.pow(20000 / 2600, back) : 20000 * Math.pow(650 / 20000, tension);
     if (Math.abs(cutoff - st.cutoff) / st.cutoff > 0.04) {
       audio.setWorldMuffle(cutoff, 0.5);
       st.cutoff = cutoff;
@@ -91,6 +99,8 @@ export function CityScene({ active }: { active: boolean }) {
         <Stranger active={active} timeScale={timeScale} />
       </StrangerBoundary>
       <Bag active={active} />
+      {/* the getaway car stands at the kerb from the start; episode 3 is played with it */}
+      <Mercedes />
       <Soundscape active={active} />
     </>
   );

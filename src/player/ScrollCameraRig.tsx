@@ -55,6 +55,7 @@ export function ScrollCameraRig() {
     }
     const ep = id === 'outro' ? builtEpisodes().slice(-1)[0] : EPISODES[id];
     const pose = rigPose;
+    pose.seated = 0;
     if (!cameraDirector.update(dt, pose) && ep) {
       const l = id === 'outro' ? 1 : local;
       ep.track.sample(l, pose);
@@ -75,7 +76,9 @@ export function ScrollCameraRig() {
     const v = st.primed ? moved / Math.max(dt, 1e-4) : 0;
     st.primed = true;
     st.speed = damp(st.speed, clamp(v, 0, 3), 5, dt);
-    const k = clamp(st.speed / 1.4, 0, 1);
+    // footsteps only on foot (a car moves the camera fast, but nobody walks)
+    const seated = clamp(pose.seated ?? 0, 0, 1);
+    const k = clamp(st.speed / 1.4, 0, 1) * (1 - seated);
     st.phase += (st.speed / 0.74) * Math.PI * dt;
     const bobY = (Math.cos(st.phase * 2) - 1) * 0.012 * k + Math.sin(clock.elapsedTime * 1.25) * 0.004 * (1 - k);
     const bobX = Math.sin(st.phase) * 0.012 * k;
@@ -83,7 +86,8 @@ export function ScrollCameraRig() {
     const sin = Math.sin(pose.yaw);
     const cos = Math.cos(pose.yaw);
     // head offset inside the ellipsoid (the pointer already lies in -1..1, so the point stays inside)
-    const free = clamp(1 - Math.abs(pose.roll) / 0.6, 0, 1); // not while lying on the ground
+    // not while lying on the ground, and only a little in a seat
+    const free = clamp(1 - Math.abs(pose.roll) / 0.6, 0, 1) * (1 - 0.7 * seated);
     const r = st.leanX * HEAD.side * free;
     const u = st.leanY * HEAD.up * free;
     const f = Math.hypot(st.leanX, st.leanY * 0.5) * HEAD.fwd * free;

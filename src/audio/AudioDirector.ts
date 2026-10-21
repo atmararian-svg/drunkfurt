@@ -32,9 +32,20 @@ export const cues = {
   fightKnockout: { src: null, bus: 'body', gain: 1 },
   fightRing: { src: null, bus: 'body', gain: 0.6 },
   fightFall: { src: null, bus: 'body', gain: 0.9 },
+  // the getaway (episode 3). Each is synthesised until a recording is set here:
+  // carUnlock (central locking, two clacks), carDoorOpen, carDoorClose (a heavy, damped shut),
+  // engineStart (starter and catch, ~1 s), and engineLoop: a seamless loop of the engine
+  // recorded at ENGINE_LOOP_RPM under load; it is pitched by rpm (playbackRate = rpm / ENGINE_LOOP_RPM).
+  carUnlock: { src: null, bus: 'sfx', gain: 0.7 },
+  carDoorOpen: { src: null, bus: 'sfx', gain: 0.8 },
+  carDoorClose: { src: null, bus: 'sfx', gain: 0.9 },
+  engineStart: { src: null, bus: 'body', gain: 0.9 },
+  engineLoop: { src: null, bus: 'body', loop: true, gain: 0.8 },
 } satisfies Record<string, CueDef>;
 
 export type CueId = keyof typeof cues;
+/** The rpm the engineLoop recording (if one is supplied) was made at. */
+export const ENGINE_LOOP_RPM = 3000;
 
 class AudioDirector {
   private ctx: AudioContext | null = null;
@@ -384,6 +395,202 @@ class AudioDirector {
     if (!this.ctx || !this.worldFilter) return;
     this.worldFilter.frequency.setTargetAtTime(cutoffHz, this.ctx.currentTime, seconds / 3);
   }
+
+  // -------------------------------------------------------------------------
+  // the car
+
+  private engineVoice: { gain: GainNode; set: (rpm: number, load: number) => void; stop: () => void } | null = null;
+
+  /** A short mechanical transient: band-passed noise (a latch, a lock). */
+  private clack(t: number, freq: number, level: number, length = 0.04, out = this.buses.get('body')!) {
+    const ctx = this.ctx!;
+    const n = this.noiseSource();
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = freq;
+    bp.Q.value = 2.5;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + length);
+    n.connect(bp).connect(g).connect(out);
+    n.start(t);
+    n.stop(t + length + 0.05);
+  }
+
+  /** A low, damped thump (a door shutting, a body settling). */
+  private thump(t: number, from: number, to: number, level: number, length: number, out = this.buses.get('body')!) {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(from, t);
+    osc.frequency.exponentialRampToValueAtTime(to, t + length);
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(level, t + 0.006);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + length);
+    osc.connect(g).connect(out);
+    osc.start(t);
+    osc.stop(t + length + 0.05);
+  }
+
+  /** The car recognises you: the central locking clacks twice. */
+  carUnlock() {
+    if (!this.ctx || this.play('carUnlock')) return;
+    const t = this.ctx.currentTime;
+    this.clack(t, 1400, 0.35, 0.05);
+    this.clack(t + 0.11, 1250, 0.3, 0.05);
+    this.thump(t, 140, 70, 0.12, 0.12);
+  }
+
+  /** The driver's door: the latch lets go and the seal parts. */
+  carDoor(open: boolean) {
+    if (!this.ctx || this.play(open ? 'carDoorOpen' : 'carDoorClose')) return;
+    const t = this.ctx.currentTime;
+    if (open) {
+      this.clack(t, 2200, 0.4, 0.03);
+      this.clack(t + 0.05, 900, 0.18, 0.12);
+      this.thump(t + 0.03, 120, 80, 0.15, 0.18);
+    } else {
+      // a heavy, damped shut: the body takes it, then the latch
+      this.thump(t, 95, 42, 0.85, 0.32);
+      this.clack(t, 500, 0.5, 0.09);
+      this.clack(t + 0.035, 2600, 0.25, 0.025);
+    }
+  }
+
+  /** The starter turns it over, then the engine catches (the engine voice takes over from there). */
+  engineStart() {
+    const ctx = this.ctx;
+    if (!ctx || this.play('engineStart')) return;
+    const t = ctx.currentTime;
+    const out = this.buses.get('body')!;
+    const osc = ctx.createOscillator();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(170, t);
+    osc.frequency.linearRampToValueAtTime(230, t + 0.55);
+    // the starter's chug: the compression strokes, about 12 a second
+    const chug = ctx.createGain();
+    chug.gain.value = 0.5;
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 12;
+    const depth = ctx.createGain();
+    depth.gain.value = 0.45;
+    lfo.connect(depth).connect(chug.gain);
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 900;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.16, t + 0.05);
+    g.gain.setValueAtTime(0.16, t + 0.5);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + 0.7);
+    osc.connect(chug).connect(lp).connect(g).connect(out);
+    osc.start(t);
+    lfo.start(t);
+    osc.stop(t + 0.75);
+    lfo.stop(t + 0.75);
+  }
+
+  /**
+   * The engine, one continuous voice whose pitch and timbre follow the rpm:
+   * a four-cylinder fires twice a revolution, so the fundamental is rpm/30 Hz,
+   * with the half order for the uneven beat and band-passed noise for the
+   * intake. `load` (0..1) opens it up when you are on the throttle. Calling it
+   * every frame only moves the parameters; rpm 0 fades the voice out and stops
+   * it. With an engineLoop recording, the recording is pitched instead.
+   */
+  engine(rpm: number, load: number) {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (rpm <= 0) {
+      this.engineVoice?.stop();
+      this.engineVoice = null;
+      return;
+    }
+    if (!this.engineVoice) this.engineVoice = this.buffers.has('engineLoop') ? this.recordedEngine() : this.synthEngine();
+    this.engineVoice.set(rpm, load);
+  }
+
+  private recordedEngine() {
+    const ctx = this.ctx!;
+    const src = ctx.createBufferSource();
+    src.buffer = this.buffers.get('engineLoop')!;
+    src.loop = true;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0001;
+    src.connect(gain).connect(this.buses.get('body')!);
+    src.start();
+    return {
+      gain,
+      set: (rpm: number, load: number) => {
+        const t = ctx.currentTime;
+        src.playbackRate.setTargetAtTime(Math.max(0.2, rpm / ENGINE_LOOP_RPM), t, 0.04);
+        gain.gain.setTargetAtTime((cues.engineLoop.gain ?? 1) * (0.35 + 0.65 * load), t, 0.06);
+      },
+      stop: () => {
+        gain.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.12);
+        src.stop(ctx.currentTime + 0.6);
+      },
+    };
+  }
+
+  private synthEngine() {
+    const ctx = this.ctx!;
+    const out = this.buses.get('body')!;
+    const fire = ctx.createOscillator();
+    fire.type = 'sawtooth';
+    const half = ctx.createOscillator();
+    half.type = 'sawtooth';
+    const halfGain = ctx.createGain();
+    halfGain.gain.value = 0.45;
+    const intake = this.noiseSource(true);
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.Q.value = 1.6;
+    const intakeGain = ctx.createGain();
+    intakeGain.gain.value = 0;
+    const mix = ctx.createGain();
+    // a touch of saturation, as an exhaust has
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i / 255) * 2 - 1;
+      curve[i] = Math.tanh(2.2 * x);
+    }
+    shaper.curve = curve;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.Q.value = 0.8;
+    const gain = ctx.createGain();
+    gain.gain.value = 0.0001;
+    fire.connect(mix);
+    half.connect(halfGain).connect(mix);
+    intake.connect(bp).connect(intakeGain).connect(mix);
+    mix.connect(shaper).connect(lp).connect(gain).connect(out);
+    fire.start();
+    half.start();
+    intake.start();
+    return {
+      gain,
+      set: (rpm: number, load: number) => {
+        const t = ctx.currentTime;
+        const f = rpm / 30;
+        fire.frequency.setTargetAtTime(f, t, 0.03);
+        half.frequency.setTargetAtTime(f / 2, t, 0.03);
+        bp.frequency.setTargetAtTime(f * 6, t, 0.05);
+        intakeGain.gain.setTargetAtTime(0.08 + 0.35 * load, t, 0.05);
+        lp.frequency.setTargetAtTime(220 + rpm * 0.32 + load * 900, t, 0.05);
+        gain.gain.setTargetAtTime(0.07 + 0.11 * load + 0.04 * (rpm / 6000), t, 0.06);
+      },
+      stop: () => {
+        const t = ctx.currentTime;
+        gain.gain.setTargetAtTime(0.0001, t, 0.12);
+        for (const n of [fire, half, intake]) n.stop(t + 0.7);
+      },
+    };
+  }
+
 }
 
 export const audio = new AudioDirector();

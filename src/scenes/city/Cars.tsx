@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { BufferGeometry, ExtrudeGeometry, Group, Object3D, Shape, SpotLight } from 'three';
 import { audio } from '../../audio/AudioDirector';
 import { GeoBatch } from '../../core/geometry';
+import { localProgress, locate, timeline } from '../../core/timeline';
 import { playerState } from '../../player/playerState';
 import { cityMaterials } from './cityMaterials';
 import { ROAD_Y } from './layout';
@@ -66,10 +67,13 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
     if (!active) return;
     const dt = Math.min(rawDt, 0.05) * timeScale();
     stepTraffic(traffic, dt, [playerState.position.x, playerState.position.z]);
+    // episode 3: the Mercedes leaves down the right-hand lane, which is kept clear for it
+    // (the car that turns into that lane stays off the street while the episode is on)
+    const getaway = locate(timeline.progress).id !== 'city' && localProgress('car') > 0;
     traffic.cars.forEach((c, i) => {
       const g = groups.current[i];
       if (!g) return;
-      g.visible = c.on;
+      g.visible = c.on && !(getaway && i === 0);
       if (!c.on) {
         passed[i] = false;
         return;
@@ -77,7 +81,7 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
       g.position.set(c.box.x, ROAD_Y, c.box.z);
       g.rotation.y = c.box.yaw;
       const d = defs[i];
-      if (!passed[i] && c.s / d.lane.length > d.pass.at && audio.running) {
+      if (!passed[i] && g.visible && c.s / d.lane.length > d.pass.at && audio.running) {
         passed[i] = true;
         audio.carPass(d.pass.from, d.pass.to, 4.5, 0.22);
       }

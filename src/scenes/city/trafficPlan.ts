@@ -1,3 +1,4 @@
+import { PARK } from '../car/getaway';
 import { STREET } from './layout';
 import { Box, CAR_BOX, CarDef, createTraffic, makeLane } from './traffic';
 
@@ -20,7 +21,8 @@ export const PARKED: [number, number, number, number][] = [
   [3.95, -142, 0, 0],
 ];
 
-export const parkedBoxes = (): Box[] => PARKED.map(([x, z, yaw]) => ({ x, z, yaw, ...CAR_BOX }));
+/** The parked cars, and the Mercedes (episode 3's car, parked at the kerb on the right). */
+export const parkedBoxes = (): Box[] => [...PARKED.map(([x, z, yaw]) => ({ x, z, yaw, ...CAR_BOX })), { x: PARK.x, z: PARK.z, yaw: Math.PI, ...CAR_BOX }];
 
 /** Moving cars, with what they are for. */
 export const CITY_CARS = () => {

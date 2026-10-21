@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense, useEffect } from 'react';
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 import { useStory } from './core/store';
-import { TOTAL_LENGTH, locate, readScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
+import { EpisodeId, TOTAL_LENGTH, locate, readScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
@@ -20,13 +20,17 @@ function EpisodeWorlds() {
   const loading = useStory((s) => s.phase === 'loading');
   const list = builtEpisodes();
   const i = Math.max(0, list.findIndex((e) => e.id === episode));
-  const mounted = episode === 'outro' ? list.slice(-1) : list.slice(Math.max(0, i - 1), i + 2);
   const activeId = episode === 'outro' ? list[list.length - 1].id : episode;
+  // an episode that plays in another's world (episode 3 on episode 2's street) draws and runs that world too
+  const host = EPISODES[activeId as EpisodeId]?.sharesWorld;
+  const near = episode === 'outro' ? list.slice(-1) : list.slice(Math.max(0, i - 1), i + 2);
+  const mounted = list.filter((e) => near.includes(e) || e.id === host);
+  const shown = (id: EpisodeId) => id === activeId || id === host;
   return (
     <>
       {mounted.map((e) => (
-        <group key={e.id} visible={loading || e.id === activeId}>
-          <e.World active={e.id === activeId} />
+        <group key={e.id} visible={loading || shown(e.id)}>
+          <e.World active={shown(e.id)} />
         </group>
       ))}
     </>

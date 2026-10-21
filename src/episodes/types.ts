@@ -28,6 +28,11 @@ export interface EpisodeDef {
    * is false while it is preloading behind the previous episode.
    */
   World: ComponentType<{ active: boolean }>;
+  /**
+   * Plays inside another episode's world (drawn and running while this one is
+   * active), e.g. episode 3 on the street where episode 2 ended.
+   */
+  sharesWorld?: EpisodeId;
   /** Scroll-driven camera path over local progress 0..1. */
   track: CameraTrack;
   /** Optional per-frame adjustment of the sampled camera pose (e.g. keep a subject in frame). */

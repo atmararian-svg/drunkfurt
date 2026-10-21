@@ -31,6 +31,8 @@ export interface CameraPose {
   pitch: number;
   roll: number;
   fov?: number;
+  /** 0 on foot … 1 sitting in a vehicle: no footsteps, and the head moves only a little. */
+  seated?: number;
 }
 
 /** Time-driven shots (for later scripted beats such as the slow-motion sequence). */
