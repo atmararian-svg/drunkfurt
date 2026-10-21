@@ -65,6 +65,7 @@ export function App() {
     if (import.meta.env.DEV) {
       (window as unknown as Record<string, unknown>).__drunkfurt = {
         timeline,
+        autoplay,
         rigPose,
         locate,
         EPISODES,
