@@ -151,6 +151,17 @@ export function disarm() {
   story.setState({ prompt: null });
 }
 
+/** The chapter starts again (going back into it): the encounter has not happened yet. */
+export function resetEncounter() {
+  encounter.outcome = null;
+  encounter.punchAtDecision = 0;
+  encounter.armed = false;
+  encounter.armedAt = 0;
+  gate.open = false;
+  lastT = -1;
+  if (story.getState().prompt === 'defend') story.setState({ prompt: null });
+}
+
 /** The visitor's click. Returns whether it did anything. */
 export function defend() {
   if (!encounter.armed || encounter.outcome) return false;

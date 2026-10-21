@@ -1,5 +1,5 @@
 import { Canvas } from '@react-three/fiber';
-import { Suspense, useEffect } from 'react';
+import { Component, ReactNode, Suspense, useEffect } from 'react';
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 import { useStory } from './core/store';
 import { EpisodeId, TOTAL_LENGTH, autoplay, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
@@ -7,7 +7,41 @@ import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
 import { Stylizer } from './render/Stylizer';
+import { FrameGrab } from './render/FrameGrab';
+import { chapterOf, chapterReadiness } from './core/chapters';
+import { preloadRoom } from './scenes/home/RoomScene';
+import { installChapterTransitions } from './ui/chapterTransition';
 import { Overlay } from './ui/Overlay';
+import { Preloader } from './ui/Preloader';
+
+/**
+ * Marks a chapter ready once its world has rendered: placed inside the
+ * world's own Suspense boundary, after the world, it only mounts when
+ * everything the world loads has arrived; two frames later its shaders have
+ * been compiled and drawn.
+ */
+function ChapterReady({ chapter }: { chapter: 1 | 2 | 3 }) {
+  useEffect(() => {
+    let raf = requestAnimationFrame(() => (raf = requestAnimationFrame(() => chapterReadiness.set(chapter, true))));
+    return () => cancelAnimationFrame(raf);
+  }, [chapter]);
+  return null;
+}
+
+/** A world that fails to load takes down only itself: its chapter is reported as failed, the rest goes on. */
+class WorldBoundary extends Component<{ chapter: 1 | 2 | 3; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidCatch(err: unknown) {
+    console.error(`[chapters] chapter ${this.props.chapter} could not be loaded`, err);
+    chapterReadiness.set(this.props.chapter, 'failed');
+  }
+  render() {
+    return this.state.failed ? null : this.props.children;
+  }
+}
 
 /**
  * Mounts the active episode's world, plus the next one in advance. Only the
@@ -28,17 +62,45 @@ function EpisodeWorlds() {
   const shown = (id: EpisodeId) => id === activeId || id === host;
   return (
     <>
-      {mounted.map((e) => (
-        <group key={e.id} visible={loading || shown(e.id)}>
-          <e.World active={shown(e.id)} />
-        </group>
-      ))}
+      {mounted.map((e) => {
+        // each world loads on its own (the station does not wait for the street's models), and says when it is ready
+        const chapter = chapterOf(e.id).number;
+        return (
+          <group key={e.id} visible={loading || shown(e.id)}>
+            <WorldBoundary chapter={chapter}>
+              <Suspense fallback={null}>
+                <e.World active={shown(e.id)} />
+                {e.id !== 'car' && e.id !== 'home' && <ChapterReady chapter={chapter} />}
+              </Suspense>
+            </WorldBoundary>
+          </group>
+        );
+      })}
     </>
   );
 }
 
 export function App() {
   const episode = useStory((s) => s.episode);
+
+  // chapters change through the chapter transition; chapter 3's assets load once chapter 2 is in
+  useEffect(() => installChapterTransitions(), []);
+  useEffect(() => {
+    let started = false;
+    const next = () => {
+      if (started || chapterReadiness.get(2) === false) return;
+      started = true;
+      preloadRoom().then(
+        () => chapterReadiness.set(3, true),
+        (err) => {
+          console.error('[chapters] chapter 3 could not be loaded', err);
+          chapterReadiness.set(3, 'failed');
+        },
+      );
+    };
+    next();
+    return chapterReadiness.subscribe(next);
+  }, []);
 
   useEffect(() => {
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
@@ -114,11 +176,13 @@ export function App() {
             <ScrollCameraRig />
             <EpisodeWorlds />
             <Stylizer version={episode} />
+            <FrameGrab />
           </Suspense>
         </Canvas>
       </div>
       <div className="scroll-track" style={{ height: `${TOTAL_LENGTH * 100}vh` }} aria-hidden />
       <Overlay />
+      <Preloader />
     </>
   );
 }

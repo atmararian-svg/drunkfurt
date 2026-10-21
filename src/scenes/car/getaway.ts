@@ -16,11 +16,15 @@ import { Gate, autoplay, gates, globalProgress, localProgress, pageTurnFrom, pla
  *    plays backwards exactly.
  *
  *  - The rev phase itself is interactive: the story waits at REV (a closed
- *    gate on the scroll) while you hold D. `getaway.rpm` follows your key in
- *    real time. At 6,000 rpm the car launches, once (`launch()` is guarded by
- *    `armed`, which it clears): the gate opens and ONE scripted move of the
+ *    gate on the scroll) until you press D. That starts one four-second rev
+ *    sequence on the wall clock (REV_SEQUENCE): four presses of the
+ *    throttle, one a second, the needle climbing with each, and at 4 s, at
+ *    6,000 rpm, the launch. Once started it plays to the end by itself
+ *    (letting go of D does not stop it, pressing again does not restart it).
+ *    The car launches once (`launch()` is guarded by `armed`, which it
+ *    clears): the gate opens and ONE scripted move of the
  *    page plays everything after it by itself, without stopping: the launch
- *    (REV → LAUNCH_END), the ink closing over it and the next page opening
+ *    (REV → LAUNCH_END) and on into the chapter transition to the next chapter
  *    (core/timeline playProgress, `locked` so that scrolling, a trackpad's
  *    momentum or a key cannot halt it half-way). The car's place is only ever
  *    set from that progress (Mercedes.tsx), so nothing else moves it. Scroll
@@ -54,12 +58,63 @@ export const CAR_BEAT = {
   ignition: 0.645,
   /** The story waits here for you to rev. */
   rev: 0.66,
-  /** The launch and its rush of speed are played over REV → LAUNCH_END; then the ink closes. */
+  /** The launch and its rush of speed are played over REV → LAUNCH_END; then the chapter turns. */
   launchEnd: 0.955,
 } as const;
 
 export const IDLE_RPM = 800;
 export const LAUNCH_RPM = 6000;
+
+/**
+ * The rev sequence, in seconds since D was pressed: four throttle presses, one
+ * a second, and the launch at 4 s. Each press brings the needle up to a peak
+ * (when the recording's own rev peaks, AudioDirector REV_SLICES) and it sags a
+ * little before the next; the fourth climbs all the way to 6,000 at 4 s.
+ */
+export const REV_SEQUENCE = {
+  seconds: 4,
+  presses: [0, 1, 2, 3],
+  /** rpm keys: [t, rpm] */
+  rpm: [
+    [0, IDLE_RPM],
+    [0.62, 3000],
+    [1, 2350],
+    [1.46, 3900],
+    [2, 3250],
+    [2.6, 4900],
+    [3, 4250],
+    [4, LAUNCH_RPM],
+  ] as [number, number][],
+};
+
+/** The needle during the rev sequence: eased between the keys (in and out of each peak, no corners). */
+function revRpm(t: number) {
+  const k = REV_SEQUENCE.rpm;
+  if (t >= k[k.length - 1][0]) return k[k.length - 1][1];
+  let i = 0;
+  while (i < k.length - 2 && t > k[i + 1][0]) i++;
+  const [t0, r0] = k[i];
+  const [t1, r1] = k[i + 1];
+  const u = clamp((t - t0) / (t1 - t0), 0, 1);
+  // the last climb accelerates into the launch; the others ease in and out
+  const e = i === k.length - 2 ? u * u * (1.6 - 0.6 * u) : smoothstep(u);
+  return r0 + (r1 - r0) * e;
+}
+
+/**
+ * The throttle pedal during the rev sequence (0 up … 1 floored): each press goes
+ * down quickly (0.16 s), is held a moment, and comes most of the way back up;
+ * the fourth stays down into the launch.
+ */
+export function revPedal(t: number) {
+  if (t < 0) return 0;
+  const i = Math.min(3, Math.floor(t));
+  const u = t - i;
+  const down = smoothstep(clamp(u / 0.16, 0, 1));
+  if (i === 3) return down;
+  const up = smoothstep(clamp((u - 0.42) / 0.42, 0, 1));
+  return down * (1 - 0.88 * up);
+}
 /**
  * The launch's sound and its gear changes, on one clock. The gear-shift
  * recording is started 3.00 s into the file at the moment of the launch, and
@@ -75,7 +130,7 @@ export const SHIFT_TIMES = SHIFTS_IN_RECORDING.map((t) => +(t - SHIFT_AUDIO_OFFS
 /**
  * Seconds of the launch (REV → LAUNCH_END) when it plays by itself: off the
  * line and up through three gear changes (the last at 7.45 s), the rush of
- * speed in the last two seconds, then the ink closes and the page goes.
+ * speed in the last two seconds, then the chapter transition.
  */
 export const LAUNCH_SECONDS = 8.6;
 /** When the rush builds (s into the launch). */
@@ -84,8 +139,12 @@ const RUSH_FROM = 6.6;
 export const getaway = {
   /** Live engine speed while you rev (rpm). */
   rpm: 0,
-  /** D (or a press on the tachometer) is held. */
+  /** D (or a press on the prompt) is down. */
   held: false,
+  /** When the rev sequence started (performance.now()), or -1. */
+  revStart: -1,
+  /** The throttle pedal, 0 up … 1 floored (for the car's own pedal and the prompt). */
+  pedal: 0,
   /** Waiting at the rev gate for you. */
   armed: false,
   /** The car has launched (on this pass through the episode). */
@@ -197,9 +256,10 @@ export function carAt(s: number) {
 const holds = { key: false, pointer: false };
 
 /**
- * D down / up (or a press on the tachometer). The key is remembered even
- * before the story waits for it, so holding D while you sit down revs as soon
- * as the engine is ready; it only counts while the rev phase is armed.
+ * D down / up (or a press on the prompt). The key is remembered even before the
+ * story waits for it, so holding D while you sit down starts the revs as soon
+ * as the engine is ready; it only counts while the rev phase is armed. Only the
+ * first press starts the sequence (updateGetaway); repeats do nothing.
  */
 export function setThrottle(on: boolean, source: keyof typeof holds = 'key') {
   holds[source] = on;
@@ -214,19 +274,22 @@ const releaseAll = () => {
  * 6,000 rpm: the one launch. Disarms the rev phase (so it cannot fire again
  * and D does nothing more), opens the gate, and hands the page to a single
  * locked scripted move from here to the next page: the launch, the rush, the
- * ink closing and the next page opening. It runs on the wall clock and needs
+ * chapter transition to the next chapter. It runs on the wall clock and needs
  * nothing from the visitor; the sound is only a listener to it.
  */
 function launch() {
   getaway.launched = true;
   getaway.armed = false;
+  getaway.revStart = -1;
   releaseAll();
   gate.open = true;
   story.setState({ prompt: null });
   const from = globalProgress('car', CAR_BEAT.rev);
   const end = globalProgress('car', CAR_BEAT.launchEnd);
-  // through the page turn that follows the launch, to where the next page has opened
-  const to = pageTurnFrom(end)?.to ?? globalProgress('car', 1);
+  // on into the chapter transition that follows the launch: once the progress enters it, the
+  // transition (ui/chapterTransition.ts) cuts to the next chapter by itself
+  const turn = pageTurnFrom(end);
+  const to = turn ? turn.from + 0.0002 : globalProgress('car', 1);
   playProgress(from, to, (LAUNCH_SECONDS * (to - from)) / (end - from), true);
   // and its sound, on the same clock (started now; if a recording is not decoded yet, it is
   // started on a later frame, further into the file by however late it is)
@@ -238,7 +301,7 @@ function launch() {
 }
 
 /** The getaway's sound state: what has been started, so nothing starts twice. */
-const sound = { wasHeld: false, launchPending: false, launchAt: 0 };
+const sound = { launchPending: false, launchAt: 0 };
 
 /** Forget a launch (scrolled back out of the car, or left the episode backwards). */
 export function resetGetaway() {
@@ -246,8 +309,9 @@ export function resetGetaway() {
   getaway.armed = false;
   releaseAll();
   gate.open = false;
+  getaway.revStart = -1;
+  getaway.pedal = 0;
   sound.launchPending = false;
-  sound.wasHeld = false;
   quietly(() => audio.carStop(0.3));
   if (story.getState().prompt === 'rev') story.setState({ prompt: null });
 }
@@ -269,28 +333,34 @@ export function updateGetaway(dt: number) {
   const ignited = ignitedAt(local);
   const launch_ = launchAt(local);
   getaway.gear = launch_.gear;
+  // scrolled back off the seat before the sequence finished: it is cancelled, and the next press starts it again
+  if (getaway.revStart >= 0 && !getaway.armed && !getaway.launched) {
+    getaway.revStart = -1;
+    quietly(() => audio.revStop(0.25));
+  }
+  // the first press of D (while the story waits for it) starts the one rev sequence
+  if (getaway.held && getaway.revStart < 0 && !getaway.launched && ignited) {
+    getaway.revStart = performance.now();
+    quietly(() => audio.revSequence());
+  }
   if (launch_.rpm >= 0) {
     getaway.rpm = launch_.rpm;
+    getaway.pedal = 1;
   } else if (!ignited) {
     // engine off: the needle falls back to zero
     getaway.rpm = Math.max(0, getaway.rpm - dt * 4000);
-  } else if (getaway.held) {
-    // a deliberate climb: about two seconds from idle to the red line
-    getaway.rpm = Math.min(LAUNCH_RPM + 50, getaway.rpm + dt * (1500 + 0.35 * getaway.rpm));
+    getaway.pedal = 0;
+  } else if (getaway.revStart >= 0) {
+    // the sequence: rpm and pedal from its own clock; at 4 s, 6,000 rpm and the launch, once
+    const t = (performance.now() - getaway.revStart) / 1000;
+    getaway.rpm = revRpm(t);
+    getaway.pedal = revPedal(t);
+    if (t >= REV_SEQUENCE.seconds && getaway.armed) launch();
   } else {
-    // released (or just started): settle to idle; the starter brings it up from zero
+    // waiting (or just started): settle to idle; the starter brings it up from zero
     const target = IDLE_RPM;
     getaway.rpm = getaway.rpm < target ? Math.min(target, getaway.rpm + dt * 1600) : target + (getaway.rpm - target) * Math.exp(-dt * 2.2);
-  }
-  // the revving recordings: one per press of D (not per frame), released with the key
-  const pressed = getaway.held && !sound.wasHeld;
-  const released = !getaway.held && sound.wasHeld;
-  sound.wasHeld = getaway.held;
-  if (getaway.armed && getaway.rpm >= LAUNCH_RPM) {
-    launch();
-  } else {
-    if (pressed) quietly(() => audio.revPress(getaway.rpm));
-    if (released) quietly(() => audio.revRelease());
+    getaway.pedal = 0;
   }
   // the launch's recordings, if they could not start at the launch itself (not decoded yet):
   // only while the launch is still playing, and further into the file by the delay
@@ -302,14 +372,14 @@ export function updateGetaway(dt: number) {
     });
   }
   // the idle: the engine-default recording, once the start recording has played through, whenever
-  // the engine is on and nobody is on the throttle; it steps aside while an accel recording or the
-  // launch's recordings play. The synthesised engine only stands in if that recording is not there.
-  const idling = ignited && !audio.revving && !audio.launching && !getaway.held && launch_.rpm < 0;
+  // the engine is on and the revs are not up; it steps aside for the rev sequence and the launch.
+  // The synthesised engine only stands in if that recording is not there.
+  const idling = ignited && getaway.revStart < 0 && !audio.revving && !audio.launching && launch_.rpm < 0;
   quietly(() => {
     if (!ignited) audio.engineOff();
     else audio.idle(idling);
     const synth = !audio.hasIdle && ignited && !audio.revving && !audio.launching;
-    audio.engine(synth ? getaway.rpm : 0, launch_.rpm >= 0 ? 1 : getaway.held ? 1 : 0.15);
+    audio.engine(synth ? getaway.rpm : 0, launch_.rpm >= 0 || getaway.revStart >= 0 ? 1 : 0.15);
   });
   // sound follows all of this; none of it can hold the story up
 }
@@ -334,7 +404,7 @@ export function leaveGetaway() {
   }
   // the scene is over (the page has turned, or you went back to the city): everything fades out
   sound.launchPending = false;
-  sound.wasHeld = false;
+  getaway.revStart = -1;
   quietly(() => {
     audio.engine(0, 0);
     audio.engineOff();

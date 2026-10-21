@@ -51,6 +51,14 @@ function loadPicture(url: string) {
   });
 }
 
+/** The room's two assets, decoded once (the preloader starts them early; the world reuses them). */
+let modelPromise: ReturnType<typeof loadGlb> | null = null;
+let picturePromise: Promise<Texture> | null = null;
+const roomModel = () => (modelPromise ??= loadGlb(roomUrl));
+const roomPicture = () => (picturePromise ??= loadPicture(portfolioUrl));
+/** Loads chapter 3's assets ahead of time (resolves when both are decoded). */
+export const preloadRoom = () => Promise.all([roomModel(), roomPicture()]).then(() => undefined);
+
 /**
  * The supplied room, printed: its baked light (grey atlases from
  * tools/room_textures.py) drives the comic bands as emission, so the room
@@ -154,8 +162,8 @@ function buildDisplay(picture: Texture) {
 const REST = 0.84;
 
 function Room({ active }: { active: boolean }) {
-  const gltf = suspend(() => loadGlb(roomUrl), ['drunkfurt-room']);
-  const picture = suspend(() => loadPicture(portfolioUrl), ['drunkfurt-portfolio']);
+  const gltf = suspend(roomModel, ['drunkfurt-room']);
+  const picture = suspend(roomPicture, ['drunkfurt-portfolio']);
   const room = useMemo(() => buildRoom(gltf), [gltf]);
   const display = useMemo(() => buildDisplay(picture), [picture]);
   const { gl, scene, camera } = useThree();

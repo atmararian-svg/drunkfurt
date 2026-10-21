@@ -5,7 +5,7 @@ import type { CameraPose } from '../../core/sequence';
 import { localProgress } from '../../core/timeline';
 import type { EpisodeDef } from '../../episodes/types';
 import { DRIVER_EYE } from './carRig';
-import { CAR_BEAT, PARK, carAt, launchAt } from './getaway';
+import { CAR_BEAT, PARK, carAt, getaway, launchAt, resetGetaway } from './getaway';
 
 /**
  * Episode 3 camera. It starts exactly where episode 2's last shot is (you,
@@ -70,7 +70,14 @@ function ride(local: number, pose: CameraPose) {
   pose.seated = sitting;
   if (local < CAR_BEAT.seated) return;
   const run = launchAt(local);
-  if (run.rpm < 0) return; // parked: the track has it
+  if (run.rpm < 0) {
+    // parked: the track has it; each blip of the throttle rocks the car a little on its springs
+    const p = getaway.pedal;
+    pose.pitch += deg(0.35) * p;
+    pose.position.y -= 0.006 * p;
+    pose.roll += deg(0.25) * p;
+    return;
+  }
   const at = carAt(run.s);
   // the push of the acceleration, strongest off the line
   const g = clamp(1 - 0.24 * run.t, 0, 1) * smoothstep(clamp(run.t / 0.25, 0, 1));
@@ -102,6 +109,7 @@ export const carEpisode: EpisodeDef = {
   World: NoWorld,
   sharesWorld: 'city',
   track: carTrack,
+  reset: resetGetaway,
   adjustPose: ride,
   // in the seat, the head stays inside the cabin (the rig already scales it down)
   clampHead: (_base, o) => {

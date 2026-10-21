@@ -4,7 +4,7 @@ import { clamp, deg, smoothstep } from '../../core/math';
 import type { CameraPose } from '../../core/sequence';
 import type { EpisodeDef } from '../../episodes/types';
 import { DISPLAY, DISPLAY_NORMAL, HOME_BEAT, SEAT_EYE } from './layout';
-import { flyAt, monitor } from './monitor';
+import { flyAt, monitor, resetMonitor } from './monitor';
 import { RoomScene } from './RoomScene';
 
 /**
@@ -88,10 +88,11 @@ function lookAtScreen(local: number, pose: CameraPose) {
 export const homeEpisode: EpisodeDef = {
   id: 'home',
   number: 4,
-  title: 'My Cave',
+  title: 'The Cave',
   subtitle: 'The back room · 00:31',
   World: RoomScene,
   track: homeTrack,
+  reset: resetMonitor,
   adjustPose: lookAtScreen,
   // seated, the head stays near the headrest (the rig already scales it down)
   clampHead: (_base, o) => {

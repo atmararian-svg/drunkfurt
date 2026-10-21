@@ -31,6 +31,8 @@ export interface CarRig {
   lights(on: number): void;
   /** Instrument cluster: engine rpm, road speed (km/h), screens on (0 off … 1 on, the ignition), gear and a fresh gear change (1 → 0). */
   cluster(rpm: number, kmh: number, on: number, gear?: number, shift?: number): void;
+  /** The throttle pedal, 0 up … 1 floored. */
+  pedal(down: number): void;
   /** Rolls the wheels by a distance travelled (m). */
   roll(distance: number): void;
   /** A point in the car's own frame (m, facing +z, driver on +x) to world space. */
@@ -146,6 +148,11 @@ export function buildCar(gltf: GLTF): CarRig {
   const dials = buildCluster();
   root.add(dials.mesh);
 
+  // the throttle pedal: it pivots on its node's origin (hung from the top, as in the car), 14° at full throttle
+  const gas = model.getObjectByName('w206_gaspedal');
+  const gasRest = gas?.quaternion.clone();
+  const qp = new Quaternion();
+
   const toWorld = (local: Vector3, out = new Vector3()) => root.localToWorld(out.copy(local));
 
   return {
@@ -163,6 +170,9 @@ export function buildCar(gltf: GLTF): CarRig {
       // the centre screen glows softly, so the eye goes to the cluster
       m.screen.emissiveIntensity = 0.22 * on;
       dials.set(rpm, kmh, on, gear, shift);
+    },
+    pedal(down) {
+      if (gas && gasRest) gas.quaternion.copy(gasRest).multiply(qp.setFromAxisAngle(X, (-14 * Math.PI * down) / 180));
     },
     roll(distance) {
       const a = distance / WHEEL_RADIUS;

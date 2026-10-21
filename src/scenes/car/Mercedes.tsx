@@ -44,6 +44,8 @@ export function Mercedes() {
     const down = (e: KeyboardEvent) => {
       if (e.code !== 'KeyD' || e.ctrlKey || e.metaKey || e.altKey) return;
       if (getaway.armed) e.preventDefault();
+      // a held key repeats keydown: only the first counts (the sequence starts once anyway)
+      if (e.repeat) return;
       setThrottle(true);
     };
     const up = (e: KeyboardEvent) => {
@@ -82,6 +84,7 @@ export function Mercedes() {
     car.lights(lit);
     car.door(doorAt(local));
     if (active) updateGetaway(dt);
+    car.pedal(getaway.pedal);
     // the cluster: rpm from the engine (your revs, or the launch's gears), km/h from the road speed
     // the gear and its changes come from the launch clock, the same one the gear-shift recording is on
     const lastShift = run.gear > 1 ? SHIFT_TIMES[run.gear - 2] : -1;

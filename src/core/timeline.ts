@@ -18,21 +18,13 @@ export interface EpisodeSpan {
    * closes over the previous episode's end or opens over this one's start.
    */
   seamless?: boolean;
-  /**
-   * Where the episode starts again (local progress) when the visitor goes back
-   * into it from the next one: the page turn back does not land on its last
-   * shot but cuts, under the ink, to this point. Without it, going back lands
-   * on the episode's end.
-   */
-  reentry?: number;
 }
 
 /** Built episodes, in order. Add the next ones here as they are made. */
 export const EPISODE_SPANS: EpisodeSpan[] = [
   { id: 'station', length: 9 },
   { id: 'city', length: 11 },
-  // back from the room, the getaway starts again from the seat (CAR_BEAT.seated), not after the launch
-  { id: 'car', length: 8, seamless: true, reentry: 0.6 },
+  { id: 'car', length: 8, seamless: true },
   { id: 'home', length: 7 },
 ];
 /** Scroll after the last episode, for the "to be continued" card. */
@@ -83,9 +75,7 @@ export function localProgress(id: EpisodeId, p = timeline.progress) {
  * downstream still reads the one progress value. Wall-clock timed, so a slow
  * frame rate cannot stretch it. Any input from the visitor stops it where it is.
  */
-export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, locked: false, then: null as number | null };
-/** When the last cut happened (performance.now()): a jump under closed ink, which the overlay then opens. */
-export const cut = { at: -1e9 };
+export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, locked: false };
 /**
  * After a locked move ends, the page holds its final position for a moment
  * (performance.now() until which it does), so a scroll already in flight
@@ -104,9 +94,21 @@ export function pinScroll(on: boolean) {
 export const scriptOwnsScroll = () => pinned || (autoplay.active && autoplay.locked) || (!autoplay.active && performance.now() < holdUntil);
 
 /** `locked`: the visitor's scrolling does not stop it (a page turn always completes). */
-/** `then`: when it arrives (under closed ink), cut straight to this progress. */
-export function playProgress(from: number, to: number, seconds: number, locked = false, then: number | null = null) {
-  Object.assign(autoplay, { active: true, from, to, seconds, start: performance.now(), locked, then });
+export function playProgress(from: number, to: number, seconds: number, locked = false) {
+  Object.assign(autoplay, { active: true, from, to, seconds, start: performance.now(), locked });
+}
+
+/** After a cinematic that holds the page (a chapter transition), the page stays put a moment longer, as after a locked move. */
+export function holdScroll(ms = 1000) {
+  holdUntil = performance.now() + ms;
+}
+
+/** Puts the story at a progress at once: no smoothing, the page scrolled to it (a cut). */
+export function jumpTo(p: number) {
+  timeline.target = timeline.progress = p;
+  timeline.velocity = 0;
+  const max = document.documentElement.scrollHeight - window.innerHeight;
+  window.scrollTo({ top: p * max, behavior: 'auto' });
 }
 
 /** Stops a scripted move, unless it is a page turn. */
@@ -115,65 +117,81 @@ export function stopAutoplay(force = false) {
   if (force) holdUntil = 0;
   autoplay.active = false;
   autoplay.locked = false;
-  autoplay.then = null;
 }
 
 /**
- * Page turns between episodes, in global progress: the ink closes over the end
- * of one episode, the next title shows, the ink opens on the next. They play by
- * themselves: once the progress enters one, it is carried through to the far
- * side in the direction the visitor was going (to the next episode going
- * forward, back to the last shot going back), and scrolling cannot stop it
- * halfway.
+ * Chapter transitions, in global progress. Each sits where one chapter ends
+ * and the next begins (between two episodes that are not seamless): from the
+ * last shot of one (`from`) to the opening shot of the next (`to`). The
+ * progress never plays through one: as soon as it enters, the chapter
+ * transition takes over (ui/chapterTransition.ts registers `onChapterTurn`).
+ * Going forward it cuts to the next chapter's opening shot; going back it
+ * restarts the previous chapter from its beginning (`back`), never from its
+ * end.
  */
-interface PageTurn {
+export interface PageTurn {
   from: number;
   to: number;
-  seconds: number;
-  /** Going back: where the ink is fully closed (between the two episodes), and where to cut to from there. */
-  back?: { at: number; to: number };
+  /** Where the chapter this transition leads back into begins. */
+  back: number;
 }
 let turns: PageTurn[] | null = null;
 function pageTurns(): PageTurn[] {
   if (turns) return turns;
   turns = [];
   let start = 0;
+  let chapterStart = 0;
   EPISODE_SPANS.forEach((e, i) => {
     const len = e.length / TOTAL_LENGTH;
     const next = start + len;
     const last = i === EPISODE_SPANS.length - 1;
-    // where the ink starts to close (as in the overlay), and where it has opened on the next shot
-    if (!last && EPISODE_SPANS[i + 1].seamless) {
-      // the next episode continues this one's shot: no page to turn
+    if (last || EPISODE_SPANS[i + 1].seamless) {
+      // the next episode continues this one's shot (or nothing follows): the chapter goes on
       start = next;
       return;
     }
+    // the last shot of this chapter, and the opening shot of the next one
     const close = start + len * (e.id === 'city' ? 0.978 : 0.955);
-    const open = last ? next + (1 - next) * 0.2 : next + (EPISODE_SPANS[i + 1].length / TOTAL_LENGTH) * 0.12;
-    const reentry = e.reentry;
-    turns!.push({ from: close, to: open, seconds: last ? 2.2 : 3.4, back: reentry !== undefined && !last ? { at: next, to: start + len * reentry } : undefined });
+    const open = next + (EPISODE_SPANS[i + 1].length / TOTAL_LENGTH) * 0.12;
+    turns!.push({ from: close, to: open, back: chapterStart });
+    chapterStart = open;
     start = next;
   });
   return turns;
 }
 
-/** The page turn that starts at (or first after) a global progress, if any. */
+/** The chapter transition that starts at (or first after) a global progress, if any. */
 export function pageTurnFrom(p: number) {
   return pageTurns().find((z) => z.from >= p - 1e-6) ?? null;
 }
 
-/** Starts a page turn if the progress has just moved into one. */
+/** Where each chapter begins (global progress): its opening shot. */
+export function chapterStarts() {
+  return [0, ...pageTurns().map((z) => z.to)];
+}
+
+/**
+ * Who carries out a chapter transition (registered by ui/chapterTransition.ts):
+ * called once when the progress enters one, with the transition and the way
+ * the visitor was going. While it is busy (`chapterTurn.busy`) nothing else
+ * starts one.
+ */
+export const chapterTurn = {
+  busy: false,
+  run: null as ((z: PageTurn, forward: boolean) => void) | null,
+};
+/** The way the progress last moved (+1 forward, -1 back), for a transition entered from a standstill. */
+let lastDirection = 1;
+
+/** Starts a chapter transition if the progress has just moved into one. */
 function turnPage() {
+  if (chapterTurn.busy || !chapterTurn.run) return;
   const p = timeline.progress;
   for (const z of pageTurns()) {
     if (p <= z.from || p >= z.to) continue;
-    // the way the visitor is going; standing still inside one (a jump), the nearer side
-    const forward = timeline.target !== p ? timeline.target > p : p - z.from > z.to - p;
+    const forward = timeline.target !== p ? timeline.target > p : lastDirection > 0;
     if (forward && gateLimit() < z.to) return;
-    // back into an episode that restarts from an earlier point: close the ink, then cut there
-    const back = !forward && z.back && p > z.back.at ? z.back : null;
-    const edge = forward ? z.to : back ? back.at : z.from;
-    playProgress(p, edge, Math.max(0.35, (z.seconds * Math.abs(edge - p)) / (z.to - z.from)), true, back ? back.to : null);
+    chapterTurn.run(z, forward);
     return;
   }
 }
@@ -188,23 +206,17 @@ export function stepTimeline(dt: number) {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo({ top: p * max, behavior: 'auto' });
     if (u >= 1) {
-      if (autoplay.then !== null) {
-        // the cut: straight to the new point, under the ink (the overlay opens it again)
-        const q = autoplay.then;
-        timeline.target = timeline.progress = q;
-        window.scrollTo({ top: q * max, behavior: 'auto' });
-        cut.at = performance.now();
-        autoplay.then = null;
-      }
       if (autoplay.locked) holdUntil = performance.now() + 1000;
       autoplay.active = autoplay.locked = false;
     }
+    if (p !== prev) lastDirection = p > prev ? 1 : -1;
     timeline.velocity = damp(timeline.velocity, (p - prev) / Math.max(dt, 1e-4), 8, dt);
     return;
   }
   // heavy but responsive smoothing: scrolling feels like moving a camera dolly
   timeline.progress = damp(timeline.progress, timeline.target, 4.2, dt);
   if (Math.abs(timeline.progress - timeline.target) < 1e-5) timeline.progress = timeline.target;
+  if (timeline.progress !== prev) lastDirection = timeline.progress > prev ? 1 : -1;
   timeline.velocity = damp(timeline.velocity, (timeline.progress - prev) / Math.max(dt, 1e-4), 8, dt);
 }
 

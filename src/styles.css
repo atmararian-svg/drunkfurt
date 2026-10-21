@@ -7,6 +7,14 @@
   --display: 'Anton', 'Impact', 'Haettenschweiler', 'Arial Narrow Bold', sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* the chapter cards and the preloader (Figma "Drunkfurt"): the design's Berthold Akzidenz Grotesk
+     Bold Extended is not available as a web font; Archivo at its widest, heaviest is the stand-in */
+  --headline: 'Archivo', 'Arial Black', 'Helvetica Neue', Arial, sans-serif;
+  --label: 'JetBrains Mono', 'IBM Plex Mono', ui-monospace, Menlo, monospace;
+  /* the comic's print texture, for printed matter outside the 3D scene */
+  --halftone-ink: radial-gradient(circle, rgba(16, 16, 16, 0.075) 0.8px, transparent 1.25px);
+  --halftone-paper: radial-gradient(circle, rgba(241, 240, 233, 0.07) 0.8px, transparent 1.25px);
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .5 0 0 0 0 .5 0 0 0 0 .5 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   color-scheme: dark;
 }
 
@@ -23,6 +31,7 @@ html, body {
 .stage {
   position: fixed;
   inset: 0;
+  z-index: 1;
 }
 .stage canvas { display: block; }
 .scroll-track { width: 1px; }
@@ -30,8 +39,12 @@ html, body {
 .overlay {
   position: fixed;
   inset: 0;
+  z-index: 3;
   pointer-events: none;
+  transition: opacity 0.6s var(--ease);
 }
+/* while the preloader is up, the story's printed matter waits */
+.is-preloading .overlay { opacity: 0; transition: none; }
 body { cursor: pointer; }
 
 .veil {
@@ -43,75 +56,38 @@ body { cursor: pointer; }
 }
 .veil.is-on { opacity: 1; transition: none; }
 
-/* --- episode title panel ------------------------------------------------ */
-.title {
-  position: absolute;
-  left: max(28px, env(safe-area-inset-left, 0px));
-  bottom: max(13vh, 80px);
-  display: grid;
-  gap: 6px;
-  opacity: 0;
-  transform: translateY(8px);
-  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
-}
-.title.is-on { opacity: 1; transform: none; transition-delay: 0.6s; }
-.title-brand {
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.42em;
-  color: var(--paper);
-}
-.title-kicker {
-  font: 500 11px/1 var(--mono);
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--yellow);
-}
-.title-name {
-  margin: 0;
-  font: 400 clamp(64px, 11vw, 168px)/0.86 var(--display);
-  letter-spacing: 0.01em;
-  text-transform: uppercase;
-  color: var(--paper);
-  text-shadow: 4px 4px 0 var(--ink);
-}
-.title-sub {
-  font: 400 12px/1.4 var(--mono);
-  letter-spacing: 0.08em;
-  color: var(--paper);
-}
-
-/* --- comic caption boxes ------------------------------------------------ */
+/* --- narration panels ---------------------------------------------------
+   Printed panels of the comic itself: an off-white panel (narration) or a
+   charcoal one (narration that matters, with a thin yellow rule), both with
+   the page's halftone and paper grain printed into them. No tape. */
 .caption {
   position: absolute;
   max-width: min(360px, calc(100vw - 40px));
-  padding: 12px 14px 13px;
+  padding: 12px 15px 13px;
   border: 2px solid var(--ink);
-  box-shadow: 5px 5px 0 var(--ink);
-  background: var(--paper);
+  box-shadow: 4px 4px 0 rgba(16, 16, 16, 0.85);
+  background-color: #e9e8e2;
+  background-image: var(--halftone-ink), var(--grain);
+  background-size: 5px 5px, 180px 180px;
   color: var(--ink);
   opacity: 0;
-  transform: translateY(6px) rotate(-0.6deg);
+  transform: translateY(6px);
   transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
+  pointer-events: auto;
 }
-.caption.is-on { opacity: 1; transform: rotate(-0.6deg); }
-.caption--yellow { background: var(--yellow); }
-/* captions are cut paper, held down with a strip of yellow tape */
-.caption::before,
-.caption::after {
-  content: '';
-  position: absolute;
-  width: 54px;
-  height: 16px;
-  background: rgba(245, 210, 26, 0.72);
-  mix-blend-mode: multiply;
-  pointer-events: none;
+.caption.is-on { opacity: 1; transform: none; }
+.caption:not(.is-on) { pointer-events: none; }
+.caption--yellow {
+  background-color: #1d1d1c;
+  background-image: var(--halftone-paper), var(--grain);
+  color: var(--paper);
+  border-color: #1d1d1c;
+  border-left: 3px solid var(--yellow);
 }
-.caption::before { top: -9px; left: 14px; transform: rotate(-8deg); }
-.caption::after { bottom: -8px; right: 18px; width: 38px; transform: rotate(6deg); }
-.caption--yellow::before,
-.caption--yellow::after { background: rgba(241, 240, 233, 0.75); mix-blend-mode: normal; }
 /* a speech balloon: his words, with a tail down towards him */
 .caption--speech {
+  background-image: none;
+  background-color: var(--paper);
   padding: 14px 20px 15px;
   border-radius: 50% / 46%;
   box-shadow: none;
@@ -119,6 +95,12 @@ body { cursor: pointer; }
 }
 .caption--speech.is-on { transform: none; }
 .caption--speech p { font: 400 clamp(18px, 2.2vw, 24px)/1.15 var(--display); text-transform: uppercase; letter-spacing: 0.02em; text-align: center; }
+.caption--speech::before,
+.caption--speech::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+}
 .caption--speech::before {
   top: auto;
   bottom: -26px;
@@ -208,6 +190,21 @@ body { cursor: pointer; }
   .rev-key { display: none; }
   .rev-touch { display: inline; }
 }
+/* once D is pressed: four marks, one per throttle press, and the pedal's travel */
+.rev-run { display: none; align-items: center; gap: 12px; }
+.rev-prompt.is-revving .rev-ask { display: none; }
+.rev-prompt.is-revving .rev-run { display: inline-flex; }
+.rev-pips { display: inline-flex; gap: 5px; }
+.rev-pip {
+  width: 14px;
+  height: 10px;
+  border: 1px solid rgba(241, 240, 233, 0.5);
+  transform: skewX(-12deg);
+  transition: background-color 0.12s linear, border-color 0.12s linear;
+}
+.rev-pip.is-lit { background: var(--yellow); border-color: var(--yellow); }
+.rev-bar { position: relative; width: 64px; height: 4px; background: rgba(241, 240, 233, 0.18); overflow: hidden; }
+.rev-bar i { position: absolute; inset: 0; background: var(--paper); transform-origin: 0 50%; transform: scaleX(0); }
 
 /* --- scroll cue --------------------------------------------------------- */
 .cue {
@@ -471,3 +468,203 @@ body { cursor: pointer; }
 }
 .handoff-open:focus-visible,
 .handoff-back:focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
+
+
+/* --- chapter transitions: the copy of the page being left, under the stage while it is uncovered */
+.chapter-out {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  width: 100vw;
+  height: 100vh;
+  transform-origin: 50% 0%;
+  pointer-events: none;
+}
+
+/* --- decoding text (ui/decode.ts) ------------------------------------------- */
+.dc-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.dc-word { white-space: nowrap; }
+.dc-ch { position: relative; display: inline-block; }
+.dc-ch[data-g] > .dc-o { visibility: hidden; }
+.dc-ch[data-g]::after {
+  content: attr(data-g);
+  position: absolute;
+  left: 50%;
+  top: 0;
+  transform: translateX(-50%);
+}
+
+/* --- chapter title cards (Figma Example-chapter-1…3) --------------------------
+   A frosted glass panel, 1471 × 836 in the 1920 × 1080 design, tilted 6°,
+   its top-right corner showing in the bottom-left of the screen: the title and
+   two label lines at its top, the rest of it bleeding off the edges. Sizes
+   follow the design's units (--u = one design pixel). */
+.tcard {
+  --u: max(calc(100vw / 1920), 0.24px);
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+.tcard.is-on { visibility: visible; }
+.tcard-slide {
+  position: absolute;
+  left: 0;
+  top: calc(100% - 614 * var(--u));
+  transform: translateX(-104%);
+}
+.tcard-panel {
+  /* the panel reaches 600 design px off the left edge, so its left edge is never seen */
+  margin-left: calc(-600 * var(--u));
+  padding: calc(24 * var(--u)) calc(24 * var(--u)) 0 calc((600 + 56) * var(--u));
+  min-height: calc(836 * var(--u));
+  transform-origin: calc(600 * var(--u)) 0;
+  transform: rotate(6deg);
+  background-color: rgba(240, 240, 240, 0.1);
+  background-image: var(--halftone-paper), var(--grain);
+  background-size: 5px 5px, 180px 180px;
+  -webkit-backdrop-filter: blur(20px) saturate(1.15) brightness(0.92);
+  backdrop-filter: blur(20px) saturate(1.15) brightness(0.92);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 1px 0 0 rgba(255, 255, 255, 0.12), 0 calc(4 * var(--u)) calc(41 * var(--u)) rgba(0, 0, 0, 0.25);
+  color: #fff;
+}
+.tcard-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: calc(64 * var(--u));
+  font: 700 max(calc(16 * var(--u)), 9px) / 1 var(--label);
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tcard-title {
+  margin: max(calc(24 * var(--u)), 8px) 0 0;
+  font-family: var(--headline);
+  font-weight: 800;
+  font-stretch: 125%;
+  font-size: max(calc(140 * var(--u)), 34px);
+  line-height: 0.82;
+  letter-spacing: -0.05em;
+  text-align: right;
+  white-space: nowrap;
+}
+.tcard [data-decode-in] { pointer-events: auto; }
+
+/* --- the preloader (Figma Preloader-Start / Preloader-Final) ---------------- */
+.preloader {
+  --pl-pad: 24px;
+  position: fixed;
+  inset: 0;
+  z-index: 6;
+  overflow: hidden;
+  background: #111;
+  color: #fff;
+  font: 700 14px/1 var(--label);
+  letter-spacing: -0.05em;
+  transform-origin: 50% 0%;
+  cursor: default;
+}
+.preloader.is-leaving { z-index: 0; }
+/* print texture: a fine halftone and paper grain over the whole page… */
+.pl-grain,
+.pl-dots {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pl-grain { background-image: var(--grain); background-size: 180px 180px; opacity: 0.9; mix-blend-mode: screen; }
+.pl-dots { background-image: var(--halftone-paper); background-size: 6px 6px; }
+/* …and under the pointer a denser, darker-inked screen shows through, feathered at the edge */
+.pl-dots::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(241, 240, 233, 0.16) 1px, transparent 1.6px);
+  background-size: 4px 4px;
+  opacity: 0;
+  transition: opacity 0.4s var(--ease);
+  -webkit-mask-image: radial-gradient(circle 150px at var(--px, -999px) var(--py, -999px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+  mask-image: radial-gradient(circle 150px at var(--px, -999px) var(--py, -999px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
+}
+.preloader.has-pointer .pl-dots::after { opacity: 1; }
+.pl-status {
+  position: absolute;
+  top: var(--pl-pad);
+  left: var(--pl-pad);
+  margin: 0;
+}
+.pl-status.is-error { color: var(--yellow); }
+.pl-chapters {
+  position: absolute;
+  top: var(--pl-pad);
+  right: var(--pl-pad);
+  display: flex;
+  justify-content: flex-end;
+  gap: 20px;
+}
+.pl-chapter { position: relative; white-space: nowrap; }
+.pl-chapter.is-active::before {
+  content: '';
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  width: 6px;
+  height: 6px;
+  margin-top: -3px;
+  background: var(--yellow);
+}
+.pl-chapter.is-failed { opacity: 0.4; text-decoration: line-through; }
+.pl-chapter.is-late { opacity: 0.6; }
+.pl-once {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  margin: 0;
+  transform: translate(-50%, -50%);
+  white-space: nowrap;
+}
+/* the dots count up, one, two, three, over and over; they keep their places, so nothing moves */
+.pl-ellipsis i { font-style: normal; animation: pl-dot 1.8s steps(1, end) infinite; }
+.pl-ellipsis i:nth-child(2) { animation-name: pl-dot2; }
+.pl-ellipsis i:nth-child(3) { animation-name: pl-dot3; }
+@keyframes pl-dot { 0% { visibility: visible; } }
+@keyframes pl-dot2 { 0% { visibility: hidden; } 33.3% { visibility: visible; } }
+@keyframes pl-dot3 { 0% { visibility: hidden; } 66.6% { visibility: visible; } }
+.pl-mark {
+  position: absolute;
+  left: var(--pl-pad);
+  bottom: var(--pl-pad);
+  line-height: 0;
+}
+.pl-word {
+  display: block;
+  font-family: var(--headline);
+  font-weight: 800;
+  font-stretch: 125%;
+  font-size: 100px;
+  line-height: 0.74;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+  padding-top: 0.04em;
+}
+.pl-stroke {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pl-ellipsis i { animation: none; }
+}

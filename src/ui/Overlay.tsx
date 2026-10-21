@@ -2,40 +2,24 @@ import { useEffect, useRef } from 'react';
 import { audio } from '../audio/AudioDirector';
 import { clamp } from '../core/math';
 import { story, useStory } from '../core/store';
-import { EPISODE_SPANS, cut, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
-import { PLANNED, builtEpisodes } from '../episodes';
+import { CHAPTERS } from '../core/chapters';
+import { chapterTurn, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
+import { builtEpisodes } from '../episodes';
+import { hoverDecode } from './decode';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
 import { enterSite, monitor, onScreen } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 
-/** An episode that picks up the previous one's last shot, with no page turn between them. */
-const seamless = (id: string) => !!EPISODE_SPANS.find((e) => e.id === id)?.seamless;
-const nextOf = (id: string) => EPISODE_SPANS[EPISODE_SPANS.findIndex((e) => e.id === id) + 1];
-
-/** Seconds the ink takes to open after a cut (going back into an episode at an earlier point). */
-const CUT_OPEN = 0.9;
-
-/** Ink coverage of the frame: the progress's own, and over it the opening after a cut. */
-function inkNow(p: number): { w: number; mode: 'close' | 'open' } {
-  const own = inkAt(p);
-  const since = (performance.now() - cut.at) / 1000;
-  if (since >= CUT_OPEN) return own;
-  const w = 1 - since / CUT_OPEN;
-  return w > own.w ? { w, mode: 'open' } : own;
-}
-
-/** Ink coverage of the frame at a given progress: episode ends, episode starts, and the strike's cut. */
+/**
+ * Ink over the whole frame at a given progress: the fight's black (the
+ * defended fight goes dark before the hits) and the closing card. Moving
+ * between chapters is the chapter transition's (chapterTransition.ts), not ink.
+ */
 function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
   const { id, local } = locate(p);
   if (id === 'outro') return { w: 1, mode: 'close' };
-  // the city's last shot (the aftermath) holds longer before the page turns
-  const end = id === 'city' ? 0.978 : 0.955;
-  if (local > end && !nextOf(id)?.seamless) return { w: (local - end) / (1 - end), mode: 'close' };
-  const first = EPISODE_SPANS[0].id === id || seamless(id);
-  if (!first && local < 0.045) return { w: 1, mode: 'open' };
-  if (!first && local < 0.12) return { w: 1 - (local - 0.045) / 0.075, mode: 'open' };
   if (id === 'city' && encounter.outcome) {
     // once the fight has gone black, the page stays inked until the aftermath opens it again
     const t = encounterAt(local).t;
@@ -55,7 +39,6 @@ const pad = (n: number) => String(n).padStart(2, '0');
  * scroll progress as the camera, updated per frame through refs.
  */
 export function Overlay() {
-  const phase = useStory((s) => s.phase);
   const prompt = useStory((s) => s.prompt);
   const sound = useStory((s) => s.sound);
   const root = useRef<HTMLDivElement>(null);
@@ -66,11 +49,12 @@ export function Overlay() {
     const el = root.current!;
     const captions = Array.from(el.querySelectorAll<HTMLElement>('[data-caption]'));
     const capDefs = episodes.flatMap((ep) => ep.captions);
-    const titles = Array.from(el.querySelectorAll<HTMLElement>('[data-title]'));
     const fill = el.querySelector<HTMLElement>('.rail-fill')!;
     const cue = el.querySelector<HTMLElement>('.cue')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
     const credits = el.querySelector<HTMLElement>('.credits')!;
+    const rail = Array.from(el.querySelectorAll<HTMLElement>('.rail li'));
+    const chapterNow = (id: string) => CHAPTERS.find((c) => (c.episodes as string[]).includes(id))?.number ?? CHAPTERS.length;
     const wipe = el.querySelector<HTMLCanvasElement>('.wipe')!;
     const hit = el.querySelector<HTMLCanvasElement>('.impact')!;
     const wctx = wipe.getContext('2d')!;
@@ -97,22 +81,14 @@ export function Overlay() {
         const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to) && (!when || when());
         c.classList.toggle('is-on', on);
       });
-      // a title shows at the start of its episode; later episodes show it over the ink of the hand-over
-      titles.forEach((t) => {
-        const i = episodes.findIndex((e) => e.id === t.dataset.ep);
-        const own = t.dataset.ep === id && local < (i === 0 ? 0.09 : 0.13);
-        // over the ink of a page turn; an episode that continues the last shot shows its title over the scene
-        const inked = i > 0 && !seamless(t.dataset.ep!);
-        const handover = inked && episodes[i - 1].id === id && local > 0.975;
-        t.classList.toggle('is-on', own || handover);
-        t.classList.toggle('on-ink', inked);
-      });
       fill.style.transform = `scaleY(${p})`;
       cue.classList.toggle('is-on', p < 0.004);
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
       credits.classList.toggle('is-on', id === 'home' && monitor.armed && !monitor.entering);
+      // the rail marks the chapter you are in
+      rail.forEach((li) => li.classList.toggle('is-here', Number(li.dataset.chapter) === chapterNow(id)));
 
-      const ink = inkNow(p);
+      const ink = inkAt(p);
       const key = `${ink.w.toFixed(3)}${ink.mode}${wipe.width}`;
       if (key !== last) {
         drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, id === 'city' && local > 0.5 ? 13 : 7);
@@ -143,6 +119,13 @@ export function Overlay() {
     };
   }, [episodes]);
 
+  /** The printed text decodes where the pointer passes over it (captions, title cards). */
+  useEffect(() => {
+    const el = root.current!;
+    const detach = Array.from(el.querySelectorAll<HTMLElement>('[data-decode], [data-decode-in]')).map((t) => hoverDecode(t));
+    return () => detach.forEach((d) => d());
+  }, [episodes]);
+
   /** Click / tap / Enter: act on the prompt if one is waiting, otherwise go to the next composed beat. */
   useEffect(() => {
     const unlock = () => {
@@ -150,6 +133,8 @@ export function Overlay() {
       audio.setEnabled(story.getState().sound);
     };
     const next = (e?: MouseEvent) => {
+      // a chapter transition plays by itself
+      if (chapterTurn.busy) return;
       // the last scene: only a click on the big screen does anything (Enter takes you in as well)
       if (monitor.entering) return;
       if (story.getState().prompt === 'monitor') {
@@ -160,7 +145,7 @@ export function Overlay() {
         defend();
         return;
       }
-      // revving is done by holding D (or the tachometer), not by clicking on
+      // revving starts with D (or a press on its card), not with a click
       if (story.getState().prompt === 'rev') return;
       const { id, local } = locate(timeline.target);
       const ep = episodes.find((e) => e.id === id);
@@ -178,7 +163,7 @@ export function Overlay() {
     };
     const onClick = (e: MouseEvent) => {
       unlock();
-      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.handoff')) return;
+      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.handoff,.preloader')) return;
       next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -212,16 +197,20 @@ export function Overlay() {
 
   return (
     <div className="overlay" ref={root}>
-      <div className={`veil ${phase === 'loading' ? 'is-on' : ''}`} />
       <canvas className="wipe" aria-hidden />
 
-      {episodes.map((ep) => (
-        <header key={ep.id} className="title" data-title data-ep={ep.id}>
-          <span className="title-brand">DRUNKFURT</span>
-          <span className="title-kicker">Episode {pad(ep.number)}</span>
-          <h1 className="title-name">{ep.title}</h1>
-          <span className="title-sub">{ep.subtitle}</span>
-        </header>
+      {CHAPTERS.map((c) => (
+        <div key={c.number} className="tcard" data-chapter={c.number} role="status" aria-label={`Chapter ${c.number}: ${c.title}. ${c.place}, ${c.time}`}>
+          <div className="tcard-slide">
+            <div className="tcard-panel">
+              <div className="tcard-meta" aria-hidden>
+                <span data-decode-in data-text={`DRUNKFURT / CHAPTER ${c.number}`} />
+                <span data-decode-in data-text={`${c.place.toUpperCase()} / ${c.time}`} />
+              </div>
+              <h2 className="tcard-title" aria-hidden data-decode-in data-text={c.title.toUpperCase()} />
+            </div>
+          </div>
+        </div>
       ))}
 
       {episodes.flatMap((ep) =>
@@ -234,8 +223,8 @@ export function Overlay() {
             data-from={c.from}
             data-to={c.to}
           >
-            {c.kicker && <span className="caption-kicker">{c.kicker}</span>}
-            <p>{c.text}</p>
+            {c.kicker && <span className="caption-kicker" data-decode data-text={c.kicker} />}
+            <p data-decode data-text={c.text} />
           </aside>
         )),
       )}
@@ -263,19 +252,16 @@ export function Overlay() {
         <i />
       </div>
 
-      <nav className="rail" aria-label="DRUNKFURT episodes">
+      <nav className="rail" aria-label="DRUNKFURT chapters">
         <div className="rail-line">
           <div className="rail-fill" />
         </div>
         <ol>
-          {PLANNED.map((p) => {
-            const built = EPISODE_SPANS.find((_, i) => i === p.number - 1);
-            return (
-              <li key={p.number} className={built ? 'is-built' : ''} title={p.title}>
-                <span>{pad(p.number)}</span>
-              </li>
-            );
-          })}
+          {CHAPTERS.map((c) => (
+            <li key={c.number} className="is-built" data-chapter={c.number} title={c.title}>
+              <span>{pad(c.number)}</span>
+            </li>
+          ))}
         </ol>
       </nav>
 

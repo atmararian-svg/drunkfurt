@@ -38,6 +38,12 @@ export interface EpisodeDef {
   /** Optional per-frame adjustment of the sampled camera pose (e.g. keep a subject in frame). */
   adjustPose?: (local: number, pose: CameraPose) => void;
   captions: Caption[];
+  /**
+   * Puts the episode's own state back to its beginning (interactions, their
+   * gates, anything remembered across frames). Called when its chapter starts
+   * (again): entering it, or going back into it.
+   */
+  reset?: () => void;
   /** Local progress values a click advances between. */
   beats: number[];
   /**

@@ -4,7 +4,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 import type { CameraPose } from '../../core/sequence';
 import type { EpisodeDef } from '../../episodes/types';
 import { CityScene } from './CityScene';
-import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
+import { BEAT, BLOCK, KO, encounter, encounterAt, resetEncounter } from './encounter';
 import { strangerGroundAt } from './strangerRoute';
 import { cityTrack } from './track';
 
@@ -89,6 +89,7 @@ export const cityEpisode: EpisodeDef = {
   subtitle: 'Outside Frankfurt (Main) Hbf · 23:59',
   World: CityScene,
   track: cityTrack,
+  reset: resetEncounter,
   adjustPose: encounterCamera,
   // the visitor can lean and crane, but not into the shop windows or the parked cars
   clampHead: (base, o) => {

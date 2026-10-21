@@ -1,9 +1,9 @@
-import accel1Url from '../assets/audio/accel-1.mp3?url';
-import accel2Url from '../assets/audio/accel-2.mp3?url';
-import accel3Url from '../assets/audio/accel-3.mp3?url';
+import revEngineUrl from '../assets/audio/aggressive-supercar-engine.mp3?url';
 import doorOpenUrl from '../assets/audio/door-open.mp3?url';
 import engineDefaultUrl from '../assets/audio/engine-default.mp3?url';
 import engineStartUrl from '../assets/audio/engine-start.mp3?url';
+import exhalesUrl from '../assets/audio/exhales.mp3?url';
+import hitsUrl from '../assets/audio/hits.mp3?url';
 import gearShiftUrl from '../assets/audio/gear-shift.mp3?url';
 import wheelsUrl from '../assets/audio/wheels.mp3?url';
 
@@ -33,20 +33,19 @@ export const cues = {
   trainIdleHum: { src: null, bus: 'ambience', loop: true, gain: 0.35 },
   footstepPlatform: { src: null, bus: 'sfx', gain: 0.5 },
   stepDown: { src: null, bus: 'sfx', gain: 0.7 },
-  // the fight in Episode 02: drop recordings into /public/audio and set src; until then they are synthesised
-  fightExhale1: { src: null, bus: 'body', gain: 0.9 },
-  fightExhale2: { src: null, bus: 'body', gain: 0.9 },
-  fightBlock: { src: null, bus: 'body', gain: 1 },
-  fightPunch: { src: null, bus: 'body', gain: 1 },
+  // the fight in Episode 02: the two supplied recordings, each holding two sounds: the hits ("Удары",
+  // the block and the punch) and the exhales ("Выдохи"); each sound is played as its own slice of
+  // its file (FIGHT_SLICES), so each lands exactly on its hit
+  fightHits: { src: hitsUrl, bus: 'body', gain: 1 },
+  fightExhales: { src: exhalesUrl, bus: 'body', gain: 0.85 },
+  // the knockout's sounds are synthesised until a recording is set here
   fightKnockout: { src: null, bus: 'body', gain: 1 },
   fightRing: { src: null, bus: 'body', gain: 0.6 },
   fightFall: { src: null, bus: 'body', gain: 0.9 },
-  // the getaway (episode 3): the supplied recordings. Revving on the spot plays one of the three
-  // accel recordings per press (one-shots: a blip of throttle and its fall); the launch plays the
-  // wheels (tyres breaking traction) and the gear-shift recording from 3.00 s into the file.
-  accel1: { src: accel1Url, bus: 'body', gain: 0.95 },
-  accel2: { src: accel2Url, bus: 'body', gain: 0.95 },
-  accel3: { src: accel3Url, bus: 'body', gain: 0.95 },
+  // the getaway (episode 3): the supplied recordings. The rev sequence on the spot is the one
+  // recording aggressive-supercar-engine (four throttle blips; see REV_SLICES); the launch plays
+  // the wheels (tyres breaking traction) and the gear-shift recording from 3.00 s into the file.
+  revEngine: { src: revEngineUrl, bus: 'body', gain: 0.9 },
   wheels: { src: wheelsUrl, bus: 'body', gain: 0.8 },
   gearShift: { src: gearShiftUrl, bus: 'body', gain: 0.95 },
   // the driver's door opening, the engine starting, and the engine idling (the supplied recordings):
@@ -64,6 +63,31 @@ export const cues = {
 } satisfies Record<string, CueDef>;
 
 export type CueId = keyof typeof cues;
+
+/**
+ * Where each fight sound is in its recording (seconds): the slice played, its transient (the
+ * moment of contact, or the breath's onset), and a level, so the two hits sit together (the first
+ * is recorded much quieter). Every slice is started so that its transient falls LEAD seconds after
+ * the cue, so a hit and its exhale, cued together, land together.
+ */
+const FIGHT_SLICES = {
+  block: { cue: 'fightHits', from: 0.88, to: 1.12, at: 0.925, level: 3.2 },
+  punch: { cue: 'fightHits', from: 1.12, to: 1.58, at: 1.165, level: 0.85 },
+  exhale1: { cue: 'fightExhales', from: 0.82, to: 1.12, at: 0.87, level: 0.9 },
+  exhale2: { cue: 'fightExhales', from: 1.12, to: 1.73, at: 1.15, level: 0.9 },
+} as const;
+const FIGHT_LEAD = 0.03;
+
+/**
+ * The rev sequence from aggressive-supercar-engine (9.0 s, 48 kHz): four
+ * throttle blips whose rises begin at about 0.62, 1.80, 2.70 and 3.85 s of the
+ * file (the revs peak at 1.30, 2.25, 3.35 and 4.30 s). Each blip is played as
+ * its own slice, started on its press (0, 1, 2, 3 s into the sequence), so the
+ * sound keeps exact time with the presses and the needle; neighbouring slices
+ * overlap by REV_XFADE. The last runs on into the launch, which fades it.
+ */
+const REV_SLICES = [0.62, 1.8, 2.7, 3.85];
+const REV_XFADE = 0.08;
 /** The rpm the engineLoop recording (if one is supplied) was made at. */
 export const ENGINE_LOOP_RPM = 3000;
 
@@ -320,10 +344,11 @@ class AudioDirector {
    *  - punch:   knuckles on a jaw: a hard crack with a deep body thump.
    */
   fight(kind: 'exhale1' | 'exhale2' | 'block' | 'punch' | 'ko' | 'ring' | 'fall') {
-    const cue = ({ exhale1: 'fightExhale1', exhale2: 'fightExhale2', block: 'fightBlock', punch: 'fightPunch', ko: 'fightKnockout', ring: 'fightRing', fall: 'fightFall' } as const)[kind];
-    if (this.play(cue)) return;
     const ctx = this.ctx;
     if (!ctx) return;
+    if (kind === 'exhale1' || kind === 'exhale2' || kind === 'block' || kind === 'punch') {
+      if (this.playSlice(kind)) return;
+    } else if (this.play(({ ko: 'fightKnockout', ring: 'fightRing', fall: 'fightFall' } as const)[kind])) return;
     const t = ctx.currentTime;
     const out = this.buses.get('body')!;
     const noiseHit = (type: BiquadFilterType, freq: number, q: number, peak: number, attack: number, decay: number, at = 0) => {
@@ -395,6 +420,28 @@ class AudioDirector {
       tone('sine', 120, 42, 0.62, 0.006, 0.38);
       noiseHit('lowpass', 800, 0.7, 0.35, 0.004, 0.16, 0.01);
     }
+  }
+
+  /** One fight sound from its recording (a slice of the file, its transient FIGHT_LEAD s from now); false if not loaded. */
+  private playSlice(kind: keyof typeof FIGHT_SLICES) {
+    const ctx = this.ctx!;
+    const sl = FIGHT_SLICES[kind];
+    const buffer = this.buffers.get(sl.cue);
+    if (!buffer) return false;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = ctx.createGain();
+    const t = ctx.currentTime;
+    const start = Math.max(sl.from, sl.at - FIGHT_LEAD);
+    const level = ((cues[sl.cue] as CueDef).gain ?? 1) * sl.level;
+    // a 6 ms fade in (the slice starts mid-file) and a short fade at its end
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(level, t + 0.006);
+    g.gain.setValueAtTime(level, t + (sl.to - start) - 0.03);
+    g.gain.linearRampToValueAtTime(0, t + (sl.to - start));
+    src.connect(g).connect(this.buses.get('body')!);
+    src.start(t, start, sl.to - start + 0.01);
+    return true;
   }
 
   /** A slow, quiet heartbeat while time is stretched; level 0 stops it. */
@@ -729,34 +776,12 @@ class AudioDirector {
   // -------------------------------------------------------------------------
   // the getaway's recordings
 
-  private rev: { src: AudioBufferSourceNode; gain: GainNode; id: CueId } | null = null;
-  private revBag: CueId[] = [];
-  private revLast: CueId | null = null;
+  private revNodes: { src: AudioBufferSourceNode; gain: GainNode }[] = [];
   private launch: { src: AudioBufferSourceNode; gain: GainNode }[] = [];
 
   /** Is the recording for this cue decoded and ready? */
   has(id: CueId) {
     return this.buffers.has(id);
-  }
-
-  /**
-   * The next of the three accel recordings: a shuffled bag, refilled when
-   * empty, never starting with the one that just played, so the order changes
-   * and the same recording never plays twice in a row.
-   */
-  private nextRev(): CueId | null {
-    const all = (['accel1', 'accel2', 'accel3'] as CueId[]).filter((id) => this.buffers.has(id));
-    if (!all.length) return null;
-    if (!this.revBag.length) {
-      const bag = [...all];
-      for (let i = bag.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [bag[i], bag[j]] = [bag[j], bag[i]];
-      }
-      if (bag.length > 1 && bag[0] === this.revLast) bag.push(bag.shift()!);
-      this.revBag = bag;
-    }
-    return this.revBag.shift()!;
   }
 
   private fadeOut(node: { src: AudioBufferSourceNode; gain: GainNode }, seconds: number) {
@@ -773,48 +798,51 @@ class AudioDirector {
   }
 
   /**
-   * D goes down: one accel recording, from the start (or a little into it if
-   * the revs are already up, so it picks up where the engine is). Whatever
-   * was playing is faded out quickly first: never two at once. Returns the
-   * cue played, or null when none is ready (the synthesised engine covers it).
+   * The rev sequence's sound, once per sequence: the four slices of
+   * aggressive-supercar-engine scheduled on the audio clock at 0, 1, 2 and 3 s
+   * from now (REV_SLICES). Returns false when the recording is not ready; the
+   * sequence and the launch run regardless.
    */
-  revPress(rpm: number): CueId | null {
+  revSequence() {
     const ctx = this.ctx;
-    if (!ctx || ctx.state !== 'running') return null;
-    if (this.rev) this.fadeOut(this.rev, 0.06);
-    this.rev = null;
-    const id = this.nextRev();
-    if (!id) return null;
-    const buffer = this.buffers.get(id)!;
-    const src = ctx.createBufferSource();
-    src.buffer = buffer;
-    const gain = ctx.createGain();
-    const level = (cues[id] as CueDef).gain ?? 1;
-    const t = ctx.currentTime;
-    gain.gain.setValueAtTime(0, t);
-    gain.gain.linearRampToValueAtTime(level, t + 0.03);
-    src.connect(gain).connect(this.buses.get('body')!);
-    const offset = Math.min(buffer.duration * 0.4, Math.max(0, ((rpm - 800) / 5200) * 0.9));
-    src.start(t, offset);
-    const node = { src, gain, id };
-    src.onended = () => {
-      if (this.rev === node) this.rev = null;
-    };
-    this.rev = node;
-    this.revLast = id;
-    return id;
+    const buffer = this.buffers.get('revEngine');
+    if (!ctx || ctx.state !== 'running' || !buffer) return false;
+    this.revStop(0.05);
+    const t0 = ctx.currentTime + 0.01;
+    const level = (cues.revEngine as CueDef).gain ?? 1;
+    REV_SLICES.forEach((from, i) => {
+      const last = i === REV_SLICES.length - 1;
+      const at = t0 + i;
+      // each slice runs to the next press (plus the crossfade); the last on into the launch
+      const length = last ? Math.min(2.4, buffer.duration - from) : 1 + REV_XFADE;
+      const src = ctx.createBufferSource();
+      src.buffer = buffer;
+      const gain = ctx.createGain();
+      gain.gain.setValueAtTime(0, at);
+      gain.gain.linearRampToValueAtTime(level, at + (i === 0 ? 0.02 : REV_XFADE));
+      gain.gain.setValueAtTime(level, at + length - REV_XFADE);
+      gain.gain.linearRampToValueAtTime(0, at + length);
+      src.connect(gain).connect(this.buses.get('body')!);
+      src.start(at, Math.max(0, from - (i === 0 ? 0 : REV_XFADE / 2)), length + 0.02);
+      const node = { src, gain };
+      src.onended = () => {
+        this.revNodes = this.revNodes.filter((n) => n !== node);
+      };
+      this.revNodes.push(node);
+    });
+    return true;
   }
 
-  /** D comes up before the launch: the recording falls away with the revs (about as fast as the needle). */
-  revRelease() {
-    if (!this.ctx || !this.rev) return;
-    this.fadeOut(this.rev, 0.45);
-    this.rev = null;
+  /** The rev sequence's sound fades out (cancelled, or the launch takes over). */
+  revStop(seconds = 0.3) {
+    if (!this.ctx) return;
+    for (const n of this.revNodes) this.fadeOut(n, seconds);
+    this.revNodes = [];
   }
 
-  /** An accel recording is sounding now (the synthesised idle stays out of its way). */
+  /** The rev sequence's sound is playing (the idle stays out of its way). */
   get revving() {
-    return !!this.rev;
+    return this.revNodes.length > 0;
   }
 
   /**
@@ -827,8 +855,8 @@ class AudioDirector {
   launchStart(offset: number, late = 0) {
     const ctx = this.ctx;
     if (!ctx || ctx.state !== 'running' || this.launch.length) return false;
-    if (this.rev) this.fadeOut(this.rev, 0.12);
-    this.rev = null;
+    // the revs hand over to the launch's own recordings
+    this.revStop(0.4);
     const t = ctx.currentTime;
     for (const [id, from] of [['wheels', 0], ['gearShift', offset]] as [CueId, number][]) {
       const buffer = this.buffers.get(id);
@@ -851,8 +879,7 @@ class AudioDirector {
     if (!this.ctx) return;
     for (const n of this.launch) this.fadeOut(n, seconds);
     this.launch = [];
-    if (this.rev) this.fadeOut(this.rev, Math.min(seconds, 0.3));
-    this.rev = null;
+    this.revStop(Math.min(seconds, 0.3));
   }
 
   /** The launch's recordings are playing. */
