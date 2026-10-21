@@ -2,7 +2,7 @@ import { Canvas } from '@react-three/fiber';
 import { Suspense, useEffect } from 'react';
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 import { useStory } from './core/store';
-import { EpisodeId, TOTAL_LENGTH, locate, readScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
+import { EpisodeId, TOTAL_LENGTH, autoplay, locate, readScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
@@ -48,12 +48,20 @@ export function App() {
     const onScroll = () => readScroll();
     window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener('resize', onScroll);
-    // the visitor takes over from a scripted beat the moment they scroll themselves
+    // the visitor takes over from a scripted beat the moment they scroll themselves; a locked
+    // one (a page turn, the getaway's launch) cannot be taken over, and while it plays the page
+    // does not scroll under it either: wheel (including a trackpad's momentum), touch and scroll
+    // keys are swallowed, so it ends exactly where it was going
+    const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'];
     const interrupt = (e: Event) => {
-      if (e instanceof KeyboardEvent && !['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'].includes(e.code)) return;
+      if (e instanceof KeyboardEvent && !scrollKeys.includes(e.code)) return;
+      if (autoplay.active && autoplay.locked) {
+        if (e.cancelable) e.preventDefault();
+        return;
+      }
       stopAutoplay();
     };
-    for (const ev of ['wheel', 'touchstart', 'keydown'] as const) window.addEventListener(ev, interrupt, { passive: true });
+    for (const ev of ['wheel', 'touchstart', 'touchmove', 'keydown'] as const) window.addEventListener(ev, interrupt, { passive: false });
     if (import.meta.env.DEV) {
       (window as unknown as Record<string, unknown>).__drunkfurt = {
         timeline,
@@ -83,7 +91,7 @@ export function App() {
     return () => {
       window.removeEventListener('scroll', onScroll);
       window.removeEventListener('resize', onScroll);
-      for (const ev of ['wheel', 'touchstart', 'keydown'] as const) window.removeEventListener(ev, interrupt);
+      for (const ev of ['wheel', 'touchstart', 'touchmove', 'keydown'] as const) window.removeEventListener(ev, interrupt);
     };
   }, []);
 

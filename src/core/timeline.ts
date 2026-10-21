@@ -75,6 +75,12 @@ export function localProgress(id: EpisodeId, p = timeline.progress) {
  * frame rate cannot stretch it. Any input from the visitor stops it where it is.
  */
 export const autoplay = { active: false, from: 0, to: 0, seconds: 1, start: 0, locked: false };
+/**
+ * After a locked move ends, the page holds its final position for a moment
+ * (performance.now() until which it does), so a scroll already in flight
+ * (an inertial flick begun before it) cannot drag the story back off it.
+ */
+let holdUntil = 0;
 
 /** `locked`: the visitor's scrolling does not stop it (a page turn always completes). */
 export function playProgress(from: number, to: number, seconds: number, locked = false) {
@@ -84,6 +90,7 @@ export function playProgress(from: number, to: number, seconds: number, locked =
 /** Stops a scripted move, unless it is a page turn. */
 export function stopAutoplay(force = false) {
   if (autoplay.locked && !force) return;
+  if (force) holdUntil = 0;
   autoplay.active = false;
   autoplay.locked = false;
 }
@@ -148,7 +155,10 @@ export function stepTimeline(dt: number) {
     timeline.target = timeline.progress = p;
     const max = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo({ top: p * max, behavior: 'auto' });
-    if (u >= 1) autoplay.active = autoplay.locked = false;
+    if (u >= 1) {
+      if (autoplay.locked) holdUntil = performance.now() + 600;
+      autoplay.active = autoplay.locked = false;
+    }
     timeline.velocity = damp(timeline.velocity, (p - prev) / Math.max(dt, 1e-4), 8, dt);
     return;
   }
@@ -192,6 +202,11 @@ export function gateLimit() {
 
 export function readScroll() {
   const max = document.documentElement.scrollHeight - window.innerHeight;
+  // a locked move (and the moment after one) owns the position: put the page back on it
+  if ((autoplay.active && autoplay.locked) || (!autoplay.active && performance.now() < holdUntil)) {
+    window.scrollTo({ top: timeline.target * max, behavior: 'auto' });
+    return;
+  }
   let raw = max > 0 ? clamp(window.scrollY / max, 0, 1) : 0;
   // a page turn ends exactly on its edge: the scroll position's rounding must not land back inside it
   for (const z of pageTurns()) for (const edge of [z.from, z.to]) if (Math.abs(raw - edge) < 0.0015) raw = edge;
