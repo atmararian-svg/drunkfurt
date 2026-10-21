@@ -52,8 +52,8 @@ export const carTrack = new CameraTrack([
   { t: CAR_BEAT.seated, pos: SEAT, yaw: deg(-10), pitch: deg(-6), fov: 50 },
   { t: CAR_BEAT.doorClosed, pos: SEAT, yaw: deg(0), pitch: deg(-9), fov: 46 },
   // the cluster comes alive: your eyes drop to it, through the steering wheel
-  { t: CAR_BEAT.rev, pos: SEAT, yaw: deg(0), pitch: deg(-13), fov: 40 },
-  { t: 1, pos: SEAT, yaw: deg(0), pitch: deg(-13), fov: 40 },
+  { t: CAR_BEAT.rev, pos: SEAT, yaw: deg(0), pitch: deg(-14), fov: 35 },
+  { t: 1, pos: SEAT, yaw: deg(0), pitch: deg(-14), fov: 35 },
 ]);
 
 const eye = new Vector3();
@@ -82,11 +82,11 @@ function ride(local: number, pose: CameraPose) {
   pose.yaw = at.yaw - Math.PI;
   // eyes up from the cluster to the road in the first half second
   const up = smoothstep(clamp(run.t / 0.6, 0, 1));
-  pose.pitch = deg(-13) + (deg(-5) - deg(-13)) * up + deg(2.2) * g;
+  pose.pitch = deg(-14) + (deg(-5) - deg(-14)) * up + deg(2.2) * g;
   const shudder = clamp(run.v / 20, 0, 1) * (1 + run.rush);
   pose.position.y += Math.sin(run.t * 71) * 0.003 * shudder + Math.sin(run.t * 37 + 1) * 0.002 * shudder;
   pose.roll = Math.sin(run.t * 29) * 0.002 * shudder;
-  pose.fov = 40 + 12 * up + 6 * smoothstep(clamp(run.v / 20, 0, 1)) + 16 * run.rush;
+  pose.fov = 35 + 17 * up + 6 * smoothstep(clamp(run.v / 20, 0, 1)) + 16 * run.rush;
 }
 
 /** Episode 3 plays on episode 2's street; its own world adds nothing (the car is part of the city). */

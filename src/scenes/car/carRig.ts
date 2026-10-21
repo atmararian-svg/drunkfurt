@@ -70,6 +70,8 @@ function palette3() {
     lamp: std({ color: '#3b3b3a', emissive: new Color('#f4f2ea'), emissiveIntensity: 0, roughness: 0.3 }, false),
     tail: std({ color: '#2e2d2c', emissive: new Color('#d8d4cc'), emissiveIntensity: 0, roughness: 0.4 }, false),
     screen: std({ color: '#0d0d0e', emissive: new Color('#c9cbd0'), emissiveIntensity: 0, roughness: 0.2 }, false),
+    // the cluster's own panel, under the dial graphic: black glass, so no lit edge shows round the dials
+    clusterGlass: std({ color: '#070708', roughness: 0.15 }, false),
   };
 }
 
@@ -83,7 +85,8 @@ function pick(name: string, mesh: string, m: Mats): Material {
   if (/^(lights_13|lights_global|vehiclelights|leftflash|rightflash|shader_brake|reverese|red$)/.test(n)) return m.tail;
   if (/^tyr/.test(n)) return m.tyre;
   if (/^(chrome|lettering|badge|metallic$|gray_glossy|59)/.test(n)) return /wheel/.test(mesh) ? m.rim : m.chrome;
-  if (/^(screen|gauges|gauges_screen)$/.test(n)) return m.screen;
+  if (/^(gauges|gauges_screen)$/.test(n)) return m.clusterGlass;
+  if (n === 'screen') return m.screen;
   if (/mirror/.test(n)) return m.mirror;
   if (/^(trim|plast_rgb|grill|grille|bonnetback)/.test(n)) return m.trim;
   if (/^(leather|cinture|airbag|perf)/.test(n)) return m.leather;
@@ -157,7 +160,8 @@ export function buildCar(gltf: GLTF): CarRig {
       m.tail.emissiveIntensity = 0.9 * on;
     },
     cluster(rpm, kmh, on) {
-      m.screen.emissiveIntensity = 0.55 * on;
+      // the centre screen glows softly, so the eye goes to the cluster
+      m.screen.emissiveIntensity = 0.22 * on;
       dials.set(rpm, kmh, on);
     },
     roll(distance) {
