@@ -262,8 +262,8 @@ built from.
   - A third car comes up the boulevard and turns into the cross street, crossing one car's lane
     and merging into another's, so the junction gets real give-way traffic.
 - **Fight sounds** are distinct sounds, each timed to its contact:
-  - in the dark of a defence, an exhale and a dull, bony knock with BAM!, then a heavier exhale
-    and a hard crack with a deep thump with WHAM!;
+  - in the dark of a defence, a dull, bony knock with BAM!, then a hard crack with a deep thump
+    with WHAM!; each exhale is laid over its hit, at the same moment;
   - on a knockout: his exhale, a heavy hit, a ringing ear and the body hitting the ground.
 
   Each is synthesised unless a recording is supplied: add files to `public/audio/` and set
@@ -398,10 +398,17 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
     the synthesised engine and the launch's recordings start on a later frame, further into the
     file by the delay, so the gear changes stay on time; if they never decode, the launch and the
     page turn run regardless. No sound call can throw into the scene or hold it up.
-  - Between revs the engine idles on the synthesised voice (one continuous voice, quiet), which
-    steps aside while a recording plays. The central locking, the doors and the starter remain
-    synthesised; recordings can be set as `src` on `carUnlock`, `carDoorOpen`, `carDoorClose`
-    and `engineStart` in `src/audio/AudioDirector.ts`.
+  - The driver's door opens to its recording (`door-open.mp3`). At the ignition the engine-start
+    recording (`engine-start.mp3`, 2.9 s) plays through; then the engine-default recording
+    (`engine-default.mp3`) idles whenever the engine runs and nobody is on the throttle. It is
+    looped without a seam (overlapping copies, 80 ms crossfades, scheduled half a second ahead),
+    gives way to the accel recordings and the launch and comes back after them, and stops if the
+    scroll goes back before the ignition. The synthesised engine is only a stand-in if the idle
+    recording cannot be decoded. The central locking and the door shutting are still synthesised
+    (`carUnlock`, `carDoorClose` in `src/audio/AudioDirector.ts` take a recording as `src`).
+  - Going back from Episode 04 does not land after the launch: the ink closes and the page cuts
+    back to the moment you sit in the car (`reentry` on the car's span in `core/timeline.ts`),
+    so the launch is played again, not rewound.
 
 ## Episode 04: My Cave
 
@@ -461,10 +468,12 @@ you into the screen and out of the story, onto the real site.
 - **Hand-over** (`src/ui/siteHandoff.ts`): as the camera arrives, the same image is laid over the
   whole page as a plain `<img>` (object-fit: cover, centred: the same crop the camera has) and
   faded in over 0.3 s, then the browser goes to `https://www.arianatmar.com/`. No iframe of the
-  site is used. Opened as a page of its own, that is a normal navigation. Inside a frame that may
-  not navigate the window (a sandboxed embed), the top window is tried and, if the site has not
-  taken over after 1.4 s (5 s for a normal page), a panel offers "Open arianatmar.com" (a real
-  link, new tab) and "Back to the room" (the camera moves back out, the prompt returns). Coming
+  site is used. Opened as a page of its own, that is a normal navigation in the same tab. Inside a
+  frame that may not navigate the window (a sandboxed embed such as the artifact preview), the
+  site opens in a new tab at the end of the move (`window.open`, still counted as the visitor's
+  click) and the page goes back into the room behind it. Only if the browser refuses that as well
+  (some browsers allow it for about a second after a click only, and the move takes 1.8 s) does a
+  panel offer "Open arianatmar.com" (a real link) and "Back to the room". Coming
   back to the page from the browser's history restores the room as before the click.
   What is matched is our side of the cut: the camera's last frame and the overlay image (the
   print treatment lifts during the move, and the two measured 2/255 apart on average in a test
