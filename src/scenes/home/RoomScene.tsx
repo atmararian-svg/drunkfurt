@@ -29,6 +29,9 @@ import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
 import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 
+/** The wall screen that shows the credits. */
+const CREDITS_SCREEN = 'screen_13';
+
 /** The last gate of the story: in the chair, the screen waits for the click. It never opens; the click leaves the story. */
 const gate: Gate = { episode: 'home', at: HOME_BEAT.gate, open: false };
 gates.push(gate);
@@ -109,7 +112,8 @@ function buildRoom(gltf: GLTF) {
     if (name === 'material') mesh.userData.ink = false;
   });
   screens.sort((a, b) => a.name.localeCompare(b.name));
-  const wall = buildWallScreens(screens.length);
+  // the credits go on the screen right of the big display, low (screen_13), in view from the chair
+  const wall = buildWallScreens(screens.length, screens.findIndex((s) => s.name === CREDITS_SCREEN));
   screens.forEach((s, i) => {
     s.material = wall.materials[i];
     s.userData.ink = false;

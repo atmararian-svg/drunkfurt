@@ -57,7 +57,6 @@ export function Overlay() {
     const fill = el.querySelector<HTMLElement>('.rail-fill')!;
     const cue = el.querySelector<HTMLElement>('.cue')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
-    const credits = el.querySelector<HTMLElement>('.credits')!;
     const rail = Array.from(el.querySelectorAll<HTMLElement>('.rail li'));
     const chapterNow = (id: string) => CHAPTERS.find((c) => (c.episodes as string[]).includes(id))?.number ?? CHAPTERS.length;
     const wipe = el.querySelector<HTMLCanvasElement>('.wipe')!;
@@ -89,7 +88,6 @@ export function Overlay() {
       fill.style.transform = `scaleY(${p})`;
       cue.classList.toggle('is-on', p < 0.004);
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
-      credits.classList.toggle('is-on', id === 'home' && monitor.armed && !monitor.entering);
       // the rail marks the chapter you are in
       rail.forEach((li) => li.classList.toggle('is-here', Number(li.dataset.chapter) === chapterNow(id)));
 
@@ -280,6 +278,7 @@ export function Overlay() {
         Sound {sound ? 'on' : 'off'}
       </button>
 
+      {/* the credits are shown on a screen in the room (scenes/home/roomScreens.ts); this copy is for assistive technology */}
       <p className="credits">
         Room: “Surveillance room” by{' '}
         <a href="https://sketchfab.com/wa_rouk" target="_blank" rel="noreferrer">

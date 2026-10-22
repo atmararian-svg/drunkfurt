@@ -130,6 +130,35 @@ function plan(seed: number) {
   }, seed);
 }
 
+/**
+ * The credits, as one more terminal on the wall: who made the room and the
+ * cluster graphic, in the log screens' type, steady and bright enough to read
+ * from the chair. Redrawn once the page's mono face has loaded.
+ */
+export const CREDIT_LINES = ['CREDITS', '', 'ROOM: "SURVEILLANCE ROOM"', '  BY WA_ROUK', '  SKETCHFAB.COM/WA_ROUK', '', 'CLUSTER GRAPHIC:', '  VECTEEZY.COM'];
+function credits() {
+  const draw = (c: CanvasRenderingContext2D) => {
+    c.fillStyle = grey(14);
+    c.fillRect(0, 0, W, H);
+    CREDIT_LINES.forEach((line, i) => {
+      if (!line) return;
+      c.font = `${i === 0 ? 800 : 700} 15px 'JetBrains Mono', ui-monospace, monospace`;
+      c.fillStyle = i === 0 ? '#e6c23a' : grey(225);
+      c.fillText(`${line.startsWith(' ') ? '  ' : '> '}${line.trim()}`, 14, 30 + i * 23);
+    });
+  };
+  const t = canvas((c) => draw(c), 1);
+  document.fonts?.ready.then(() => {
+    const el = t.image as HTMLCanvasElement;
+    const c = el.getContext('2d')!;
+    draw(c);
+    c.fillStyle = 'rgba(0,0,0,0.18)';
+    for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1);
+    t.needsUpdate = true;
+  });
+  return t;
+}
+
 /** Snow: no signal. */
 function noise(seed: number) {
   return canvas((c, r) => {
@@ -148,9 +177,13 @@ export interface WallScreens {
   dispose(): void;
 }
 
-/** One material per screen, each with its own picture and its own schedule. */
-export function buildWallScreens(count: number): WallScreens {
+/**
+ * One material per screen, each with its own picture and its own schedule;
+ * the screen at `creditsAt` shows the credits, steady (no moods).
+ */
+export function buildWallScreens(count: number, creditsAt = -1): WallScreens {
   const pics: Texture[] = [feed(1), feed(2), feed(3), feed(4), log(5), log(6), scope(7), scope(8), plan(9), noise(10)];
+  const creditPic = credits();
   // the log screens scroll their text slowly
   const scrolling = pics.slice(4, 6);
   scrolling.forEach((t) => {
@@ -160,7 +193,8 @@ export function buildWallScreens(count: number): WallScreens {
   const materials: MeshBasicMaterial[] = [];
   const mood: { level: number; target: number; next: number; rate: number; flicker: number }[] = [];
   for (let i = 0; i < count; i++) {
-    const m = new MeshBasicMaterial({ map: pics[Math.floor(r() * pics.length)], toneMapped: false });
+    const pick = pics[Math.floor(r() * pics.length)];
+    const m = new MeshBasicMaterial({ map: i === creditsAt ? creditPic : pick, toneMapped: false });
     m.userData.comic = false;
     const level = 0.15 + r() * 0.45;
     m.color.setScalar(level);
@@ -173,6 +207,10 @@ export function buildWallScreens(count: number): WallScreens {
     update(dt, now) {
       clock += dt;
       for (let i = 0; i < count; i++) {
+        if (i === creditsAt) {
+          materials[i].color.setScalar(0.92);
+          continue;
+        }
         const s = mood[i];
         if (clock >= s.next) {
           // a new mood: mostly a dim glow, sometimes bright, sometimes nearly dark
@@ -195,6 +233,7 @@ export function buildWallScreens(count: number): WallScreens {
     },
     dispose() {
       pics.forEach((t) => t.dispose());
+      creditPic.dispose();
       materials.forEach((m) => m.dispose());
     },
   };

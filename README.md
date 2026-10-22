@@ -534,7 +534,11 @@ you into the screen and out of the story, onto the real site.
   the room, right of the chair; 0.5 at its side; 0.5–0.66 turning in and lowering
   (1.65 → 1.155 m); 0.66–0.72 the settle (a 3.5 cm dip, then upright, eyes up to the screen).
   At 0.76 the story waits (a gate that never opens: the story ends here) with one caption,
-  "Click the screen, or a project on it", and the credits.
+  "Click the screen, or a project on it". The credits (the room by wa_rouk, the cluster graphic
+  by Vecteezy.com) are not printed over the page: they are on one of the wall's terminals, the
+  one to the right of and below the big screen (`screen_13`, `roomScreens.ts` `CREDIT_LINES`),
+  steady and readable from the chair; a visually hidden copy with links stays in the page for
+  assistive technology.
 - **Hover**: each frame the pointer is picked against the picture's own plane (not the bezel or
   the room). Over it, the camera leans 30 cm towards the screen and narrows 3°, and the picture
   comes up to 97 %; away, it eases back (damped, about a second either way). Over a project card
@@ -631,7 +635,7 @@ src/
     ink.ts                ink buffer material + ink line effect
     Stylizer.tsx          classifies meshes, renders the ink buffer, composer
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
-  ui/Overlay.tsx          title cards, captions, chapter rail, ink, prompts, credits
+  ui/Overlay.tsx          title cards, captions, chapter rail, ink, prompts
   ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
   ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
