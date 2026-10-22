@@ -2,7 +2,7 @@ import { Camera, Mesh, Raycaster, Vector2 } from 'three';
 import { clamp } from '../../core/math';
 import { story } from '../../core/store';
 import { pinScroll } from '../../core/timeline';
-import { closeHandoff, navigateTo, whiteOutAt } from '../../ui/siteHandoff';
+import { closeHandoff, holdColour, navigateTo } from '../../ui/siteHandoff';
 
 /** The portfolio site the screen shows. */
 export const SITE = 'https://www.arianatmar.com';
@@ -31,12 +31,25 @@ export const SCREEN_LINKS: { name: string; path: string; x0: number; y0: number;
 export const FLY_SECONDS = 1.8;
 const BACK_SECONDS = 1.1;
 /**
- * The white-out, as fractions of the move: it starts at WHITE_FROM and is
- * complete (the whole view white) at WHITE_AT, 80% of the way in; the browser
- * is sent to the site at that moment, behind the white.
+ * The screen's picture turns into a solid colour on the way in, as fractions
+ * of the move: from WHITE_FROM, complete at WHITE_AT (80%). The move then goes
+ * on until that rectangle fills the view, and only then is the browser sent.
+ * The colour is the page's: white for the home page (and About, All works,
+ * which are white pages), #0D0D0D, exactly, for a project.
  */
 export const WHITE_FROM = 0.5;
 export const WHITE_AT = 0.8;
+export const HOME_COLOUR = '#ffffff';
+export const PROJECT_COLOUR = '#0D0D0D';
+
+/** How solid the picture is at a point of the move (0 … 1), eased, 1 from WHITE_AT on. */
+export function solidAt(f: number) {
+  const u = clamp((f - WHITE_FROM) / (WHITE_AT - WHITE_FROM), 0, 1);
+  return u * u * (3 - 2 * u);
+}
+
+/** The colour a link's page opens on. */
+export const linkColour = (link: number) => (link >= 0 && SCREEN_LINKS[link].path.startsWith('/case/') ? PROJECT_COLOUR : HOME_COLOUR);
 
 /**
  * The portfolio screen's state, kept outside React: the scene and the camera
@@ -55,6 +68,8 @@ export const monitor = {
   entering: false,
   /** Where the click leads. */
   url: '',
+  /** The colour the screen turns into on the way in (that page's). */
+  solid: HOME_COLOUR,
   /** The browser has been sent there (once). */
   sent: false,
   /** The move into the screen, 0 seated … 1 the screen fills the view, a tween on the wall clock. */
@@ -100,32 +115,35 @@ let sendTimer = 0;
 
 /**
  * The click on the screen. Once only: the page is held where it is, the
- * camera accelerates into the screen, and the view whites out, complete at
- * 80% of the move, at which moment the browser is sent to the page that was
- * clicked: a project, About or All works, or the home page. Camera, white and
- * navigation run on one clock, the move's own (wall clock from the click):
- * the white is an animation scheduled on it (it does not wait for the 3D
- * frames), and the navigation a timer at its 80% mark. Repeated clicks do
- * nothing.
+ * camera accelerates into the screen, the screen's picture turns into the
+ * solid colour of the page it leads to (complete at 80% of the move), the
+ * move goes on until that rectangle fills the view, and then the browser is
+ * sent to the page that was clicked: a project, About or All works, or the
+ * home page. Camera, colour and navigation run on one clock, the move's own
+ * (wall clock from the click); the navigation is a timer at its end, and the
+ * same colour is laid over the page then, so it holds while the browser
+ * goes. Repeated clicks do nothing.
  */
 export function enterSite(link = -1) {
   if (!monitor.armed || monitor.entering) return;
   monitor.entering = true;
   monitor.sent = false;
   monitor.url = linkUrl(link);
+  monitor.solid = linkColour(link);
   pinScroll(true);
   story.setState({ prompt: null });
   document.documentElement.classList.add('site-handoff');
   const now = performance.now();
   Object.assign(monitor.fly, { from: flyAt(now), to: 1, start: now, seconds: FLY_SECONDS });
   const ms = FLY_SECONDS * 1000;
-  whiteOutAt(ms * WHITE_FROM, ms * (WHITE_AT - WHITE_FROM));
   window.clearTimeout(sendTimer);
   sendTimer = window.setTimeout(() => {
     if (!monitor.entering || monitor.sent) return;
     monitor.sent = true;
+    // the view is the colour by now (the screen fills it); the same colour over the page holds it while the browser goes
+    holdColour(monitor.solid);
     navigateTo(monitor.url, backToRoom);
-  }, ms * WHITE_AT + 20);
+  }, ms + 40);
 }
 
 /** The site did not open here (or opened in another tab): out of the screen, back in the chair. */

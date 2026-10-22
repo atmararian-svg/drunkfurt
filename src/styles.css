@@ -404,7 +404,7 @@ body { cursor: pointer; }
 .site-handoff .sound,
 .site-handoff .credits { opacity: 0 !important; transition: opacity 0.35s var(--ease); }
 
-/* the white the camera enters at the end of the move into the screen (siteHandoff.ts), over everything */
+/* the page's colour, laid over everything once the screen fills the view (siteHandoff.ts holdColour) */
 .whiteout {
   position: fixed;
   inset: 0;
@@ -456,14 +456,22 @@ body { cursor: pointer; }
 .handoff-back:focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
 
 
-/* --- chapter transitions: the copy of the page being left, under the stage while it is uncovered */
+/* --- chapter transitions (pixelReveal.ts): the copy of the page being left, over the stage until the blocks cover it… */
 .chapter-out {
   position: fixed;
   inset: 0;
-  z-index: 0;
+  z-index: 5;
   width: 100vw;
   height: 100vh;
-  transform-origin: 50% 0%;
+  pointer-events: none;
+}
+/* …and the incoming page in blocks, above everything but the hand-over colour */
+.pixel-reveal {
+  position: fixed;
+  inset: 0;
+  z-index: 7;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
 }
 
@@ -553,14 +561,12 @@ body { cursor: pointer; }
   inset: 0;
   z-index: 6;
   overflow: hidden;
-  background: #111;
+  background: #070707;
   color: #fff;
   font: 700 14px/1 var(--label);
   letter-spacing: -0.05em;
-  transform-origin: 50% 0%;
   cursor: default;
 }
-.preloader.is-leaving { z-index: 0; }
 /* print texture: a fine halftone and paper grain over the whole page… */
 .pl-grain,
 .pl-dots {
@@ -568,8 +574,8 @@ body { cursor: pointer; }
   inset: 0;
   pointer-events: none;
 }
-.pl-grain { background-image: var(--grain); background-size: 180px 180px; opacity: 0.9; mix-blend-mode: screen; }
-.pl-dots { background-image: var(--halftone-paper); background-size: 6px 6px; }
+.pl-grain { background-image: var(--grain); background-size: 180px 180px; opacity: 0.45; mix-blend-mode: soft-light; }
+.pl-dots { background-image: var(--halftone-paper); background-size: 6px 6px; opacity: 0.6; }
 /* …and under the pointer a denser, darker-inked screen shows through, feathered at the edge */
 .pl-dots::after {
   content: '';

@@ -8,6 +8,8 @@ import { useFrame, useThree } from '@react-three/fiber';
  * its drawing buffer.
  */
 let pending: ((c: HTMLCanvasElement) => void) | null = null;
+/** Called after every drawn frame with the canvas, while it still holds the picture (see `onFrameDrawn`). */
+const watchers = new Set<(src: HTMLCanvasElement) => void>();
 
 export function grabFrame(): Promise<HTMLCanvasElement> {
   return new Promise((resolve) => {
@@ -15,9 +17,26 @@ export function grabFrame(): Promise<HTMLCanvasElement> {
   });
 }
 
+/**
+ * Watches the frames as they are drawn: `draw` gets the 3D canvas at the end
+ * of each frame, when it can be copied (the pixel reveal draws from it).
+ * Returns the function that stops watching.
+ */
+export function onFrameDrawn(draw: (src: HTMLCanvasElement) => void) {
+  watchers.add(draw);
+  return () => void watchers.delete(draw);
+}
+
 export function FrameGrab() {
   const gl = useThree((s) => s.gl);
   useFrame(() => {
+    watchers.forEach((w) => {
+      try {
+        w(gl.domElement);
+      } catch (err) {
+        console.warn('[frame]', err);
+      }
+    });
     if (!pending) return;
     const done = pending;
     pending = null;

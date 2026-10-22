@@ -3,7 +3,7 @@ import { story } from '../core/store';
 import { PageTurn, chapterTurn, holdScroll, jumpTo, locate, pinScroll, timeline } from '../core/timeline';
 import { EPISODES } from '../episodes';
 import { grabFrame } from '../render/FrameGrab';
-import { coverStage, reveal } from './reveal';
+import { pixelReveal } from './pixelReveal';
 import { hideTitleCard, showTitleCard } from './titleCards';
 
 /**
@@ -18,7 +18,9 @@ import { hideTitleCard, showTitleCard } from './titleCards';
  *     its opening shot: the next chapter's going forward, the previous
  *     chapter's own beginning going back (never its end);
  *  4. once that chapter's world is on screen and has drawn a few frames, the
- *     parallax reveal (reveal.ts) slides the copy away and uncovers it;
+ *     pixel reveal (pixelReveal.ts) brings it in over the copy: coarse blocks
+ *     scattered over it (drifting up the page going forward, down it going
+ *     back), then finer, then the sharp page;
  *  5. the scroll is released and the chapter's title card plays.
  *
  * It cannot be interrupted or started twice (`chapterTurn.busy`); every step
@@ -60,7 +62,6 @@ async function run(z: PageTurn, forward: boolean) {
       outgoing.className = 'chapter-out';
       document.body.appendChild(outgoing);
     }
-    coverStage(dir);
     resetChapter(chapter.number);
     jumpTo(target);
     // the chapter's world on screen, drawn a few times (its shaders compiled), or give up waiting after 4 s
@@ -72,13 +73,11 @@ async function run(z: PageTurn, forward: boolean) {
       })(),
       4000,
     );
-    await reveal(outgoing, dir);
+    await pixelReveal(dir, { outgoing });
   } catch (err) {
     console.warn('[chapters] transition', err);
   } finally {
     outgoing?.remove();
-    const stage = document.querySelector<HTMLElement>('.stage');
-    if (stage) stage.style.clipPath = '';
     pinScroll(false);
     holdScroll(700);
     chapterTurn.busy = false;

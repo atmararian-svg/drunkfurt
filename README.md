@@ -53,11 +53,17 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   in" with its dots counting one, two, three; along the bottom FRANKFURT, revealed letter by
   letter (a staggered, eased reveal with seeded irregularity, each letter rising and fading in
   through a few stand-in glyphs), over which "Drunk" is written in red: the design's own brush
-  path (decoded from the .fig file's vector network, `src/ui/drunkStroke.ts`), five pen strokes
-  drawn on along their length (`stroke-dashoffset`) left to right, the pen speeding and slowing
-  and lifting between letters, as far as the loading has got. The page is the comic's print in
-  CSS: near-black with a fine halftone and paper grain, and under the pointer a denser screen
-  shows through a feathered circle (CSS variables, no re-render, gone when the pointer leaves).
+  path (decoded from the .fig file's vector network, `src/ui/drunkStroke.ts`), five strokes
+  drawn on as one continuous line (`stroke-dashoffset`), the pen's speed eased so it never
+  stops or jumps. The order follows the real loading: the title decodes in with chapter 1;
+  chapter 1 resolves when it is ready and chapter 2 decodes in its place; then chapter 3, and
+  while it loads "Drunk" is written: at the hand's pace up to 80% of the word, then only a
+  slow creep (something always moves) until chapter 3 is really in, when the rest is written
+  quickly; word and chapter 3 finish together (if chapter 3 was in first, its label waits for
+  the word). Then READY, and the pixel reveal brings chapter 1 in over the preloader by itself.
+  No progress is invented. The page is the comic's print in CSS: near-black (#070707) with a
+  faint halftone and soft-light grain, and under the pointer a denser screen shows through a
+  feathered circle (CSS variables, no re-render, gone when the pointer leaves).
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
   station no longer waits for the street's models) and a marker after it that reports when
   everything in it has loaded and drawn twice; a world that fails is caught by its own error
@@ -65,14 +71,15 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   start loading once chapter 2 is in, and are reused by its world. The preloader waits for
   chapter 1 without limit (if it fails, it says so and stays); chapters 2 and 3 get 25 s after
   chapter 1 before the story starts anyway (they go on loading behind it).
-- **Transitions between chapters** (`src/ui/chapterTransition.ts`, `src/ui/reveal.ts`), after
-  the supplied "parallax reveal" (Framer Motion variants, done with the Web Animations API):
-  when the progress reaches the end of a chapter, the frame on screen is copied (at the end of
-  the next frame, after the composer has drawn it: `render/FrameGrab.tsx`), the copy is laid
-  over the page, the next chapter is reset and cut to, and once its world has drawn a few frames
-  the copy drifts up 20% and shrinks to 95% while the new chapter is uncovered from the bottom
-  edge and slides up from half a screen below, on one curve (1.25 s, cubic-bezier(0.76, 0,
-  0.24, 1)). Going back the directions mirror. The preloader leaves into chapter 1 the same
+- **Transitions between chapters** (`src/ui/chapterTransition.ts`, `src/ui/pixelReveal.ts`),
+  after the supplied pixel loader (Framer "ImagePixelLoader"): when the progress reaches the end
+  of a chapter, the frame on screen is copied (`render/FrameGrab.tsx`) and laid over the page,
+  the next chapter is reset and cut to, and once its world has drawn a few frames it comes in
+  over the copy in coarse 28 px blocks, scattered and drifting up the page (down it going
+  back), which then grow finer (to ~1.6 px, on the reference's smooth curve) while from 43% the
+  sharp page fades in out of a 3 px blur. The "image" is the live 3D canvas itself, copied after
+  every drawn frame, shrunk to one pixel per block and drawn back up unsmoothed into an overlay
+  canvas. All of its numbers are in `PIXEL_REVEAL`. The preloader leaves into chapter 1 the same
   way. It cannot be interrupted or started twice, every wait in it has a time limit, and clicks
   are ignored while it plays.
 - **Going back restarts the chapter**: scrolling back across a chapter's start does not land on
@@ -339,8 +346,13 @@ built from.
     tyre noise from passing cars (panned), two impacts and a slow heartbeat at the climax.
   - The ambience thins and muffles (a low-pass sweep) as the stranger approaches.
   - A "Sound on/off" switch sits top right.
-- **Ink**: the brush-stroke black (`ui/brush.ts`) is used for the fight (the page goes dark
-  before the hits). Moving between chapters is the chapter transition (above).
+- **The fight's conceal** (`drawIgnite` in `ui/brush.ts`), after Framer's "Ignite Reveal"
+  without the fire: from the decision the dark spreads over the frame from a few points as an
+  irregular, organic front (distance from the points broken up by fractal noise, ranked so the
+  coverage is exactly the dark share of the frame), its edge a soft ash grey; it is complete at
+  `BLOCK.dark` (0.3 s, before the first hit at 0.42 s), the hits are printed into it, and on the
+  aftermath it recedes the same way from other points. It is drawn on the overlay only; the
+  fight's logic and timing are untouched (apart from `BLOCK.dark`, when he goes down, under it).
 - **The flicker at the chapter's start**, fixed at its cause: the two corner blocks facing the
   square were placed from the kerb line (x = ±9.5) like the boulevard's blocks, and overlapped
   the first boulevard blocks over z −25…−41, so their fronts, shopfronts and cornices lay in the
@@ -540,18 +552,20 @@ you into the screen and out of the story, onto the real site.
   (cover-fit at a 40° field of view: its height fills the frame, or on a viewport wider than
   16:9 its width). Repeated clicks are ignored; once clicked, the hover lean is held, so it
   cannot pull against the move.
-- **White-out and hand-over** (`src/ui/siteHandoff.ts`): camera, white and navigation run on one
-  clock, the move's own (wall clock from the click). The white is an animation scheduled on it:
-  it begins at 50% of the move and is complete at 80% (eased, so it reads as the screen's light
-  flooding the view); at that 80% mark a timer sends the browser to the page that was clicked,
-  with the white forced complete first, and the white stays while the browser goes. Opened as a
-  page of its own, that is a normal navigation in the same tab. Inside a frame that may not
+- **The screen turns into the page's colour, then the hand-over** (`monitor.ts`,
+  `RoomScene.tsx`, `src/ui/siteHandoff.ts`): a plane exactly over the screen's picture fades in
+  from 50% of the move and is solid at 80%: white (#ffffff) for the home page (and About, All
+  works, which are white pages), exactly #0D0D0D for a project. The print treatment lifts with
+  it, so the colour reaches the page unchanged (checked in pixels: 255,255,255 and 13,13,13).
+  The room around the screen is untouched; the move goes on until the solid rectangle fills the
+  view, and only then, at 100%, is the browser sent, with a page-wide layer of the same colour
+  laid over at that instant (nothing visibly changes) and kept while the browser goes. Opened as
+  a page of its own, that is a normal navigation in the same tab. Inside a frame that may not
   navigate the window (a sandboxed embed such as the artifact preview), the page opens in a new
-  tab at that moment (`window.open`, still counted as the visitor's click), and this page fades
-  back from white into the room. Only if the browser refuses that as well (some browsers allow it
-  for about a second after a click only, and the 80% mark is at 1.44 s) is a link to the page
-  shown on the white, with "Back to the room". Coming back from the browser's history restores
-  the room as before the click. No frame of the site is embedded and nothing of it is read.
+  tab at that moment (`window.open`), and this page fades back into the room. Only if the
+  browser refuses that as well is a link to the page shown, with "Back to the room". Coming back
+  from the browser's history restores the room as before the click. No frame of the site is
+  embedded and nothing of it is read.
   After the navigation the browser loads the site, which opens on its own white intro ("Arian —
   Atmar") before the page; that part is the site's.
 - **Sound**: the city's rumble, low and muffled, as if through walls.
@@ -619,8 +633,8 @@ src/
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
   ui/Overlay.tsx          title cards, captions, chapter rail, ink, prompts, credits
   ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
-  ui/chapterTransition.ts chapter changes: copy, reset, cut, parallax reveal, title card
-  ui/reveal.ts            the parallax reveal (after the supplied transition code)
+  ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
+  ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
   ui/titleCards.ts        the glass chapter cards, in and out
   ui/decode.ts            decoding text: reveal, loading loop, pointer zone
   ui/drunkStroke.ts       the "Drunk" brush path from the Figma file
@@ -629,7 +643,7 @@ src/
   scenes/city/            Episode 2: the street, the stranger, the encounter
   scenes/car/             Episode 3: the Mercedes (carRig.ts), its beats, rev and launch (getaway.ts)
   scenes/home/            Episode 4: the room, the big display, the click into the site (monitor.ts)
-  ui/siteHandoff.ts       the white-out and the navigation to the clicked page
+  ui/siteHandoff.ts       the colour hold and the navigation to the clicked page
 tools/                    asset conversion (FBX → GLB, textures) and the walk-cycle bake
 ```
 

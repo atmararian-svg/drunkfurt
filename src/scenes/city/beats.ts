@@ -36,7 +36,7 @@ export const KO = {
  * Seconds of the fight's own clock after the click (spread over gate → aftermath).
  */
 export const BLOCK = {
-  dark: 0.12,
+  dark: 0.3,
   hit1: 0.42,
   hit2: 0.86,
   resolve: 2.1,

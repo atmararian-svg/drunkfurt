@@ -1,17 +1,19 @@
 /**
  * The hand-over from the story to the real site. As the camera moves into
- * the screen, the whole view goes white (`whiteOut`, driven by the move; fully
- * white by 80% of it), and then the browser is sent to the page the visitor
- * clicked (`navigateTo`), with the white kept up while it goes. No frame of
+ * the screen, the screen's picture turns into the page's solid colour (the
+ * scene does that, on the screen itself); once that rectangle fills the view,
+ * the same colour is laid over the page (`holdColour`) and the browser is
+ * sent to the page the visitor clicked (`navigateTo`), the colour kept up
+ * while it goes. No frame of
  * the site is embedded, and nothing of it is read: the address comes from the
  * link that was clicked on the screen's picture.
  *
  * Opened as the page itself, that is a plain navigation in the same tab: the
- * white stays until the site paints. Inside a frame (an embed, a sandboxed
+ * colour stays until the site paints. Inside a frame (an embed, a sandboxed
  * preview), which may not send the whole window anywhere, the site opens in
  * a new tab on the strength of the visitor's click, and this page fades back
- * from white into the room behind it. Only if the browser refuses that too
- * is a link to the page shown on the white, with a way back into the room,
+ * from the colour into the room behind it. Only if the browser refuses that too
+ * is a link to the page shown on the colour, with a way back into the room,
  * so nobody is left on a blank page.
  */
 let white: HTMLDivElement | null = null;
@@ -32,18 +34,16 @@ function layer() {
 }
 
 /**
- * Schedules the white: it begins `delay` ms from now and is complete `duration`
- * ms later, eased in (slow at first, so it reads as the screen's light
- * flooding the view, not a flash).
+ * Lays the colour over the whole page at once. Called when the screen's
+ * rectangle of that same colour already fills the view, so nothing visibly
+ * changes: it only keeps the colour up whatever the 3D frames do next.
  */
-export function whiteOutAt(delay: number, duration: number) {
+export function holdColour(colour: string) {
   const el = layer();
+  el.style.background = colour;
+  el.classList.toggle('is-dark', colour.toLowerCase() !== '#ffffff');
+  el.style.opacity = '1';
   el.style.pointerEvents = 'auto';
-  if (typeof el.animate === 'function') {
-    el.animate([{ opacity: 0 }, { opacity: 1 }], { delay, duration, easing: 'cubic-bezier(0.55, 0, 0.45, 1)', fill: 'forwards' });
-  } else {
-    window.setTimeout(() => (el.style.opacity = '1'), delay + duration);
-  }
 }
 
 function showStuck(url: string, onBack: () => void) {
@@ -72,14 +72,9 @@ function showStuck(url: string, onBack: () => void) {
   open.focus({ preventScroll: true });
 }
 
-/** Sends the browser to `url` (once the view is white). */
+/** Sends the browser to `url` (once the view is the page's colour). */
 export function navigateTo(url: string, onBack: () => void) {
   leaving = false;
-  // the white is complete by now (on the same clock); make sure it is, whatever the frames did
-  if (white) {
-    white.getAnimations?.().forEach((a) => a.finish());
-    white.style.opacity = '1';
-  }
   window.addEventListener('pagehide', onPageHide);
   const stuck = () => showStuck(url, onBack);
   // inspection only: the dev build can be told to stop short of leaving
@@ -136,9 +131,6 @@ export function closeHandoff(now = false) {
     return;
   }
   old.style.pointerEvents = 'none';
-  const from = getComputedStyle(old).opacity;
-  old.getAnimations?.().forEach((a) => a.cancel());
-  old.style.opacity = from;
   old.style.transition = 'opacity 0.6s linear';
   requestAnimationFrame(() => (old.style.opacity = '0'));
   window.setTimeout(() => old.remove(), 700);

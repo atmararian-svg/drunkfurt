@@ -7,28 +7,33 @@ import { chapterTurn, episodeRange, gateLimit, locate, scrollToProgress, timelin
 import { builtEpisodes } from '../episodes';
 import { hoverDecode } from './decode';
 import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
-import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
+import { drawBrushWipe, drawHits, drawIgnite, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
 import { enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 
 /**
- * Ink over the whole frame at a given progress: the fight's black (the
- * defended fight goes dark before the hits) and the closing card. Moving
- * between chapters is the chapter transition's (chapterTransition.ts), not ink.
+ * Ink over the whole frame at a given progress: the fight's conceal (the dark
+ * spreads over the frame before the hits, drawIgnite, and recedes on the
+ * aftermath) and the closing card. Moving between chapters is the chapter
+ * transition's (chapterTransition.ts), not ink.
  */
-function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
+function inkAt(p: number): { w: number; mode: 'close' | 'open'; kind: 'ignite' | 'brush' } {
   const { id, local } = locate(p);
-  if (id === 'outro') return { w: 1, mode: 'close' };
+  if (id === 'outro') return { w: 1, mode: 'close', kind: 'brush' };
   if (id === 'city' && encounter.outcome) {
-    // once the fight has gone black, the page stays inked until the aftermath opens it again
+    // the dark spreads from the decision and is complete at the outcome's `dark` (BLOCK.dark, KO.dark): the
+    // fight itself happens under it; the page stays dark until the aftermath, where it recedes
     const t = encounterAt(local).t;
     const black = encounter.outcome === 'blocked' ? BLOCK.dark : KO.dark;
-    if (t >= black && local < BEAT.aftermath) return { w: 1, mode: 'open' };
-    if (local >= BEAT.aftermath && local < BEAT.aftermath + 0.035) return { w: 1 - (local - BEAT.aftermath) / 0.035, mode: 'open' };
+    const lead = encounter.outcome === 'blocked' ? BLOCK.dark : 0.45;
+    if (t >= 0 && local < BEAT.aftermath) return { w: clamp((t - (black - lead)) / lead, 0, 1), mode: 'close', kind: 'ignite' };
+    if (local >= BEAT.aftermath && local < BEAT.aftermath + OPEN) return { w: 1 - (local - BEAT.aftermath) / OPEN, mode: 'open', kind: 'ignite' };
   }
-  return { w: 0, mode: 'open' };
+  return { w: 0, mode: 'open', kind: 'brush' };
 }
+/** How much of the city episode the conceal takes to recede on the aftermath. */
+const OPEN = 0.045;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -89,9 +94,10 @@ export function Overlay() {
       rail.forEach((li) => li.classList.toggle('is-here', Number(li.dataset.chapter) === chapterNow(id)));
 
       const ink = inkAt(p);
-      const key = `${ink.w.toFixed(3)}${ink.mode}${wipe.width}`;
+      const key = `${ink.w.toFixed(3)}${ink.mode}${ink.kind}${wipe.width}`;
       if (key !== last) {
-        drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, id === 'city' && local > 0.5 ? 13 : 7);
+        if (ink.kind === 'ignite') drawIgnite(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode);
+        else drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, 7);
         last = key;
       }
       // the fight frames, a function of where the fight is (its time comes from the progress):

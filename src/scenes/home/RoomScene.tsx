@@ -26,7 +26,7 @@ import { Gate, gates, localProgress } from '../../core/timeline';
 import { input } from '../../player/input';
 import { postFx } from '../../render/Stylizer';
 import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
-import { SCREEN_LINKS, flyAt, monitor, pick, resetMonitor } from './monitor';
+import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 
 /** The last gate of the story: in the chair, the screen waits for the click. It never opens; the click leaves the story. */
@@ -169,7 +169,16 @@ function buildDisplay(picture: Texture) {
   mark.name = 'portfolio-link-mark';
   mark.userData.ink = false;
   mark.visible = false;
-  return { group: g, screen, glass, mark, markMat };
+  // the colour the picture turns into on the way in (white for the home page, #0D0D0D for a project),
+  // a plane exactly over the picture, so the change happens on the screen itself, at its size
+  const solidMat = new MeshBasicMaterial({ color: '#ffffff', transparent: true, opacity: 0, depthWrite: false, toneMapped: false });
+  solidMat.userData.comic = false;
+  const solid = add(new PlaneGeometry(DISPLAY.width, DISPLAY.height), solidMat, 0, 0, 0.005);
+  solid.name = 'portfolio-solid';
+  solid.renderOrder = 2;
+  solid.userData.ink = false;
+  solid.visible = false;
+  return { group: g, screen, glass, mark, markMat, solid, solidMat };
 }
 
 /** The picture's brightness: a little below full in the room, full when you lean in, exactly full on arrival. */
@@ -266,8 +275,15 @@ function Room({ active }: { active: boolean }) {
     const f = flyAt();
     const lit = REST + (0.97 - REST) * smoothstep(clamp(monitor.hover, 0, 1));
     display.glass.color.setScalar(lit + (1 - lit) * smoothstep(clamp(f * 1.4, 0, 1)));
-    // in the last part of the move the print treatment lifts, so the picture is the plain image
-    postFx.clean = smoothstep(clamp((f - 0.55) / 0.4, 0, 1));
+    // the picture turns into the solid colour of the page it leads to, complete at 80% of the move;
+    // the print treatment lifts with it, so the colour reaches the page exactly (no paper, no vignette)
+    const solid = solidAt(f);
+    display.solid.visible = solid > 0;
+    if (solid > 0) {
+      display.solidMat.color.set(monitor.solid);
+      display.solidMat.opacity = solid;
+    }
+    postFx.clean = smoothstep(clamp((f - WHITE_FROM + 0.1) / (WHITE_AT - WHITE_FROM + 0.05), 0, 1));
     // indoors: the city's rumble, far off and muffled through the walls
     if (audio.running) {
       audio.startCityAmbience();
