@@ -3,6 +3,7 @@ import { Suspense, useEffect, useMemo } from 'react';
 import { suspend } from 'suspend-react';
 import {
   BoxGeometry,
+  BufferGeometry,
   Color,
   DoubleSide,
   Group,
@@ -11,9 +12,11 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
+  Object3D,
   PlaneGeometry,
   SRGBColorSpace,
   Texture,
+  Vector3,
 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import portfolioUrl from '../../assets/portfolio.webp?url';
@@ -29,8 +32,8 @@ import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
 import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 
-/** The wall screen that shows the credits. */
-const CREDITS_SCREEN = 'screen_13';
+/** The wall screen that shows the text about the author. */
+const ABOUT_SCREEN = 'screen_13';
 
 /** The last gate of the story: in the chair, the screen waits for the click. It never opens; the click leaves the story. */
 const gate: Gate = { episode: 'home', at: HOME_BEAT.gate, open: false };
@@ -63,6 +66,55 @@ const roomPicture = () => (picturePromise ??= loadPicture(portfolioUrl));
 export const preloadRoom = () => Promise.all([roomModel(), roomPicture()]).then(() => undefined);
 
 /**
+ * The block of the monitor wall cut out for the big display (tools/room2glb.mjs
+ * CUT), a little taller: the conversion kept the triangles whose centre lay
+ * just outside the block, thin strips of the old monitors' housings that
+ * showed as two bright lines along the display's lower edge (and, hidden
+ * behind it, its upper edge). Model coordinates (before ROOM_LIFT).
+ */
+const CUT = { x0: 1.42, x1: 3.24, y0: -1.87, y1: -0.64, z0: -0.15, z1: 0.6 };
+
+/**
+ * Removes the triangles of the room's surfaces left inside CUT, on this copy
+ * of the model only: the meshes concerned get their own geometry (returned,
+ * to be freed with the copy); the cached model is not touched.
+ */
+function trimCut(model: Object3D) {
+  const made: BufferGeometry[] = [];
+  model.updateMatrixWorld(true);
+  const v = new Vector3();
+  model.traverse((o) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh || /^screen_/.test(mesh.name) || mesh.name === 'leds') return;
+    const geo = mesh.geometry;
+    const pos = geo.getAttribute('position');
+    const index = geo.getIndex();
+    if (!index) return;
+    const keep: number[] = [];
+    let cut = 0;
+    for (let t = 0; t < index.count; t += 3) {
+      let x = 0;
+      let y = 0;
+      let z = 0;
+      for (let k = 0; k < 3; k++) {
+        v.fromBufferAttribute(pos, index.getX(t + k)).applyMatrix4(mesh.matrixWorld);
+        x += v.x / 3;
+        y += v.y / 3;
+        z += v.z / 3;
+      }
+      if (x > CUT.x0 && x < CUT.x1 && y > CUT.y0 && y < CUT.y1 && z > CUT.z0 && z < CUT.z1) cut++;
+      else keep.push(index.getX(t), index.getX(t + 1), index.getX(t + 2));
+    }
+    if (!cut) return;
+    const own = geo.clone();
+    own.setIndex(keep);
+    mesh.geometry = own;
+    made.push(own);
+  });
+  return made;
+}
+
+/**
  * The supplied room, printed: its baked light (grey atlases from
  * tools/room_textures.py) drives the comic bands as emission, so the room
  * keeps the model's own light and shadow without any lights of its own. The
@@ -75,6 +127,7 @@ function buildRoom(gltf: GLTF) {
   root.position.y = ROOM_LIFT;
   // its own copy of the loaded (cached, shared) model, so a second visit starts from it as loaded
   const model = gltf.scene.clone(true);
+  const trimmed = trimCut(model);
   root.add(model);
   const printed = (map: Texture | null, comic: object) => {
     if (map) map.colorSpace = SRGBColorSpace;
@@ -112,8 +165,8 @@ function buildRoom(gltf: GLTF) {
     if (name === 'material') mesh.userData.ink = false;
   });
   screens.sort((a, b) => a.name.localeCompare(b.name));
-  // the credits go on the screen right of the big display, low (screen_13), in view from the chair
-  const wall = buildWallScreens(screens.length, screens.findIndex((s) => s.name === CREDITS_SCREEN));
+  // the text about the author goes on the screen right of the big display, low (screen_13), in view from the chair
+  const wall = buildWallScreens(screens.length, screens.findIndex((s) => s.name === ABOUT_SCREEN));
   screens.forEach((s, i) => {
     s.material = wall.materials[i];
     s.userData.ink = false;
@@ -121,6 +174,7 @@ function buildRoom(gltf: GLTF) {
   // this build's own materials, freed with it
   const dispose = () => {
     mats.forEach((m) => m.dispose());
+    trimmed.forEach((g) => g.dispose());
     steel.dispose();
     led.dispose();
   };

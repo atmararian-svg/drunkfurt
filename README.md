@@ -400,22 +400,16 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   driver's door (front left, `w206_door_FL`) opens by turning that node 62° about the vertical
   through the hinge. Each wheel and tyre is its own node at its hub and rolls about the axle by
   distance / 0.325 m. The headlights' lamp materials glow and two spot lights throw the beams.
-- **The instrument cluster** (`carCluster.ts`) is the supplied dial illustration ("car
-  dashboard UI illustration" by Vecteezy, free licence, credited in the room at the end), adapted
-  by `tools/cluster_svg.py` into `src/assets/cluster.svg` and printed on the car's own cluster
-  screen: the model's `w206_gauges` panel, 30.8 × 10.4 cm behind the steering wheel, tilted
-  15° towards the driver. The graphic sits on a plane 3 mm in front of it, so it is seen in
-  perspective through the wheel, lit like a screen, and moves with the car.
-  - The original has three dials. The left one is a tachometer (0–10 × 1,000 rpm, red from
-    6): it stays a tachometer, and its red zone starts where the launch happens. The right one
-    (0–100, fuel) is kept. The middle one is a speedometer labelled 0–160 (mph), with uneven
-    labels (140 and 160 squeezed into the bottom) and a grey panel in its centre ("12.24v", a
-    battery icon, two lines and a small triangle): the panel and those parts are removed, and
-    the speedometer's ticks, labels and ring are rebuilt as 0–300 km/h (ticks every 10, major
-    ticks and labels every 50, a 270° sweep), not relabelled. The decorative cowl arc is
-    dropped (the car has a real one).
-  - Colours go from cyan to an AMG-like cluster: near-black face, white and grey markings, red
-    accents (the tachometer's red zone, the needles).
+- **The instrument cluster** (`carCluster.ts`) is drawn in code on a canvas (no third-party
+  graphic), in the manner of an AMG cluster, and printed on the car's own cluster screen: the
+  model's `w206_gauges` panel, 30.8 × 10.4 cm behind the steering wheel, tilted 15° towards the
+  driver. The graphic sits on a plane 3 mm in front of it, so it is seen in perspective through
+  the wheel, lit like a screen, and moves with the car.
+  - Black glass with a faint lift behind each dial, thin chrome-grey rims, white numerals in
+    the wide grotesque of the title cards, red accents. Left the tachometer (0–10 × 1,000/min,
+    red from 7, 225° sweep), in the middle the large speedometer (0–300 km/h, ticks every 10,
+    labels every 40, 270° sweep), right the oil temperature (an arc filled to 90 °C, red from
+    130); along the bottom the odometer, outside temperature and the time over a red hairline.
   - The needles are drawn live: the tachometer from the engine's rpm, the speedometer from the
     car's road speed. Revving on the spot moves only the tachometer; the speedometer stays at 0
     until the car moves, and reaches about 180 km/h in the rush. Under the speedometer's hub the gear shows: P parked, D1–D4
@@ -502,7 +496,10 @@ you into the screen and out of the story, onto the real site.
   - every node transform is baked into the geometry (metres, y up);
   - the six central screens (the middle three columns of the two middle rows), their housings,
     arms and the cables in that block are cut out (a box, x 1.42–3.24, y −1.80…−0.70,
-    z −0.15…0.60 in the model's frame); the pillars behind stay;
+    z −0.15…0.60 in the model's frame); the pillars behind stay. Triangles whose centre lay just
+    outside that box survived as thin strips of the old housings along the display's lower
+    edge (two bright lines); `trimCut` in `RoomScene.tsx` removes them at build time with a
+    slightly taller box (y −1.87…−0.64), on the scene's own copy of the geometry;
   - the model's single screens mesh is split into one mesh per screen (`screen_00`…`screen_21`),
     each with its own planar texture coordinates, so each can dim and glow on its own; the small
     glowing bits become `leds`;
@@ -534,11 +531,10 @@ you into the screen and out of the story, onto the real site.
   the room, right of the chair; 0.5 at its side; 0.5–0.66 turning in and lowering
   (1.65 → 1.155 m); 0.66–0.72 the settle (a 3.5 cm dip, then upright, eyes up to the screen).
   At 0.76 the story waits (a gate that never opens: the story ends here) with one caption,
-  "Click the screen, or a project on it". The credits (the room by wa_rouk, the cluster graphic
-  by Vecteezy.com) are not printed over the page: they are on one of the wall's terminals, the
-  one to the right of and below the big screen (`screen_13`, `roomScreens.ts` `CREDIT_LINES`),
-  steady and readable from the chair; a visually hidden copy with links stays in the page for
-  assistive technology.
+  "Click the screen, or a project on it". One of the wall's terminals, to the right of and
+  below the big screen (`screen_13`), shows a few lines about the author (`roomScreens.ts`
+  `ABOUT_TEXT`), steady and readable from the chair, at twice the other screens' resolution.
+  No credits are printed anywhere on the page (see Assets).
 - **Hover**: each frame the pointer is picked against the picture's own plane (not the bezel or
   the room). Over it, the camera leans 30 cm towards the screen and narrows 3°, and the picture
   comes up to 97 %; away, it eases back (damped, about a second either way). Over a project card
@@ -673,9 +669,8 @@ wipe opens.
 
 - **Supplied assets**: the walking man (`src/assets/man.glb`, 1.4 MB), the knife
   (`src/assets/knife.glb`, 0.15 MB), the Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`,
-  2.2 MB) and the instrument-cluster illustration (`src/assets/cluster.svg`, adapted from
-  "car dashboard UI illustration" by Vecteezy, free licence, which asks for the credit
-  "Vecteezy.com": it is in the credits), all supplied by the project owner (see Episode 03).
+  2.2 MB), all supplied by the project owner (see Episode 03). The instrument cluster is this
+  project's own drawing (`carCluster.ts`); the Vecteezy illustration used before is gone.
 - **Supplied audio** (`src/assets/audio/`, all from the project owner): `hits.mp3` and
   `exhales.mp3` (the fight), `aggressive-supercar-engine.mp3` (the rev sequence), `wheels.mp3`,
   `gear-shift.mp3` (the launch), `door-open.mp3`, `engine-start.mp3`, `engine-default.mp3` (the
@@ -685,7 +680,8 @@ wipe opens.
 - **Episode 04**: the room is "Surveillance room" by wa_rouk
   (https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304), under
   the Sketchfab Standard licence according to the file's own metadata; it was supplied by the
-  project owner, and is credited in the room. The screen picture is a screenshot of
+  project owner. That licence does not ask for a credit, so none is shown (the owner's choice:
+  nothing on the page distracts from the story). The screen picture is a screenshot of
   arianatmar.com, also supplied by the owner.
   - `tools/fbx2glb.mjs` converts the FBX (FBXLoader + GLTFExporter in node) without his
     glasses and hair. FBXLoader makes one bone per skin cluster, so a joint shared by several

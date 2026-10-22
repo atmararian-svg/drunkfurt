@@ -144,14 +144,6 @@ body { cursor: pointer; }
 .caption--bl { bottom: max(11vh, 64px); left: max(28px, env(safe-area-inset-left, 0px)); }
 .caption--br { bottom: max(11vh, 64px); right: max(72px, calc(env(safe-area-inset-right, 0px) + 56px)); }
 
-.outro .credit {
-  margin: 18px 0 0;
-  font: 500 10px/1.4 var(--mono);
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--grey);
-}
-.outro .credit a { color: inherit; }
 
 /* --- episode 3: hold D (the revs are on the car's own cluster) ------------ */
 .rev-prompt {
@@ -380,15 +372,7 @@ body { cursor: pointer; }
   .act.is-on .act-hint { animation: none; }
 }
 
-/* --- episode 4: the credits in the room, and the hand-over to the site ---- */
-.credits {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-}
+/* --- episode 4: the hand-over to the site ---------------------------------- */
 
 /* once the screen is clicked, the page's printed matter steps back */
 .site-handoff .caption,

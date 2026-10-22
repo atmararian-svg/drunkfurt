@@ -131,29 +131,59 @@ function plan(seed: number) {
 }
 
 /**
- * The credits, as one more terminal on the wall: who made the room and the
- * cluster graphic, in the log screens' type, steady and bright enough to read
- * from the chair. Redrawn once the page's mono face has loaded.
+ * About the author, as one more terminal on the wall: in the log screens'
+ * type, steady and bright enough to read from the chair, at twice the other
+ * screens' resolution so the small type stays sharp. Redrawn once the page's
+ * mono face has loaded.
  */
-export const CREDIT_LINES = ['CREDITS', '', 'ROOM: "SURVEILLANCE ROOM"', '  BY WA_ROUK', '  SKETCHFAB.COM/WA_ROUK', '', 'CLUSTER GRAPHIC:', '  VECTEEZY.COM'];
-function credits() {
-  const draw = (c: CanvasRenderingContext2D) => {
+export const ABOUT_TEXT = [
+  'My name is Arian.',
+  'An Award-Winning Senior UI/UX Designer working with studios around the World.',
+  'I have six (6+) years of experience in interface / web design and I fr love what I’m doing!',
+  'I have 30+ major projects under my belt and have shown you my favorites in my portfolio.',
+];
+function about() {
+  const k = 2;
+  const el = document.createElement('canvas');
+  el.width = W * k;
+  el.height = H * k;
+  const c = el.getContext('2d')!;
+  const draw = () => {
     c.fillStyle = grey(14);
-    c.fillRect(0, 0, W, H);
-    CREDIT_LINES.forEach((line, i) => {
-      if (!line) return;
-      c.font = `${i === 0 ? 800 : 700} 15px 'JetBrains Mono', ui-monospace, monospace`;
-      c.fillStyle = i === 0 ? '#e6c23a' : grey(225);
-      c.fillText(`${line.startsWith(' ') ? '  ' : '> '}${line.trim()}`, 14, 30 + i * 23);
+    c.fillRect(0, 0, el.width, el.height);
+    const left = 28;
+    const max = el.width - left * 2;
+    let y = 46;
+    ABOUT_TEXT.forEach((para, i) => {
+      c.font = `${i === 0 ? 800 : 600} ${i === 0 ? 26 : 21}px 'JetBrains Mono', ui-monospace, monospace`;
+      c.fillStyle = i === 0 ? '#e6c23a' : grey(222);
+      // wrapped by words, each paragraph a prompt line and its continuation indented
+      const words = para.split(' ');
+      let line = '';
+      const lines: string[] = [];
+      for (const w of words) {
+        const next = line ? `${line} ${w}` : w;
+        if (c.measureText(`> ${next}`).width > max && line) {
+          lines.push(line);
+          line = w;
+        } else line = next;
+      }
+      lines.push(line);
+      lines.forEach((l, j) => {
+        c.fillText(`${j === 0 ? '> ' : '  '}${l}`, left, y);
+        y += i === 0 ? 34 : 28;
+      });
+      y += 12;
     });
-  };
-  const t = canvas((c) => draw(c), 1);
-  document.fonts?.ready.then(() => {
-    const el = t.image as HTMLCanvasElement;
-    const c = el.getContext('2d')!;
-    draw(c);
     c.fillStyle = 'rgba(0,0,0,0.18)';
-    for (let y = 0; y < H; y += 3) c.fillRect(0, y, W, 1);
+    for (let yy = 0; yy < el.height; yy += 4) c.fillRect(0, yy, el.width, 2);
+  };
+  draw();
+  const t = new CanvasTexture(el);
+  t.colorSpace = SRGBColorSpace;
+  t.anisotropy = 4;
+  document.fonts?.ready.then(() => {
+    draw();
     t.needsUpdate = true;
   });
   return t;
@@ -179,11 +209,11 @@ export interface WallScreens {
 
 /**
  * One material per screen, each with its own picture and its own schedule;
- * the screen at `creditsAt` shows the credits, steady (no moods).
+ * the screen at `aboutAt` shows the text about the author, steady (no moods).
  */
-export function buildWallScreens(count: number, creditsAt = -1): WallScreens {
+export function buildWallScreens(count: number, aboutAt = -1): WallScreens {
   const pics: Texture[] = [feed(1), feed(2), feed(3), feed(4), log(5), log(6), scope(7), scope(8), plan(9), noise(10)];
-  const creditPic = credits();
+  const aboutPic = about();
   // the log screens scroll their text slowly
   const scrolling = pics.slice(4, 6);
   scrolling.forEach((t) => {
@@ -194,7 +224,7 @@ export function buildWallScreens(count: number, creditsAt = -1): WallScreens {
   const mood: { level: number; target: number; next: number; rate: number; flicker: number }[] = [];
   for (let i = 0; i < count; i++) {
     const pick = pics[Math.floor(r() * pics.length)];
-    const m = new MeshBasicMaterial({ map: i === creditsAt ? creditPic : pick, toneMapped: false });
+    const m = new MeshBasicMaterial({ map: i === aboutAt ? aboutPic : pick, toneMapped: false });
     m.userData.comic = false;
     const level = 0.15 + r() * 0.45;
     m.color.setScalar(level);
@@ -207,7 +237,7 @@ export function buildWallScreens(count: number, creditsAt = -1): WallScreens {
     update(dt, now) {
       clock += dt;
       for (let i = 0; i < count; i++) {
-        if (i === creditsAt) {
+        if (i === aboutAt) {
           materials[i].color.setScalar(0.92);
           continue;
         }
@@ -233,7 +263,7 @@ export function buildWallScreens(count: number, creditsAt = -1): WallScreens {
     },
     dispose() {
       pics.forEach((t) => t.dispose());
-      creditPic.dispose();
+      aboutPic.dispose();
       materials.forEach((m) => m.dispose());
     },
   };

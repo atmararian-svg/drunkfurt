@@ -278,27 +278,10 @@ export function Overlay() {
         Sound {sound ? 'on' : 'off'}
       </button>
 
-      {/* the credits are shown on a screen in the room (scenes/home/roomScreens.ts); this copy is for assistive technology */}
-      <p className="credits">
-        Room: “Surveillance room” by{' '}
-        <a href="https://sketchfab.com/wa_rouk" target="_blank" rel="noreferrer">
-          wa_rouk
-        </a>{' '}
-        · Instrument cluster graphic:{' '}
-        <a href="https://www.vecteezy.com" target="_blank" rel="noreferrer">
-          Vecteezy.com
-        </a>
-      </p>
 
       <section className="outro">
         <span className="title-brand">DRUNKFURT</span>
         <h2 className="title-name">To be continued</h2>
-        <p className="credit">
-          Instrument cluster graphic:{' '}
-          <a href="https://www.vecteezy.com" target="_blank" rel="noreferrer">
-            Vecteezy.com
-          </a>
-        </p>
       </section>
     </div>
   );
