@@ -36,6 +36,7 @@ export function Mercedes() {
   const tmp = useMemo(() => new Vector3(), []);
   useEffect(() => {
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__getaway = { getaway, setThrottle, car, audio };
+    return () => car.dispose();
   }, [car]);
 
   // hold D to rev; the key is released if the window loses focus or the page is hidden

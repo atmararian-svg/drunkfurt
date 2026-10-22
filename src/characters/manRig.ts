@@ -17,6 +17,7 @@ import {
   Vector3,
 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { paint } from './anatomy';
 import { loft } from './shapes';
 import { twoBone } from './feet';
@@ -58,6 +59,8 @@ export interface ManRig {
   lie(): void;
   /** Where the blade's tip is (world). */
   tip(out: Vector3): Vector3;
+  /** Frees what this build made (its materials, the knit textures, the beanie, scarf and knife copies). */
+  dispose(): void;
   /** Distance he covers per walk cycle (m), so the cycle can be locked to his route. */
   stride: number;
   /** Phase at which his walk starts from standing (the -x foot under him). */
@@ -96,7 +99,12 @@ const knit = (shade: number, rib: number) => {
 
 export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   const root = new Group();
-  const model = gltf.scene;
+  // his own copy of the loaded model (skeleton re-bound to the copy's bones). The loaded scene is
+  // shared and cached: built on directly, a second build (the chapter entered again) found it still
+  // in the last pose it was left in (lying on the pavement), took that for his rest pose, measured
+  // his head from it (most of his body is above a lying man's head) and fitted a second, enormous
+  // beanie onto the first.
+  const model = cloneSkinned(gltf.scene);
   root.add(model);
   model.updateMatrixWorld(true);
   // the model is in centimetres, feet on the ground
@@ -225,8 +233,10 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
     ],
     10,
   );
+  const worn: MeshStandardMaterial[] = [];
   const wear = (geo: BufferGeometry, parent: Bone, shade: number, rib: number) => {
     const mat = new MeshStandardMaterial({ map: knit(shade, rib), roughness: 1, vertexColors: true });
+    worn.push(mat);
     mat.userData.comic = { mono: true, halftone: 0.55 };
     paint(geo, new Color(1, 1, 1));
     // project UVs round the loft so the ribs run vertically
@@ -374,6 +384,14 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
     },
     tip(out) {
       return knifeModel.localToWorld(out.set(1, 0, 0));
+    },
+    dispose() {
+      // the materials are this build's own (the loaded model's geometry and textures are shared: kept)
+      const mats = new Set<MeshStandardMaterial>();
+      for (const o of [root, groundKnife]) o.traverse((x) => (x as Mesh).isMesh && mats.add((x as Mesh).material as MeshStandardMaterial));
+      mats.forEach((m) => m.dispose());
+      worn.forEach((m) => m.map?.dispose());
+      [beanieGeo, scarfGeo, tail].forEach((g) => g.dispose());
     },
   };
   // distance per cycle: the clip walks in place, 1.70 m per cycle at its own size (centimetres); scaled with him

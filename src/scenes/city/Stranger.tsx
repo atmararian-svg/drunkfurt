@@ -2,7 +2,7 @@ import { useFrame } from '@react-three/fiber';
 import { suspend } from 'suspend-react';
 import manUrl from '../../assets/man.glb?url';
 import knifeUrl from '../../assets/knife.glb?url';
-import { Component, ReactNode, useMemo, useRef } from 'react';
+import { Component, ReactNode, useEffect, useMemo, useRef } from 'react';
 import { Object3D, PointLight, SpotLight, Vector3 } from 'three';
 import { loadGlb } from '../../characters/inlineModel';
 import { buildMan } from '../../characters/manRig';
@@ -43,6 +43,8 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     if (import.meta.env.DEV) (window as unknown as { __stranger: unknown }).__stranger = r;
     return r;
   }, [gltf, knifeGltf]);
+  // this build's resources go with it (the next visit builds a fresh one from its own copy of the model)
+  useEffect(() => () => rig.dispose(), [rig]);
   const tmp = useMemo(() => ({ a: new Vector3(), b: new Vector3(), c: new Vector3(), d: new Vector3(), e: new Vector3() }), []);
   const key = useRef<SpotLight>(null);
   const keyTarget = useMemo(() => new Object3D(), []);

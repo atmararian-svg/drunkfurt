@@ -70,7 +70,8 @@ function buildRoom(gltf: GLTF) {
   const root = new Group();
   root.name = 'room';
   root.position.y = ROOM_LIFT;
-  const model = gltf.scene;
+  // its own copy of the loaded (cached, shared) model, so a second visit starts from it as loaded
+  const model = gltf.scene.clone(true);
   root.add(model);
   const printed = (map: Texture | null, comic: object) => {
     if (map) map.colorSpace = SRGBColorSpace;
@@ -113,7 +114,13 @@ function buildRoom(gltf: GLTF) {
     s.material = wall.materials[i];
     s.userData.ink = false;
   });
-  return { root, wall };
+  // this build's own materials, freed with it
+  const dispose = () => {
+    mats.forEach((m) => m.dispose());
+    steel.dispose();
+    led.dispose();
+  };
+  return { root, wall, dispose };
 }
 
 /**
@@ -174,7 +181,13 @@ function Room({ active }: { active: boolean }) {
   const room = useMemo(() => buildRoom(gltf), [gltf]);
   const display = useMemo(() => buildDisplay(picture), [picture]);
   const { gl, scene, camera } = useThree();
-  useEffect(() => () => room.wall.dispose(), [room]);
+  useEffect(
+    () => () => {
+      room.wall.dispose();
+      room.dispose();
+    },
+    [room],
+  );
 
   useEffect(() => {
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__home = { monitor, display, room };

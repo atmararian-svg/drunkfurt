@@ -35,6 +35,8 @@ export interface CarRig {
   pedal(down: number): void;
   /** Rolls the wheels by a distance travelled (m). */
   roll(distance: number): void;
+  /** Frees this build's own materials and the cluster's canvas texture (the model's geometry is shared: kept). */
+  dispose(): void;
   /** A point in the car's own frame (m, facing +z, driver on +x) to world space. */
   toWorld(local: Vector3, out?: Vector3): Vector3;
 }
@@ -101,7 +103,9 @@ function pick(name: string, mesh: string, m: Mats): Material {
 
 export function buildCar(gltf: GLTF): CarRig {
   const root = new Group();
-  const model = gltf.scene;
+  // its own copy of the loaded (cached, shared) model: a second build, when the chapter is entered
+  // again, must start from the model as loaded (doors shut, wheels square), not as the last visit left it
+  const model = gltf.scene.clone(true);
   model.scale.setScalar(0.01);
   root.add(model);
   const m = palette3();
@@ -173,6 +177,18 @@ export function buildCar(gltf: GLTF): CarRig {
     },
     pedal(down) {
       if (gas && gasRest) gas.quaternion.copy(gasRest).multiply(qp.setFromAxisAngle(X, (-14 * Math.PI * down) / 180));
+    },
+    dispose() {
+      const mats = new Set<Material>();
+      root.traverse((o) => {
+        const mesh = o as Mesh;
+        if (!mesh.isMesh) return;
+        (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((x) => mats.add(x));
+      });
+      mats.forEach((x) => {
+        (x as MeshStandardMaterial & { map?: { dispose(): void } }).map?.dispose?.();
+        x.dispose();
+      });
     },
     roll(distance) {
       const a = distance / WHEEL_RADIUS;
