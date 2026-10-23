@@ -11,16 +11,17 @@ import { DISABLE_PATH, ENABLE_PATH } from './soundWords';
  *    resolve from 28 px blocks, SOUND too (drawn once into a canvas over its
  *    letters for that, then the letters themselves take over).
  *  - The page is split in two at the line between ENABLE and DISABLE. With the
- *    pointer on the left, ENABLE is the choice: SOUND moves under it and bends
- *    into a smile, and DISABLE breaks into coarse pixels; on the right the
- *    other way round (DISABLE chosen, ENABLE pixelated, SOUND under DISABLE,
- *    bent the opposite way). It travels eased in and out: slow start, quick
- *    middle, slow end. Off both, SOUND lies straight in the middle. A little
- *    hysteresis at the line keeps it from flickering there.
- *  - SOUND also rides up and down with the pointer: its height follows the
- *    pointer's (eased on the clock, quickly), its place across stays the
- *    layout's. The whole word moves (its container), so this never fights the
- *    letters' own glide into a curve.
+ *    pointer on the left, ENABLE is the choice: SOUND bends into a smile, and
+ *    DISABLE breaks into fine pixels; on the right the other way round
+ *    (DISABLE chosen, ENABLE pixelated, SOUND bent the opposite way). The
+ *    letters glide between the curves eased in and out: slow start, quick
+ *    middle, slow end. Off both, SOUND lies straight. A little hysteresis at
+ *    the line keeps it from flickering there.
+ *  - SOUND hangs at its height, as if on a line across the page: it slides
+ *    left and right with the pointer (eased on the clock, like a weight on a
+ *    rope), never up or down. The whole word moves (its container), so this
+ *    never fights the letters' own glide into a curve. With the keyboard it
+ *    slides under the word chosen.
  *  - A click (or a tap) on a half chooses it; the two halves are real buttons
  *    (keyboard: Tab or ← →, then Enter). The promise resolves with the choice,
  *    which the caller makes the page's actual sound setting.
@@ -36,15 +37,20 @@ const DISABLE = { x: 921, y: 24, w: 975, h: 412 };
 const SPLIT = (ENABLE.x + ENABLE.w + DISABLE.x) / 2;
 /**
  * SOUND's letters in each state: where each stands (its box's top left) and
- * its tilt, in design px. Straight in the middle by default; the arcs and
- * their places are the design's (its per-letter transforms in the -enable and
- * -disable frames): a smile under ENABLE, the opposite curve under DISABLE.
+ * its tilt, in design px. Straight in the middle by default; the arcs are the
+ * design's (its per-letter transforms in the -enable and -disable frames): a
+ * smile, and the opposite curve, each moved across to the middle (its height
+ * kept), since where the word stands across is the pointer's (below).
  */
 type Place = { x: number; y: number; deg: number };
 const STRAIGHT: Place[] = [0, 73, 163.7, 252.3, 337].map((x) => ({ x: 749 + x, y: 958, deg: 0 }));
-// [a, b, x, y] of each letter's transform within its group at (gx, gy): the tilt is atan2(b, a)
-const fromDesign = (gx: number, gy: number, letters: [number, number, number, number][]): Place[] =>
-  letters.map(([a, b, x, y]) => ({ x: gx + x, y: gy + y, deg: (Math.atan2(b, a) * 180) / Math.PI }));
+const meanX = (ps: Place[]) => ps.reduce((a, p) => a + p.x, 0) / ps.length;
+// [a, b, x, y] of each letter's transform within its group at (gx, gy): the tilt is atan2(b, a); centred across on the straight word
+const fromDesign = (gx: number, gy: number, letters: [number, number, number, number][]): Place[] => {
+  const ps = letters.map(([a, b, x, y]) => ({ x: gx + x, y: gy + y, deg: (Math.atan2(b, a) * 180) / Math.PI }));
+  const dx = meanX(STRAIGHT) - meanX(ps);
+  return ps.map((p) => ({ ...p, x: p.x + dx }));
+};
 const SOUND_SIZE = 93.275;
 const LAYOUT: Record<'none' | 'on' | 'off', Place[]> = {
   none: STRAIGHT,
@@ -63,11 +69,13 @@ const LAYOUT: Record<'none' | 'on' | 'off', Place[]> = {
     [0.9569, 0.2904, 342.05, 12.05],
   ]),
 };
-/** SOUND's middle, top to bottom (design px), where it rests; how far above and below it may follow the pointer. */
-const SOUND_MID = 990;
-const FOLLOW = { up: 930, down: 60 };
-/** Block size of the word not chosen (design px), and of everything as it comes in. */
-const INACTIVE_BLOCK = 16;
+/** SOUND's middle across (design px), where it rests; how far either way it may slide (it stays inside the frame). */
+const SOUND_MID = 960;
+const SLIDE = 720;
+/** Where it slides to when a word is chosen from the keyboard: under that word. */
+const UNDER = { on: ENABLE.x + ENABLE.w / 2, off: DISABLE.x + DISABLE.w / 2 };
+/** Block size of the word not chosen (design px; fine, so it still reads as the word), and of everything as it comes in. */
+const INACTIVE_BLOCK = 6;
 const INTRO_BLOCK = 28;
 const INTRO_MS = 700;
 
@@ -181,7 +189,7 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     });
   };
 
-  /** SOUND's height: where the pointer would have it, and where it is (px from its resting place). */
+  /** SOUND's place across: where the pointer would have it, and where it is (px from its resting place). */
   let followTo = 0;
   let followAt = 0;
 
@@ -193,12 +201,12 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     last = now;
     let moving = false;
     const intoK = introAt < 0 || reduced ? 1 : Math.min(1, (now - introAt) / INTRO_MS);
-    // (once it has come in) SOUND follows the pointer up and down
+    // (once it has come in) SOUND slides along after the pointer, left and right only
     if (intoK >= 1 && followAt !== followTo) {
-      followAt += (followTo - followAt) * (reduced ? 1 : 1 - Math.exp(-dt * 16));
+      followAt += (followTo - followAt) * (reduced ? 1 : 1 - Math.exp(-dt * 7));
       if (Math.abs(followTo - followAt) < 0.3) followAt = followTo;
       else moving = true;
-      word.style.transform = `translateY(${followAt.toFixed(1)}px)`;
+      word.style.transform = `translateX(${followAt.toFixed(1)}px)`;
     }
     for (const key of ['enable', 'disable'] as const) {
       const c = key === 'enable' ? enable : disable;
@@ -269,11 +277,16 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     wake();
   };
 
+  const slideTo = (px: number) => {
+    followTo = Math.max(-SLIDE * u, Math.min(SLIDE * u, px));
+    wake();
+  };
+
   // the pointer picks a half, with a little give at the line so it never flickers there
   const GIVE = 14;
   const move = (e: PointerEvent) => {
     if (e.pointerType === 'touch') return;
-    followTo = Math.min(FOLLOW.down * u, Math.max(-FOLLOW.up * u, e.clientY - (top + SOUND_MID * u)));
+    slideTo(e.clientX - (left + SOUND_MID * u));
     wake();
     const split = left + SPLIT * u;
     if (e.clientX < split - GIVE) set('on');
@@ -281,8 +294,7 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     else if (state === 'none') set(e.clientX < split ? 'on' : 'off');
   };
   const leave = () => {
-    followTo = 0;
-    wake();
+    slideTo(0);
     set('none');
   };
 
@@ -302,8 +314,14 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   };
   const onClick = click(true);
   const offClick = click(false);
-  const focusOn = () => set('on');
-  const focusOff = () => set('off');
+  const focusOn = () => {
+    set('on');
+    slideTo((UNDER.on - SOUND_MID) * u);
+  };
+  const focusOff = () => {
+    set('off');
+    slideTo((UNDER.off - SOUND_MID) * u);
+  };
   const key = (e: KeyboardEvent) => {
     if (done) return;
     if (e.key === 'ArrowLeft') {

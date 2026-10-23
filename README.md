@@ -71,15 +71,16 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   from its art, `src/ui/soundWords.ts`, filled even-odd) side by side at the top, SOUND along the
   bottom, all coming in through the transition's pixelation (28 px blocks resolving; SOUND drawn
   once into a canvas over its own letters for that). The page is split at the line between the
-  two words: the pointer on the left makes ENABLE the choice (SOUND moves under it and bends into
-  a smile, DISABLE breaks into 16 px blocks), on the right the other way round (SOUND under
-  DISABLE, bent the opposite way); off both, SOUND lies straight in the middle. The places and
-  curves are the design's per-letter transforms; the letters travel between them eased in and
+  two words: the pointer on the left makes ENABLE the choice (SOUND bends into a smile, DISABLE
+  breaks into blocks), on the right the other way round (SOUND bent the opposite way); off both,
+  SOUND lies straight. The curves are the design's per-letter transforms; the letters glide
+  between them eased in and
   out (CSS transitions of the same translate + rotate, 0.9 s, `cubic-bezier(0.65, 0, 0.35, 1)`:
   slow start, quick middle, slow end); the words' blocks ease on the clock; 14 px of give at the line keeps it from
-  flickering. SOUND also rides up and down with the pointer (its height follows the pointer's,
-  eased quickly on the clock; its place across stays the layout's; the whole word moves, so this
-  never fights the letters' glide into a curve). The screen stands on the preloader's own ground:
+  flickering. SOUND hangs at its height as if on a line across the page: it slides left and right
+  after the pointer (eased on the clock, like a weight on a rope), never up or down; its curves
+  are centred on it, so it bends where it is; the whole word moves, so this never fights the
+  letters' glide into a curve. The word not chosen breaks into fine 6 px blocks. The screen stands on the preloader's own ground:
   its grain and its dot grid (`dotGrid.ts`) stay on under the words. The two halves are real buttons (click, tap, or ← → and Enter); the choice sets the
   page's sound (`story.sound`, `audio.setEnabled`), the same setting as the Sound on/off switch,
   and the click is also the gesture the browser needs before any audio can start.
