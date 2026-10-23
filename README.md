@@ -67,15 +67,16 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   `pixelReveal.ts`), and only then does the sound choice come in; once it is made, the pixel
   reveal brings chapter 1 in over it.
 - **Sound choice** (`src/ui/soundChoice.ts`, Figma "Preloader-sound-default / -enable /
-  -disable"): ENABLE and DISABLE (the design's slanted lettering, cropped from its images,
-  `src/assets/sound-enable.webp`, `sound-disable.webp`) side by side at the top, SOUND along the
+  -disable"): ENABLE and DISABLE (the design's slanted lettering as vector outlines, traced
+  from its art, `src/ui/soundWords.ts`, filled even-odd) side by side at the top, SOUND along the
   bottom, all coming in through the transition's pixelation (28 px blocks resolving; SOUND drawn
   once into a canvas over its own letters for that). The page is split at the line between the
-  two words: the pointer on the left makes ENABLE the choice (SOUND bends into a smile, DISABLE
-  breaks into 16 px blocks), on the right the other way round (SOUND bent the opposite way);
-  off both, SOUND lies straight. The word stays in place and only bends: the curves are the
-  design's per-letter transforms, centred on the straight word, and the letters glide between
-  them (CSS transitions of the same translate + rotate); the words' blocks ease on the clock; 14 px of give at the line keeps it from
+  two words: the pointer on the left makes ENABLE the choice (SOUND moves under it and bends into
+  a smile, DISABLE breaks into 16 px blocks), on the right the other way round (SOUND under
+  DISABLE, bent the opposite way); off both, SOUND lies straight in the middle. The places and
+  curves are the design's per-letter transforms; the letters travel between them eased in and
+  out (CSS transitions of the same translate + rotate, 0.9 s, `cubic-bezier(0.65, 0, 0.35, 1)`:
+  slow start, quick middle, slow end); the words' blocks ease on the clock; 14 px of give at the line keeps it from
   flickering. The two halves are real buttons (click, tap, or ← → and Enter); the choice sets the
   page's sound (`story.sound`, `audio.setEnabled`), the same setting as the Sound on/off switch,
   and the click is also the gesture the browser needs before any audio can start.

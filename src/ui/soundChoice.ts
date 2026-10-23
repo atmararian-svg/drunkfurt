@@ -1,21 +1,21 @@
-import disableUrl from '../assets/sound-disable.webp';
-import enableUrl from '../assets/sound-enable.webp';
 import { drawPixelated } from './pixelReveal';
+import { DISABLE_PATH, ENABLE_PATH } from './soundWords';
 
 /**
  * The sound choice, between the preloader and chapter 1 (Figma
  * "Preloader-sound-default / -enable / -disable"): ENABLE and DISABLE, the
- * design's slanted lettering, side by side at the top; SOUND along the bottom.
+ * design's slanted lettering (vector outlines, soundWords), side by side at
+ * the top; SOUND along the bottom.
  *
  *  - Everything comes in through the transition's pixelation: the two words
  *    resolve from 28 px blocks, SOUND too (drawn once into a canvas over its
  *    letters for that, then the letters themselves take over).
  *  - The page is split in two at the line between ENABLE and DISABLE. With the
- *    pointer on the left, ENABLE is the choice: SOUND bends into a smile, and
- *    DISABLE breaks into coarse pixels; on the right the other way round
- *    (DISABLE chosen, ENABLE pixelated, SOUND bent the opposite way). Off
- *    both, SOUND lies straight. The word stays where it is and only bends,
- *    the letters gliding between the curves. A little
+ *    pointer on the left, ENABLE is the choice: SOUND moves under it and bends
+ *    into a smile, and DISABLE breaks into coarse pixels; on the right the
+ *    other way round (DISABLE chosen, ENABLE pixelated, SOUND under DISABLE,
+ *    bent the opposite way). It travels eased in and out: slow start, quick
+ *    middle, slow end. Off both, SOUND lies straight in the middle. A little
  *    hysteresis at the line keeps it from flickering there.
  *  - A click (or a tap) on a half chooses it; the two halves are real buttons
  *    (keyboard: Tab or ← →, then Enter). The promise resolves with the choice,
@@ -32,34 +32,26 @@ const DISABLE = { x: 921, y: 24, w: 975, h: 412 };
 const SPLIT = (ENABLE.x + ENABLE.w + DISABLE.x) / 2;
 /**
  * SOUND's letters in each state: where each stands (its box's top left) and
- * its tilt, in design px. The arcs are the design's (its per-letter
- * transforms in the -enable and -disable frames), moved so the word stays
- * where it is (centred on its straight layout): choosing only bends it, a
- * smile under ENABLE, the opposite curve under DISABLE, and the letters glide
- * between the curves instead of crossing the page.
+ * its tilt, in design px. Straight in the middle by default; the arcs and
+ * their places are the design's (its per-letter transforms in the -enable and
+ * -disable frames): a smile under ENABLE, the opposite curve under DISABLE.
  */
 type Place = { x: number; y: number; deg: number };
 const STRAIGHT: Place[] = [0, 73, 163.7, 252.3, 337].map((x) => ({ x: 749 + x, y: 958, deg: 0 }));
-const fromDesign = (letters: [number, number, number, number][]): Place[] => {
-  // [a, b, x, y] of each letter's transform: the tilt is atan2(b, a); the group is centred on the straight word
-  const mx = (ps: { x: number; y: number }[]) => ps.reduce((s, p) => s + p.x, 0) / ps.length;
-  const my = (ps: { x: number; y: number }[]) => ps.reduce((s, p) => s + p.y, 0) / ps.length;
-  const pts = letters.map(([a, b, x, y]) => ({ x, y, deg: (Math.atan2(b, a) * 180) / Math.PI }));
-  const dx = mx(STRAIGHT) - mx(pts);
-  const dy = my(STRAIGHT) - my(pts);
-  return pts.map((p) => ({ x: p.x + dx, y: p.y + dy, deg: p.deg }));
-};
+// [a, b, x, y] of each letter's transform within its group at (gx, gy): the tilt is atan2(b, a)
+const fromDesign = (gx: number, gy: number, letters: [number, number, number, number][]): Place[] =>
+  letters.map(([a, b, x, y]) => ({ x: gx + x, y: gy + y, deg: (Math.atan2(b, a) * 180) / Math.PI }));
 const SOUND_SIZE = 93.275;
 const LAYOUT: Record<'none' | 'on' | 'off', Place[]> = {
   none: STRAIGHT,
-  on: fromDesign([
+  on: fromDesign(234, 934, [
     [0.9535, 0.3014, 19.89, 4.63],
     [0.9878, 0.1555, 83.9, 25.98],
     [1.0, -0.0041, 167.12, 39.43],
     [0.9867, -0.1623, 248.0, 39.38],
     [0.9469, -0.3215, 322.68, 27.65],
   ]),
-  off: fromDesign([
+  off: fromDesign(1261, 934, [
     [0.9444, -0.3289, 0, 44.79],
     [0.983, -0.1834, 72.47, 19.14],
     [0.9997, -0.0247, 165.46, 2.22],
@@ -74,14 +66,7 @@ const INTRO_MS = 700;
 
 type State = 'none' | 'on' | 'off';
 
-const load = (src: string) =>
-  new Promise<HTMLImageElement>((resolve, reject) => {
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = src;
-  });
+const WORDS = { enable: { box: ENABLE, path: ENABLE_PATH }, disable: { box: DISABLE, path: DISABLE_PATH } };
 
 export interface SoundChoice {
   /** Resolves with the choice: true, sound on. */
@@ -136,11 +121,22 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   let state: State = 'none';
   let done = false;
   let raf = 0;
-  let introAt = -1; // when the intro began (ms), -1 before the images are in
+  let introAt = -1; // when the intro began (ms), -1 before the fonts are in
   const block = { enable: INTRO_BLOCK, disable: INTRO_BLOCK };
   const tiny = document.createElement('canvas');
   const sharp = { enable: document.createElement('canvas'), disable: document.createElement('canvas') };
-  let imgs: { enable: HTMLImageElement; disable: HTMLImageElement } | null = null;
+  const paths = { enable: new Path2D(WORDS.enable.path), disable: new Path2D(WORDS.disable.path) };
+  /** A word's outline filled into its sharp canvas, at this size. */
+  const drawWord = (key: keyof typeof WORDS) => {
+    const c = sharp[key];
+    const ctx = c.getContext('2d')!;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, c.width, c.height);
+    ctx.setTransform(c.width / WORDS[key].box.w, 0, 0, c.height / WORDS[key].box.h, 0, 0);
+    ctx.fillStyle = '#fff';
+    ctx.fill(paths[key], 'evenodd');
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  };
 
   /** The design frame scaled to fit the page, centred; every position follows from it. */
   const layout = () => {
@@ -158,7 +154,7 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
       Object.assign(c.style, { left: `${r.x * u}px`, top: `${r.y * u}px`, width: `${r.w * u}px`, height: `${r.h * u}px` });
       c.width = sharp[key].width = Math.max(1, Math.round(r.w * u * dpr));
       c.height = sharp[key].height = Math.max(1, Math.round(r.h * u * dpr));
-      if (imgs) sharp[key].getContext('2d')!.drawImage(imgs[key], 0, 0, c.width, c.height);
+      drawWord(key);
     }
     word.style.fontSize = `${SOUND_SIZE * u}px`;
     placeLetters(false);
@@ -181,7 +177,7 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   /** One frame: the words' blocks ease towards their targets (on the clock, not per frame); returns whether anything still moves. */
   let last = 0;
   const paint = (now: number) => {
-    if (!imgs) return true;
+    if (introAt < 0) return true;
     const dt = last ? Math.min(0.1, (now - last) / 1000) : 0.016;
     last = now;
     let moving = false;
@@ -305,17 +301,16 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
 
   word.style.visibility = 'hidden';
   layout();
-  Promise.all([load(enableUrl), load(disableUrl), document.fonts?.ready])
-    .then(([e, d]) => {
+  Promise.resolve(document.fonts?.ready)
+    .then(() => {
       if (done) return;
-      imgs = { enable: e, disable: d };
       layout();
       introReady = false;
       introAt = performance.now();
       wake();
     })
     .catch(() => {
-      // the art could not be decoded: the choice still works, as the two plain buttons
+      // the fonts never settled: the choice still works, as the two plain buttons
       host.classList.add('is-plain');
       introAt = 0;
       intro.hidden = true;

@@ -760,7 +760,8 @@ body { cursor: pointer; }
   line-height: 0.707;
   white-space: pre;
   transform-origin: 0 0;
-  transition: transform 0.6s cubic-bezier(0.33, 1, 0.68, 1);
+  /* to the chosen side and into its curve: eased in and out (slow start, quick middle, slow end) */
+  transition: transform 0.9s cubic-bezier(0.65, 0, 0.35, 1);
 }
 .snd-intro { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; image-rendering: pixelated; }
 /* the halves are the real controls: transparent, the whole page split at the line between the words */
