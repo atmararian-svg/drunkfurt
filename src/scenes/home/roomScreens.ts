@@ -56,7 +56,8 @@ function feed(n: number) {
     c.font = '600 15px monospace';
     c.fillStyle = grey(225);
     c.fillText(`CAM ${String(n).padStart(2, '0')}`, 12, 24);
-    c.fillText(`00:${String(28 + n).padStart(2, '0')}:${String(Math.floor(r() * 60)).padStart(2, '0')}`, W - 104, H - 14);
+    // the cameras' time code is the story's: chapter 3 is at 00:32 (core/chapters.ts), only the seconds differ
+    c.fillText(`00:32:${String(Math.floor(r() * 60)).padStart(2, '0')}`, W - 104, H - 14);
     c.fillStyle = '#e6c23a';
     c.beginPath();
     c.arc(W - 22, 20, 5, 0, Math.PI * 2);

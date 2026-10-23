@@ -165,6 +165,11 @@ export function pageTurnFrom(p: number) {
   return pageTurns().find((z) => z.from >= p - 1e-6) ?? null;
 }
 
+/** Every chapter transition, in order (the chapter ring reads where they are). */
+export function chapterTurns(): readonly PageTurn[] {
+  return pageTurns();
+}
+
 /** Where each chapter begins (global progress): its opening shot. */
 export function chapterStarts() {
   return [0, ...pageTurns().map((z) => z.to)];

@@ -34,13 +34,22 @@ import { pinScroll } from '../core/timeline';
  *
  * Around it: the page darkens (a layer over everything but the letter, fading
  * in), the cursor becomes CLICK TO CLOSE (a label that follows the pointer),
- * and a click closes it (the sheet folds back up, the dark fades out). On touch
+ * and a click closes it: the sheet crumples back up where it is, then, a
+ * ball again, drops out through the bottom of the page and is gone (it is not
+ * put back on the pavement: read, it is done with), while the dark fades out. On touch
  * screens, and for the keyboard, there is a visible close button; Escape
  * closes too. While it is open the scroll is held and nothing reaches the 3D
  * scene. If WebGL is unavailable, the image itself unfolds in CSS instead.
  */
 /** The reveal's timing (ms), in one place to tune: opening (lift, travel and unfolding on one curve) and closing. */
-export const LETTER_REVEAL = { open: 1900, close: 1100, hold: undefined as number | undefined };
+export const LETTER_REVEAL = {
+  open: 1900,
+  /** Closing: crumpling up, and (overlapping its end) the drop out of the page. */
+  close: 1500,
+  /** The share of the closing spent crumpling; the drop starts a little before it ends. */
+  crumple: 0.55,
+  hold: undefined as number | undefined,
+};
 /** The sheet's aspect (width / height): the supplied image's, 1592 × 2000. */
 const ASPECT = 1592 / 2000;
 
@@ -110,11 +119,10 @@ const image = () =>
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
-/** Opens the letter (once at a time). `onClosed` runs when it has folded away. */
 /**
  * Opens the letter (once at a time). `spot`: where the crumpled sheet lies on
  * the page (its centre and its size, CSS px), so it is lifted from there;
- * `onClosed` runs when it has been put back.
+ * `onClosed` runs when it has crumpled up and left the page.
  */
 export function openLetter(onClosed: () => void, spot?: { x: number; y: number; size: number }) {
   if (current) return;
@@ -237,28 +245,38 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     // (inspection only, in development: `hold` fixes the opening at a point of its curve)
     const held = import.meta.env.DEV ? LETTER_REVEAL.hold : undefined;
     const u = held !== undefined ? held : reduced ? 1 : Math.min(1, (now - t0) / ms);
-    unfold = from + (to - from) * ease(u);
+    // closing: it crumples where it is, then falls (faster and faster) out through the bottom of the page
+    const C = LETTER_REVEAL.crumple;
+    unfold = closing ? from * (1 - ease(Math.min(1, u / C))) : from + (to - from) * ease(u);
+    const drop = closing ? Math.pow(Math.max(0, (u - (C - 0.1)) / (1.1 - C)), 2) : 0;
     light.lerp(target, 0.08);
     if (renderer && mat && sheet && scene && cam) {
       mat.uniforms.uUnfold.value = unfold;
       // lifted from where it lay, rising and unfolding on one curve, so it is fully open as it arrives in the middle
       const k = 1 - unfold;
       const { h } = fit();
-      const gx = ((ground.x - window.innerWidth / 2) / h) * k;
-      const gy = (-(ground.y - window.innerHeight / 2) / h) * k;
-      // a lift: it rises off the pavement first, then comes forward to the reader
-      sheet.position.set(gx, gy + Math.sin(Math.PI * Math.min(1, unfold * 1.15)) * 0.12 * k, 0);
+      if (closing) {
+        // from the middle, down and out: the page's half height, plus the ball's size, below the middle
+        const out = (window.innerHeight / 2 / h) + ground.scale * 0.5;
+        sheet.position.set(0, -out * drop, 0);
+      } else {
+        const gx = ((ground.x - window.innerWidth / 2) / h) * k;
+        const gy = (-(ground.y - window.innerHeight / 2) / h) * k;
+        // a lift: it rises off the pavement first, then comes forward to the reader
+        sheet.position.set(gx, gy + Math.sin(Math.PI * Math.min(1, unfold * 1.15)) * 0.12 * k, 0);
+      }
       // lying on the ground (tipped away), turning to face you as it opens; a slight drift in the hand once open
       sheet.rotation.set(-1.15 * k * k + Math.sin(now / 2100) * 0.012 * unfold, 0.35 * k + Math.sin(now / 2700) * 0.015 * unfold, 0.6 * k);
       sheet.scale.setScalar(ground.scale + (1 - ground.scale) * unfold);
       renderer.render(scene, cam);
     } else if (fallback) {
       const k = 1 - unfold;
-      fallback.style.transform = `translate(${(ground.x - window.innerWidth / 2) * k}px, ${(ground.y - window.innerHeight / 2) * k}px) rotate(${-25 * k}deg) scale(${ground.scale + (1 - ground.scale) * unfold}, ${0.12 + 0.88 * unfold})`;
+      const [fx, fy] = closing ? [0, (window.innerHeight / 2 + 200) * drop] : [(ground.x - window.innerWidth / 2) * k, (ground.y - window.innerHeight / 2) * k];
+      fallback.style.transform = `translate(${fx}px, ${fy}px) rotate(${-25 * k}deg) scale(${ground.scale + (1 - ground.scale) * unfold}, ${0.12 + 0.88 * unfold})`;
       fallback.style.opacity = String(Math.min(1, unfold * 2));
     }
     // the page darkens as soon as the sheet is picked up (on the clock, not the unfolding), and back as it is put down
-    const shade = closing ? Math.min(1, unfold * 1.6) : Math.min(1, u * 2.2);
+    const shade = closing ? 1 - u : Math.min(1, u * 2.2);
     dim.style.opacity = String(shade * shade * (3 - 2 * shade));
     if (u < 1 || !closing) raf = requestAnimationFrame(draw);
     else finish();
@@ -297,7 +315,7 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     closing = true;
     from = unfold;
     to = 0;
-    ms = LETTER_REVEAL.close * Math.max(0.3, unfold);
+    ms = LETTER_REVEAL.close * Math.max(0.5, unfold);
     t0 = performance.now();
     root.classList.add('is-closing');
   }

@@ -3,7 +3,7 @@
   --charcoal: #1b1b1b;
   --paper: #f1f0e9;
   --grey: #8a8984;
-  --yellow: #f5d21a;
+  --yellow: #f5d21a; /* the station's signage colour (3D only): the page's accents are all --red */
   /* the red of "Drunk" (ui/palette.ts RED): the one red of every interaction and its status */
   --red: #cd1919;
   --display: 'Anton', 'Impact', 'Haettenschweiler', 'Arial Narrow Bold', sans-serif;
@@ -60,7 +60,7 @@ body { cursor: pointer; }
 
 /* --- narration panels ---------------------------------------------------
    Printed panels of the comic itself: an off-white panel (narration) or a
-   charcoal one (narration that matters, with a thin yellow rule), both with
+   charcoal one (narration that matters, with a thin red rule), both with
    the page's halftone and paper grain printed into them. No tape. */
 .caption {
   position: absolute;
@@ -84,7 +84,7 @@ body { cursor: pointer; }
   background-image: var(--halftone-paper), var(--grain);
   color: var(--paper);
   border-color: #1d1d1c;
-  border-left: 3px solid var(--yellow);
+  border-left: 3px solid var(--red);
 }
 /* spoken words (his, and yours to him): typed at the bottom of the page like the thoughts in the car, no balloon,
    no panel: centred, 32 px up, JetBrains Mono 16 px, capitals */
@@ -113,10 +113,10 @@ body { cursor: pointer; }
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
-/* who is speaking, and to whom: a label over the words, in the page's yellow */
+/* who is speaking, and to whom: a label over the words, in the page's red */
 .caption.caption--speech .caption-kicker {
   margin-bottom: 8px;
-  color: var(--yellow);
+  color: var(--red);
   font: 700 12px/1 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0.08em;
   pointer-events: none;
@@ -180,7 +180,7 @@ body { cursor: pointer; }
   display: block;
   width: 2px;
   height: 34px;
-  background: linear-gradient(var(--yellow) 0 50%, transparent 50% 100%);
+  background: linear-gradient(var(--red) 0 50%, transparent 50% 100%);
   background-size: 2px 68px;
   animation: cue 1.8s var(--ease) infinite;
 }
@@ -189,53 +189,69 @@ body { cursor: pointer; }
   to { background-position: 0 34px; }
 }
 
-/* --- chapter rail: where you are, in the page's red; each number takes you to its chapter --- */
-.rail {
+/* --- the chapter ring (chapterRing.ts): a sliver at the right edge, vertically centred --- */
+.ring {
   position: absolute;
   top: 50%;
-  right: max(22px, env(safe-area-inset-right, 0px));
-  display: flex;
-  gap: 10px;
+  right: 0;
   transform: translateY(-50%);
+  pointer-events: none;
+}
+.is-over-ring body { cursor: grab; }
+.is-turning-ring body,
+.is-turning-ring * { cursor: grabbing !important; user-select: none; }
+.ring-label {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  justify-items: end;
+  gap: 6px;
+  transform: translateY(-50%);
+  font: 700 14px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s var(--ease);
+}
+.ring-label.is-on { opacity: 1; }
+.ring-name { color: #fff; }
+.ring-label.is-preview .ring-name { color: var(--red); }
+.ring-hint { font-size: 11px; color: rgba(241, 240, 233, 0.6); }
+/* the chapters as plain buttons, for the keyboard and screen readers: shown only when focused */
+.ring-nav {
+  position: absolute;
+  top: 50%;
+  right: 24px;
+  display: grid;
+  gap: 4px;
+  transform: translateY(-50%);
+}
+.ring-nav button {
+  position: absolute;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  padding: 6px 8px;
+  border: 0;
+  background: #fff;
+  color: #111;
+  font: 700 12px/1 'JetBrains Mono', ui-monospace, monospace;
   pointer-events: auto;
 }
-.rail-line {
-  width: 2px;
-  height: 180px;
-  background: rgba(205, 25, 25, 0.28);
-  overflow: hidden;
+.ring-nav button:focus-visible {
+  position: static;
+  width: auto;
+  height: auto;
+  clip-path: none;
+  outline: 2px dashed var(--red);
+  outline-offset: 2px;
 }
-.rail-fill {
-  width: 100%;
-  height: 100%;
-  background: var(--red);
-  transform-origin: top;
-  transform: scaleY(0);
-}
-.rail ol {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  margin: 0 0 0 -6px;
-  padding: 0;
-  list-style: none;
-}
-.rail-go {
-  padding: 4px 6px;
-  border: 0;
-  border-radius: 3px;
-  background: none;
-  color: rgba(241, 240, 233, 0.45);
-  font: 700 11px/1 'JetBrains Mono', ui-monospace, monospace;
-  letter-spacing: -0.02em;
-  cursor: pointer;
-  transition: color 0.2s ease, background-color 0.2s ease;
-}
-.rail-go:hover,
-.rail-go:focus-visible { color: #fff; background: var(--red); outline: none; }
-.rail li.is-here .rail-go { color: var(--red); }
-.rail li.is-here .rail-go:hover,
-.rail li.is-here .rail-go:focus-visible { color: #fff; }
 
 /* --- ink wipe (canvas brush strokes) and outro ------------------------- */
 .wipe,
@@ -276,12 +292,11 @@ body { cursor: pointer; }
   cursor: pointer;
   transition: background-color 0.2s ease, color 0.2s ease;
 }
-.sound[aria-pressed='false'],
-.sound:hover { background: var(--red); color: #fff; }
+/* (hovering only decodes its text: no colour of its own) */
+.sound[aria-pressed='false'] { background: var(--red); color: #fff; }
 .sound:focus-visible { outline: 2px dashed var(--red); outline-offset: 3px; }
 
 @media (max-width: 640px) {
-  .rail { display: none; }
   .caption--tr, .caption--br { right: 20px; }
   .caption--tl, .caption--bl { left: 20px; }
   .caption:not(.caption--speech) p { font-size: 14px; }
@@ -296,7 +311,8 @@ body { cursor: pointer; }
 
 /* once the screen is clicked, the page's printed matter steps back */
 .site-handoff .caption,
-.site-handoff .rail,
+.site-handoff .ring,
+.site-handoff .ring-label,
 .site-handoff .sound { opacity: 0 !important; transition: opacity 0.35s var(--ease); }
 
 /* the page's colour, laid over everything once the screen fills the view (siteHandoff.ts holdColour) */
@@ -330,7 +346,7 @@ body { cursor: pointer; }
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--ink);
-  background: var(--yellow);
+  background: var(--red);
   padding: 10px 16px 8px;
   border: 2px solid var(--ink);
   text-decoration: none;
@@ -478,7 +494,7 @@ body { cursor: pointer; }
   left: var(--pl-pad);
   margin: 0;
 }
-.pl-status.is-error { color: var(--yellow); }
+.pl-status.is-error { color: var(--red); }
 .pl-chapters {
   position: absolute;
   top: var(--pl-pad);
@@ -496,7 +512,7 @@ body { cursor: pointer; }
   width: 6px;
   height: 6px;
   margin-top: -3px;
-  background: var(--yellow);
+  background: var(--red);
 }
 .pl-chapter.is-failed { opacity: 0.4; text-decoration: line-through; }
 .pl-chapter.is-late { opacity: 0.6; }
@@ -648,7 +664,7 @@ body { cursor: pointer; }
   0%, 100% { transform: translateX(0); }
   50% { transform: translateX(calc(16 * var(--u))); }
 }
-.fx-press:focus-visible { outline: 2px dashed var(--yellow); outline-offset: 8px; }
+.fx-press:focus-visible { outline: 2px dashed var(--red); outline-offset: 8px; }
 /* on a narrow page the subtitles at the bottom take the whole width: the prompt stands above them */
 @media (max-width: 760px) {
   .fx-press { right: 16px; bottom: 116px; }
@@ -738,7 +754,8 @@ body { cursor: pointer; }
 
 /* --- the sound choice, after the loading (ui/soundChoice.ts; Figma Preloader-sound-*) --------- */
 .pl-sound { display: none; }
-.preloader.is-choosing > :not(.pl-sound) { display: none; }
+/* the sound choice stands on the same printed ground as the loading: its grain and its dot grid stay */
+.preloader.is-choosing > :not(.pl-sound, .pl-dots, .pl-grain) { display: none; }
 .preloader.is-choosing .pl-sound { display: block; }
 .snd { position: absolute; inset: 0; cursor: pointer; }
 .snd-frame { position: absolute; pointer-events: none; }
@@ -779,7 +796,7 @@ body { cursor: pointer; }
   cursor: pointer;
 }
 .snd-half--off { right: 0; width: auto; }
-.snd-half:focus-visible { outline: 2px dashed var(--yellow); outline-offset: -12px; }
+.snd-half:focus-visible { outline: 2px dashed var(--red); outline-offset: -12px; }
 .snd.is-chosen .snd-half { cursor: default; }
 /* if the art cannot be shown, the two buttons are plain words */
 .snd.is-plain .snd-half { color: #fff; font: 700 14px/1 var(--label); letter-spacing: 0.08em; text-transform: uppercase; }

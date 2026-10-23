@@ -89,7 +89,7 @@ export const homeEpisode: EpisodeDef = {
   id: 'home',
   number: 4,
   title: 'The Cave',
-  subtitle: 'The back room · 00:31',
+  subtitle: 'The back room · 00:32',
   World: RoomScene,
   track: homeTrack,
   reset: resetMonitor,

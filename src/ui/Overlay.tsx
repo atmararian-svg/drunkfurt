@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import { audio } from '../audio/AudioDirector';
 import { clamp, smoothstep } from '../core/math';
 import { story, useStory } from '../core/store';
-import { CHAPTERS } from '../core/chapters';
+import { CHAPTERS, chapterOf } from '../core/chapters';
 import { chapterTurn, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { builtEpisodes } from '../episodes';
-import { hoverDecode } from './decode';
+import { decodeIn, hoverDecode, splitChars } from './decode';
 import { BEAT, BLOCK, KO, defend, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
@@ -17,6 +17,7 @@ import { createTypewriter, Typewriter } from './typewriter';
 import { letter, letterSpot, pickLetter } from '../scenes/city/letter';
 import { closeLetterNow, openLetter } from './letterReveal';
 import { goToChapter } from './chapterTransition';
+import { mountChapterRing, ringOwnsPointer } from './chapterRing';
 import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
 import { PressPrompt } from './PressPrompt';
 
@@ -73,6 +74,9 @@ export function Overlay() {
   const prompt = useStory((s) => s.prompt);
   const sound = useStory((s) => s.sound);
   const root = useRef<HTMLDivElement>(null);
+  const ringHost = useRef<HTMLDivElement>(null);
+  const soundText = useRef<HTMLSpanElement>(null);
+  useEffect(() => mountChapterRing(ringHost.current!), []);
   // one list for the page's life: the effects below must not re-run (and restart what they drive) on every re-render
   const episodes = useMemo(builtEpisodes, []);
 
@@ -81,11 +85,8 @@ export function Overlay() {
     const el = root.current!;
     const captions = Array.from(el.querySelectorAll<HTMLElement>('[data-caption]'));
     const capDefs = episodes.flatMap((ep) => ep.captions);
-    const fill = el.querySelector<HTMLElement>('.rail-fill')!;
     const cue = el.querySelector<HTMLElement>('.cue')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
-    const rail = Array.from(el.querySelectorAll<HTMLElement>('.rail li'));
-    const chapterNow = (id: string) => CHAPTERS.find((c) => (c.episodes as string[]).includes(id))?.number ?? CHAPTERS.length;
     // balloons are typed in (the supplied typewriter); the thoughts in the car as well, line by line
     const typed = new Map<HTMLElement, { tw: Typewriter; on: boolean }>();
     captions.forEach((c) => {
@@ -161,11 +162,8 @@ export function Overlay() {
         if (thoughts.done) thoughtTw.show(MONOLOGUE);
         else void thoughtTw.play(MONOLOGUE).then(thoughtsTyped);
       }
-      fill.style.transform = `scaleY(${p})`;
       cue.classList.toggle('is-on', p < 0.004);
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
-      // the rail marks the chapter you are in
-      rail.forEach((li) => li.classList.toggle('is-here', Number(li.dataset.chapter) === chapterNow(id)));
 
       const ink = inkAt(p);
       const key = `${ink.w.toFixed(3)}${ink.mode}${wipe.width}`;
@@ -273,6 +271,8 @@ export function Overlay() {
     const onClick = (e: MouseEvent) => {
       unlock();
       if ((e.target as HTMLElement).closest('a,button,.fx-press,.whiteout,.preloader,.letter-layer')) return;
+      // a press on the chapter ring (or the end of a turn of it) is the ring's
+      if (ringOwnsPointer()) return;
       next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -296,6 +296,16 @@ export function Overlay() {
       window.removeEventListener('scroll', onScroll);
     };
   }, [episodes]);
+
+  // the switch's label, split for decoding; a new label decodes in
+  const soundShown = useRef('');
+  useEffect(() => {
+    const el = soundText.current!;
+    const text = `SOUND ${sound ? 'ON' : 'OFF'}`;
+    if (!soundShown.current) splitChars(el);
+    else void decodeIn(el, 380, 0, { rise: 0 });
+    soundShown.current = text;
+  }, [sound]);
 
   const toggleSound = () => {
     const on = !story.getState().sound;
@@ -366,33 +376,37 @@ export function Overlay() {
         <i />
       </div>
 
-      <nav className="rail" aria-label="DRUNKFURT chapters">
-        <div className="rail-line">
-          <div className="rail-fill" />
-        </div>
-        <ol>
-          {CHAPTERS.map((c) => (
-            <li key={c.number} className="is-built" data-chapter={c.number}>
-              {/* a chapter number takes you to that chapter's beginning (chapterTransition.ts goToChapter) */}
-              <button
-                type="button"
-                className="rail-go"
-                aria-label={`Chapter ${c.number}: ${c.title}`}
-                title={c.title}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  goToChapter(c.number);
-                }}
-              >
-                {pad(c.number)}
-              </button>
-            </li>
-          ))}
-        </ol>
+      {/* the chapter ring (chapterRing.ts) is drawn into .ring-host; for the keyboard and screen readers, the chapters as buttons */}
+      <div className="ring-host" ref={ringHost} />
+      <nav className="ring-nav" aria-label="DRUNKFURT chapters">
+        {CHAPTERS.map((c) => (
+          <button
+            key={c.number}
+            type="button"
+            aria-label={`Chapter ${c.number}: ${c.title}`}
+            onClick={(e) => {
+              e.stopPropagation();
+              // the chapter you are in is not restarted
+              if (chapterOf(locate(timeline.progress).id).number !== c.number) goToChapter(c.number);
+            }}
+          >
+            {pad(c.number)} {c.title.toUpperCase()}
+          </button>
+        ))}
       </nav>
 
-      <button type="button" className="sound" onClick={toggleSound} aria-pressed={sound}>
-        SOUND {sound ? 'ON' : 'OFF'}
+      {/* the pointer coming onto it decodes its text (decode.ts), nothing else; a click switches the sound */}
+      <button
+        type="button"
+        className="sound"
+        onClick={toggleSound}
+        onPointerEnter={(e) => {
+          if (e.pointerType !== 'touch') void decodeIn(soundText.current!, 450, 0, { rise: 0 });
+        }}
+        aria-pressed={sound}
+        aria-label={`Sound ${sound ? 'on' : 'off'}`}
+      >
+        <span ref={soundText} data-text={`SOUND ${sound ? 'ON' : 'OFF'}`} aria-hidden />
       </button>
 
 

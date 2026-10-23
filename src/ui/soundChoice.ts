@@ -17,6 +17,10 @@ import { DISABLE_PATH, ENABLE_PATH } from './soundWords';
  *    bent the opposite way). It travels eased in and out: slow start, quick
  *    middle, slow end. Off both, SOUND lies straight in the middle. A little
  *    hysteresis at the line keeps it from flickering there.
+ *  - SOUND also rides up and down with the pointer: its height follows the
+ *    pointer's (eased on the clock, quickly), its place across stays the
+ *    layout's. The whole word moves (its container), so this never fights the
+ *    letters' own glide into a curve.
  *  - A click (or a tap) on a half chooses it; the two halves are real buttons
  *    (keyboard: Tab or ← →, then Enter). The promise resolves with the choice,
  *    which the caller makes the page's actual sound setting.
@@ -59,6 +63,9 @@ const LAYOUT: Record<'none' | 'on' | 'off', Place[]> = {
     [0.9569, 0.2904, 342.05, 12.05],
   ]),
 };
+/** SOUND's middle, top to bottom (design px), where it rests; how far above and below it may follow the pointer. */
+const SOUND_MID = 990;
+const FOLLOW = { up: 930, down: 60 };
 /** Block size of the word not chosen (design px), and of everything as it comes in. */
 const INACTIVE_BLOCK = 16;
 const INTRO_BLOCK = 28;
@@ -174,6 +181,10 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     });
   };
 
+  /** SOUND's height: where the pointer would have it, and where it is (px from its resting place). */
+  let followTo = 0;
+  let followAt = 0;
+
   /** One frame: the words' blocks ease towards their targets (on the clock, not per frame); returns whether anything still moves. */
   let last = 0;
   const paint = (now: number) => {
@@ -182,6 +193,13 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     last = now;
     let moving = false;
     const intoK = introAt < 0 || reduced ? 1 : Math.min(1, (now - introAt) / INTRO_MS);
+    // (once it has come in) SOUND follows the pointer up and down
+    if (intoK >= 1 && followAt !== followTo) {
+      followAt += (followTo - followAt) * (reduced ? 1 : 1 - Math.exp(-dt * 16));
+      if (Math.abs(followTo - followAt) < 0.3) followAt = followTo;
+      else moving = true;
+      word.style.transform = `translateY(${followAt.toFixed(1)}px)`;
+    }
     for (const key of ['enable', 'disable'] as const) {
       const c = key === 'enable' ? enable : disable;
       const r = key === 'enable' ? ENABLE : DISABLE;
@@ -255,12 +273,18 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   const GIVE = 14;
   const move = (e: PointerEvent) => {
     if (e.pointerType === 'touch') return;
+    followTo = Math.min(FOLLOW.down * u, Math.max(-FOLLOW.up * u, e.clientY - (top + SOUND_MID * u)));
+    wake();
     const split = left + SPLIT * u;
     if (e.clientX < split - GIVE) set('on');
     else if (e.clientX > split + GIVE) set('off');
     else if (state === 'none') set(e.clientX < split ? 'on' : 'off');
   };
-  const leave = () => set('none');
+  const leave = () => {
+    followTo = 0;
+    wake();
+    set('none');
+  };
 
   let resolveChoice: (on: boolean) => void = () => {};
   const chosen = new Promise<boolean>((r) => (resolveChoice = r));

@@ -25,7 +25,7 @@ export const THOUGHTS = {
 
 export const MONOLOGUE = [
   "This can't keep happening.",
-  "Good businesses shouldn't struggle to show their worth.",
+  "Good businesses shouldn't have to struggle because they can't show the world what they're worth.",
   'There has to be a better way.',
   "It's time the world saw what I've built.",
 ].join('\n');

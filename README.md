@@ -5,8 +5,8 @@ DRUNKFURT is the name of the experience and its fictional world; Frankfurt am Ma
 setting, so real places and railway signage keep their real names.
 Three chapters are built (four episodes):
 
-- **Chapter 1, Arrival** (episode 01): Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
-- **Chapter 2, Night City** (episodes 02 and 03): out of the station, down the boulevard towards the
+- **Chapter 1, The Arrival** (episode 01): Frankfurt (Main) Hbf, platform 7, a few minutes before midnight.
+- **Chapter 2, No Welcome** (episodes 02 and 03): out of the station, down the boulevard towards the
   towers, a stranger who wants your bag; then past him to a Mercedes at the kerb, into the
   driver's seat, and away (press D to rev).
 - **Chapter 3, The Cave** (episode 04): a back room full of surveillance screens; sit down at the
@@ -77,7 +77,10 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   curves are the design's per-letter transforms; the letters travel between them eased in and
   out (CSS transitions of the same translate + rotate, 0.9 s, `cubic-bezier(0.65, 0, 0.35, 1)`:
   slow start, quick middle, slow end); the words' blocks ease on the clock; 14 px of give at the line keeps it from
-  flickering. The two halves are real buttons (click, tap, or ← → and Enter); the choice sets the
+  flickering. SOUND also rides up and down with the pointer (its height follows the pointer's,
+  eased quickly on the clock; its place across stays the layout's; the whole word moves, so this
+  never fights the letters' glide into a curve). The screen stands on the preloader's own ground:
+  its grain and its dot grid (`dotGrid.ts`) stay on under the words. The two halves are real buttons (click, tap, or ← → and Enter); the choice sets the
   page's sound (`story.sound`, `audio.setEnabled`), the same setting as the Sound on/off switch,
   and the click is also the gesture the browser needs before any audio can start.
   No progress is invented. The page is the comic's print: near-black (#070707) with a soft-light
@@ -85,12 +88,40 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   on its own tilted orbit, larger and brighter the nearer they are (the supplied Framer
   "DotGridBackground", ported to a plain canvas in `src/ui/dotGrid.ts`; its frame loop only runs
   while something moves).
-- **The chapter rail and the sound switch** (right side, `Overlay.tsx`): the rail shows where you
-  are in the page's red; each chapter number is a button that takes you to that chapter's opening
-  shot through the chapter transition (`goToChapter` in `chapterTransition.ts`). Forwards, the
-  waits of the chapters passed over are opened so the page can stand at the new chapter; back,
-  the chapter entered is reset, as scrolling back does. The sound switch (SOUND ON / SOUND OFF)
-  is a white tab in the manner of the letter's close control; off, and under the pointer, red.
+- **The chapter ring** (`src/ui/chapterRing.ts`, asset `src/assets/ring.glb` from the supplied
+  "Stargate" model by tools/ring2glb.mjs): the page's way of saying where you are and of going
+  elsewhere. A metal ring at its own scale at the right edge, vertically centred, almost all of
+  it beyond the edge: idle, about a tenth of its diameter shows, with the current chapter's
+  marker at nine o'clock.
+  - Three markers 120° apart (the model's chevrons 0, 3 and 6; the other six and the model's
+    inner ring, whose symbols are modelled into it, are left out). The inner ring is a plain
+    band built here and engraved by a texture laid around it by angle: fine divisions every 3°
+    (longer every 15°), a track line, sector codes (DF-12 / 120…) with alignment marks, and at
+    each marker the chapter's glyph, its number and its serial DF-0n — 01 arrival: an axis
+    entered by three strokes; 02 conflict: the axis broken and shifted, crossed by a diagonal;
+    03 creation: an open frame with an axis standing in it.
+  - Light is the page's red only (`RED`, as emissive, never the whole ring): the current
+    chapter's marker and glyph lit, chapters behind you dim, those ahead dark.
+  - It follows the scroll, never leads it (the chapter of `locate(timeline.progress)`). Over the
+    last 1.6 viewport heights of a chapter its engravings light one after another towards the
+    next marker; when the chapter turns, the ring makes one eased rotation (1.5 s) to the next
+    marker while the light runs on into it, a hair past it and back (the alignment), and the new
+    marker flares once. Backwards the same, the other way; a change during a turn retargets
+    from where it is, so it never spins twice or falls out of step.
+  - Hover: it comes further in (a quarter of its diameter) and 6 % larger, with the chapter's
+    name and DRAG TO NAVIGATE beside it (decoded in). Drag (mouse, or touch: the drag does not
+    scroll the page) turns it like a dial: up and down along the rim, geared 1.6 : 1; the marker
+    nearest nine o'clock is previewed (its name in red, its marker pulsing, apart from the
+    current one); let go and it snaps to a marker and, settled, goes there through the chapter
+    transition (`goToChapter`: pixel reveal, title card). The current chapter is not restarted;
+    while a transition, a scripted beat, the open letter or the flight into the screen runs, it
+    does not turn. For the keyboard and screen readers the chapters are also buttons (shown when
+    focused).
+  - Its own small WebGL canvas (pointer-events none, so the page stays clickable around it; the
+    pointer is followed on the window), drawn only when something changes.
+- **The sound switch** (top right, `Overlay.tsx`): SOUND ON / SOUND OFF, a white tab in the
+  manner of the letter's close control (red when off). The pointer coming onto it decodes its
+  text and changes nothing else; a click switches the sound.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
   station no longer waits for the street's models) and a marker after it that reports when
   everything in it has loaded and drawn twice; a world that fails is caught by its own error
@@ -376,8 +407,9 @@ built from.
     leaning towards the pointer, plain paper on the back, a soft drop shadow. While it is open
     the cursor is the design's close control (Figma "cursor-button": CLICK TO CLOSE in JetBrains
     Mono Bold 14 px on a white tab, centred on the pointer), the scroll is held and nothing
-    reaches the scene; a click closes it (the sheet folds back up and is put down where it lay,
-    the dark fades out), as do Escape and a visible button of the same design (shown on touch
+    reaches the scene; a click closes it (the sheet crumples back up where it is, then, a ball,
+    drops out through the bottom of the page and is gone: it is not put back on the pavement;
+    the dark fades out meanwhile), as do Escape and a visible button of the same design (shown on touch
     screens and to the keyboard). Only then does the invitation come. Without WebGL the image
     itself unfolds in CSS.
   - **Spoken words** (his "Your bag…", your invitation) are not balloons: they are typed at the
@@ -466,7 +498,8 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
 - **The thoughts** (`scenes/car/thoughts.ts`): once the door has shut, the story waits (a gate
   at 0.642, before the ignition) while four lines are typed at the bottom of the page, centred,
   32 px up, JetBrains Mono 16 px, in capitals, with no box, never wider than 600 px: "This
-  can't keep happening." / "Good businesses shouldn't struggle to show their worth." / "There
+  can't keep happening." / "Good businesses shouldn't have to struggle because they can't show
+  the world what they're worth." / "There
   has to be a better way." / "It's time the world saw what I've built." They
   are typed with the supplied typewriter (`ui/typewriter.ts`, a plain-DOM port of the Framer
   "TypewriterText": its phases, speeds, smart pauses after punctuation, deleting each line
@@ -730,7 +763,8 @@ src/
     ink.ts                ink buffer material + ink line effect
     Stylizer.tsx          classifies meshes, renders the ink buffer, composer
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
-  ui/Overlay.tsx          title cards, captions, chapter rail, ink, prompts
+  ui/Overlay.tsx          title cards, captions, the chapter ring's place, ink, prompts
+  ui/chapterRing.ts       the chapter ring: engravings, scroll-linked turn and light, hover, drag
   ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
   ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
@@ -787,10 +821,16 @@ wipe opens.
   "Drunk" path were taken from it (decoded from the .fig with kiwi-schema). From the second file
   ("Drunkfurt-2"): the Rock Salt "Drunk" (glyph outlines), ACTION, BAM, POW and the arrow
   (vector paths), and the placement of the fight's prompts. From the third ("Drunkfurt-3"): the
-  sound choice (ENABLE and DISABLE cropped from its images as Figma crops them, SOUND's per-letter
+  sound choice (ENABLE and DISABLE traced to vector outlines from its images, SOUND's per-letter
   layouts), the car's prompt placement and the close cursor. The letter
   (`src/assets/letter.webp`, 1592 × 2000) is the high-resolution image supplied with that brief,
   used as it is.
+- **The chapter ring**: "Stargate" by stale_mud (https://sketchfab.com/3d-models/stargate-1af03ae28595490aa11ce3ba07b1e23f),
+  under the Sketchfab Standard licence according to its metadata, supplied by the project owner.
+  `tools/ring2glb.mjs` keeps the outer ring and three chevrons (textures as grey JPEGs, 512 px,
+  made from the model's: base colours in grey, the lens glow map in grey so its light is the
+  page's red), then `gltf-transform weld`, `simplify --ratio 0.5 --error 0.002` and `quantize`:
+  0.58 MB. The inner ring and its engravings are this project's own (`chapterRing.ts`).
 - **Episode 04**: the room is "Surveillance room" by wa_rouk
   (https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304), under
   the Sketchfab Standard licence according to the file's own metadata; it was supplied by the

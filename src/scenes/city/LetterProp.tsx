@@ -14,7 +14,7 @@ export const LETTER_SPOT = { x: 6.42, y: 0.045, z: -35.15 };
  * icosahedron pushed in and out by a seeded noise, flat shaded, so its facets
  * read as creases), printed like the rest of the street. It is there from the
  * aftermath; picked up (the reveal opens) it leaves the pavement, and once
- * read it is back where it lay. The pointer over it lifts it a little in tone and shows the hand.
+ * read it is gone (the reveal drops it out of the page). The pointer over it lifts it a little in tone and shows the hand.
  */
 function crumple() {
   const g = new IcosahedronGeometry(0.075, 2);
@@ -55,8 +55,8 @@ export function LetterProp({ active }: { active: boolean }) {
   }, [mesh, camera]);
 
   useFrame(() => {
-    // (read, it is put back where it lay: the reveal folds it back down there)
-    const show = active && letterThere(localProgress('city')) && !letter.open;
+    // (read, it is gone for good: the reveal crumpled it and dropped it out of the page)
+    const show = active && letterThere(localProgress('city')) && !letter.open && !letter.read;
     mesh.visible = show;
     if (!show) {
       if (letter.over) {
@@ -66,8 +66,7 @@ export function LetterProp({ active }: { active: boolean }) {
       return;
     }
     const p = input.pointer;
-    // once read, it is only part of the street
-    const over = !letter.read && p.active && pickLetter(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight);
+    const over = p.active && pickLetter(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight);
     if (over !== letter.over) {
       letter.over = over;
       document.documentElement.classList.toggle('is-over-letter', over);

@@ -16,8 +16,8 @@ export interface Chapter {
 }
 
 export const CHAPTERS: Chapter[] = [
-  { number: 1, episodes: ['station'], title: 'Arrival', place: 'Main train station', time: '23:47' },
-  { number: 2, episodes: ['city', 'car'], title: 'Night City', place: 'Outside Frankfurt (Main) Station', time: '23:59' },
+  { number: 1, episodes: ['station'], title: 'The Arrival', place: 'Main train station', time: '23:47' },
+  { number: 2, episodes: ['city', 'car'], title: 'No Welcome', place: 'Outside Frankfurt (Main) Station', time: '23:59' },
   { number: 3, episodes: ['home'], title: 'The Cave', place: 'The back room', time: '00:32' },
 ];
 
