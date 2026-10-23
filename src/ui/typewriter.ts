@@ -23,6 +23,8 @@
  * shown, the original's disappearance. Timers are the component's own
  * (setTimeout per character, as in the original); `stop` clears them all.
  */
+import { RED } from './palette';
+
 export const BLINK_MS = 1250;
 
 export interface TypewriterOptions {
@@ -40,8 +42,8 @@ export interface TypewriterOptions {
 
 const SMART = { comma: 140, period: 320, ellipsis: 520, line: 260 };
 const TRAIL = 3;
-/** The trail's gradient (#ff8a80 → #ff3b30), one step per character. */
-const TRAIL_COLOURS = ['#ff8a80', '#ff6358', '#ff3b30'];
+/** The trail's gradient, from a light red to the page's red (palette RED), one step per character. */
+const TRAIL_COLOURS = ['#e8807a', '#db4a46', RED];
 
 export interface Typewriter {
   /** Types `text` (split into blocks by the content mode); resolves when the last block is fully typed. */

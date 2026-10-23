@@ -27,6 +27,15 @@ export const SCREEN_LINKS: { name: string; path: string; x0: number; y0: number;
   { name: 'All works', path: '/all-works', x0: 1724, y0: 8, x1: 1792, y1: 42 },
 ];
 
+/**
+ * Whether the projects, About and All works on the screen's picture are
+ * links of their own. Off for now: the whole picture leads to the home page
+ * (no hover mark on a card, every click goes to the site's front). Set it
+ * back to true to open each project at its own page again; nothing else
+ * needs to change.
+ */
+export const PROJECT_LINKS = false;
+
 /** Seconds of the move into the screen, and of the way back out if the site cannot be opened. */
 export const FLY_SECONDS = 1.8;
 const BACK_SECONDS = 1.1;
@@ -100,6 +109,7 @@ export function pick(clientX: number, clientY: number): { link: number } | null 
   ray.setFromCamera(ndc, camera);
   const hit = ray.intersectObject(mesh, false)[0];
   if (!hit?.uv) return null;
+  if (!PROJECT_LINKS) return { link: -1 };
   const x = hit.uv.x * W;
   const y = (1 - hit.uv.y) * H;
   return { link: SCREEN_LINKS.findIndex((l) => x >= l.x0 && x <= l.x1 && y >= l.y0 && y <= l.y1) };

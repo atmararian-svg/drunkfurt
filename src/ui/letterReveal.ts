@@ -10,7 +10,7 @@ import {
   Vector2,
   WebGLRenderer,
 } from 'three';
-import letterUrl from '../assets/letter.png';
+import letterUrl from '../assets/letter.webp';
 import { letter } from '../scenes/city/letter';
 import { pinScroll } from '../core/timeline';
 
@@ -39,10 +39,10 @@ import { pinScroll } from '../core/timeline';
  * closes too. While it is open the scroll is held and nothing reaches the 3D
  * scene. If WebGL is unavailable, the image itself unfolds in CSS instead.
  */
-const OPEN_MS = 1700;
-const CLOSE_MS = 900;
-/** The sheet's aspect (width / height): the supplied image's, 448 × 563. */
-const ASPECT = 448 / 563;
+/** The reveal's timing (ms), in one place to tune: opening (lift, travel and unfolding on one curve) and closing. */
+export const LETTER_REVEAL = { open: 1900, close: 1100, hold: undefined as number | undefined };
+/** The sheet's aspect (width / height): the supplied image's, 1592 × 2000. */
+const ASPECT = 1592 / 2000;
 
 const vertex = /* glsl */ `
 uniform float uUnfold;
@@ -111,7 +111,12 @@ const image = () =>
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /** Opens the letter (once at a time). `onClosed` runs when it has folded away. */
-export function openLetter(onClosed: () => void) {
+/**
+ * Opens the letter (once at a time). `spot`: where the crumpled sheet lies on
+ * the page (its centre and its size, CSS px), so it is lifted from there;
+ * `onClosed` runs when it has been put back.
+ */
+export function openLetter(onClosed: () => void, spot?: { x: number; y: number; size: number }) {
   if (current) return;
   letter.open = true;
   pinScroll(true);
@@ -137,15 +142,15 @@ export function openLetter(onClosed: () => void) {
   const alt = document.createElement('p');
   alt.className = 'dc-sr';
   alt.textContent =
-    "A letter. Subject: We can't keep losing clients like this. To Daniel Drungel, Business Operations, and Dimasta Eblon, CEO. I've been looking at this quarter's numbers, and there's a pattern we can't ignore anymore. We're losing potential clients to competitors with weaker services but much better websites. People visit our site, look around, and leave. We're paying for traffic that goes nowhere. We've talked about redesigning the website for months, but nothing has changed. Meanwhile, our competitors are investing in their online presence, winning new contracts, and making us look outdated. We have a good business, a solid team, and a service people need. But none of that matters if we can't communicate our value before a potential client walks away. We need to take this seriously and get the right person to rebuild our website. Not another quick fix. Something that actually represents what we've built. We can't afford to keep falling behind. Signed.";
+    "A letter. Subject: We can't keep losing clients like this. From Daniel Drungel, Business Operations, to Dimasta Eblon, CEO. I've been looking at this quarter's numbers, and there's a pattern we can't ignore anymore. We're losing potential clients to competitors with weaker services but much better websites. People visit our site, look around, and leave. We're paying for traffic that goes nowhere. We've talked about redesigning the website for months, but nothing has changed. Meanwhile, our competitors are investing in their online presence, winning new contracts, and making us look outdated. We have a good business, a solid team, and a service people need. But none of that matters if we can't communicate our value before a potential client walks away. We need to take this seriously and get the right person to rebuild our website. Not another quick fix. Something that actually represents what we've built. We can't afford to keep falling behind. Signed.";
   root.append(dim, stageEl, alt, label, button);
   document.body.appendChild(root);
   document.documentElement.classList.add('is-reading');
 
   // the sheet's size on the page: as large as fits with margins, never past 1.6 × the image's own pixels
   const fit = () => {
-    const maxH = Math.min(window.innerHeight * 0.86, 563 * 1.6);
-    const maxW = Math.min(window.innerWidth * 0.9, 448 * 1.6);
+    const maxH = Math.min(window.innerHeight * 0.86, 2000);
+    const maxW = Math.min(window.innerWidth * 0.9, 1592);
     const h = Math.min(maxH, maxW / ASPECT);
     return { w: h * ASPECT, h };
   };
@@ -157,7 +162,7 @@ export function openLetter(onClosed: () => void) {
   let unfold = 0;
   let from = 0;
   let to = 1;
-  let ms = OPEN_MS;
+  let ms = LETTER_REVEAL.open;
   const light = new Vector2(0.3, 0.4);
   const target = new Vector2(0.3, 0.4);
 
@@ -220,31 +225,48 @@ export function openLetter(onClosed: () => void) {
   };
   size();
   window.addEventListener('resize', size);
+  // where it lies (the middle of the page lower down if unknown); its size there, as a share of the open sheet
+  const ground = {
+    x: spot?.x ?? window.innerWidth / 2,
+    y: spot?.y ?? window.innerHeight * 0.8,
+    // the crumpled ball is about a third of the sheet's height across
+    scale: Math.max(0.05, Math.min(0.6, (spot?.size ?? 60) / (fit().h * 0.36))),
+  };
 
   const draw = (now: number) => {
-    const u = reduced ? 1 : Math.min(1, (now - t0) / ms);
+    // (inspection only, in development: `hold` fixes the opening at a point of its curve)
+    const held = import.meta.env.DEV ? LETTER_REVEAL.hold : undefined;
+    const u = held !== undefined ? held : reduced ? 1 : Math.min(1, (now - t0) / ms);
     unfold = from + (to - from) * ease(u);
     light.lerp(target, 0.08);
     if (renderer && mat && sheet && scene && cam) {
       mat.uniforms.uUnfold.value = unfold;
-      // picked up from below, turning as it opens; a slight drift in the hand once open
+      // lifted from where it lay, rising and unfolding on one curve, so it is fully open as it arrives in the middle
       const k = 1 - unfold;
-      sheet.position.set(0, -0.55 * k * k, 0);
-      sheet.rotation.set(0.9 * k + Math.sin(now / 2100) * 0.012 * unfold, -0.7 * k + Math.sin(now / 2700) * 0.015 * unfold, 0.5 * k);
-      sheet.scale.setScalar(0.45 + 0.55 * Math.min(1, unfold * 1.2));
+      const { h } = fit();
+      const gx = ((ground.x - window.innerWidth / 2) / h) * k;
+      const gy = (-(ground.y - window.innerHeight / 2) / h) * k;
+      // a lift: it rises off the pavement first, then comes forward to the reader
+      sheet.position.set(gx, gy + Math.sin(Math.PI * Math.min(1, unfold * 1.15)) * 0.12 * k, 0);
+      // lying on the ground (tipped away), turning to face you as it opens; a slight drift in the hand once open
+      sheet.rotation.set(-1.15 * k * k + Math.sin(now / 2100) * 0.012 * unfold, 0.35 * k + Math.sin(now / 2700) * 0.015 * unfold, 0.6 * k);
+      sheet.scale.setScalar(ground.scale + (1 - ground.scale) * unfold);
       renderer.render(scene, cam);
     } else if (fallback) {
       const k = 1 - unfold;
-      fallback.style.transform = `translateY(${30 * k}vh) rotate(${-25 * k}deg) scale(${0.2 + 0.8 * unfold}, ${0.12 + 0.88 * unfold})`;
+      fallback.style.transform = `translate(${(ground.x - window.innerWidth / 2) * k}px, ${(ground.y - window.innerHeight / 2) * k}px) rotate(${-25 * k}deg) scale(${ground.scale + (1 - ground.scale) * unfold}, ${0.12 + 0.88 * unfold})`;
       fallback.style.opacity = String(Math.min(1, unfold * 2));
     }
-    dim.style.opacity = String(Math.min(1, unfold * 1.6));
+    // the page darkens as soon as the sheet is picked up (on the clock, not the unfolding), and back as it is put down
+    const shade = closing ? Math.min(1, unfold * 1.6) : Math.min(1, u * 2.2);
+    dim.style.opacity = String(shade * shade * (3 - 2 * shade));
     if (u < 1 || !closing) raf = requestAnimationFrame(draw);
     else finish();
   };
 
   const move = (e: PointerEvent) => {
-    label.style.transform = `translate(${e.clientX}px, ${e.clientY}px)`;
+    // the supplied cursor (Figma "cursor-button") is the pointer: centred on it
+    label.style.transform = `translate(${e.clientX}px, ${e.clientY}px) translate(-50%, -50%)`;
     root.classList.toggle('has-pointer', e.pointerType !== 'touch');
     target.set((e.clientX / window.innerWidth) * 2 - 1, -((e.clientY / window.innerHeight) * 2 - 1));
   };
@@ -275,7 +297,7 @@ export function openLetter(onClosed: () => void) {
     closing = true;
     from = unfold;
     to = 0;
-    ms = CLOSE_MS * Math.max(0.3, unfold);
+    ms = LETTER_REVEAL.close * Math.max(0.3, unfold);
     t0 = performance.now();
     root.classList.add('is-closing');
   }

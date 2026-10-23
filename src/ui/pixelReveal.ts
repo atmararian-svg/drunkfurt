@@ -201,3 +201,54 @@ export function pixelReveal(dir: RevealDirection, opts: { outgoing?: HTMLElement
     window.setTimeout(finish, P.duration + 1500);
   });
 }
+
+/**
+ * The transition's cover phase on its own, for a page that is not the 3D
+ * stage (the preloader leaving): the screen fills with blocks of `colour`, in
+ * the reveal's scattered, drifting order, over `ms`. Resolves when it is fully
+ * covered, with the function that takes the cover away (at once: what lies
+ * under it is then the same colour).
+ */
+export function pixelCover(colour: string, dir: RevealDirection = 'up', ms = 700): Promise<() => void> {
+  const P = PIXEL_REVEAL;
+  const canvas = document.createElement('canvas');
+  canvas.className = 'pixel-reveal';
+  canvas.setAttribute('aria-hidden', 'true');
+  const cols = Math.max(1, Math.round(window.innerWidth / P.from));
+  const rows = Math.max(1, Math.round(window.innerHeight / P.from));
+  canvas.width = cols;
+  canvas.height = rows;
+  // drawn at one pixel per block and shown unsmoothed: crisp blocks at any size
+  canvas.style.imageRendering = 'pixelated';
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  const remove = () => canvas.remove();
+  if (!ctx || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    if (ctx) {
+      ctx.fillStyle = colour;
+      ctx.fillRect(0, 0, cols, rows);
+    }
+    return Promise.resolve(remove);
+  }
+  const at = new Float32Array(cols * rows);
+  for (let y = 0; y < rows; y++)
+    for (let x = 0; x < cols; x++) {
+      const along = dir === 'up' ? 1 - (y + 0.5) / rows : (y + 0.5) / rows;
+      at[y * cols + x] = clamp((1 - P.drift) * hash(x + 3, y + 11) + P.drift * along, 0, 0.999);
+    }
+  ctx.fillStyle = colour;
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const frame = (now: number) => {
+      const k = smooth(clamp((now - t0) / ms, 0, 1));
+      ctx.clearRect(0, 0, cols, rows);
+      for (let i = 0; i < at.length; i++) if (at[i] < k) ctx.fillRect(i % cols, Math.floor(i / cols), 1, 1);
+      if (k < 1) requestAnimationFrame(frame);
+      else {
+        ctx.fillRect(0, 0, cols, rows);
+        resolve(remove);
+      }
+    };
+    requestAnimationFrame(frame);
+  });
+}

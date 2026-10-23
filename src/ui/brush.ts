@@ -173,7 +173,7 @@ export function drawKnockout(ctx: CanvasRenderingContext2D, W: number, H: number
     const a = 1 - t / 0.18;
     ctx.fillStyle = `rgba(241,240,233,${0.95 * a})`;
     ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = `rgba(213,58,50,${0.35 * a})`;
+    ctx.fillStyle = `rgba(205,25,25,${0.35 * a})`;
     ctx.fillRect(0, 0, W, H);
   }
   if (t < 0.5) {

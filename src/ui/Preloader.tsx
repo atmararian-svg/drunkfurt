@@ -4,7 +4,10 @@ import { pinScroll } from '../core/timeline';
 import { decodeIn, decodeLoop, splitChars } from './decode';
 import { DRUNK_BOX, DRUNK_COLOR, DRUNK_GLYPHS, DRUNK_PEN, DRUNK_SIZE, DRUNK_STROKES } from './drunkWord';
 import { mountDotGrid } from './dotGrid';
-import { pixelReveal } from './pixelReveal';
+import { audio } from '../audio/AudioDirector';
+import { story } from '../core/store';
+import { pixelCover, pixelReveal } from './pixelReveal';
+import { SoundChoice, mountSoundChoice } from './soundChoice';
 import { showTitleCard } from './titleCards';
 
 /**
@@ -26,10 +29,14 @@ import { showTitleCard } from './titleCards';
  *
  * The order: the title decodes in with chapter 1; chapter 1 resolves when it
  * is ready and chapter 2 takes its place; then chapter 3, while the word is
- * written; word and chapter 3 finish together, READY, and the pixel reveal
- * (pixelReveal.ts) brings chapter 1 in over the preloader by itself. Everything runs in one effect, with direct DOM writes and
+ * written; word and chapter 3 finish together, READY; the preloader leaves in
+ * the transition's blocks (pixelCover), the sound choice comes in
+ * (soundChoice.ts), and once ENABLE or DISABLE is chosen the pixel reveal
+ * (pixelReveal.ts) brings chapter 1 in over it. Everything runs in one effect, with direct DOM writes and
  * one animation-frame loop; React renders it once and then only to remove it.
  */
+/** The preloader's page colour (styles.css .preloader), which the sound choice shares. */
+const PAGE_BG = '#070707';
 const MIN_ACTIVE = 650; // ms a chapter label decodes before it may resolve, so it can be read
 const LATER_CHAPTER_WAIT = 25000; // ms chapters 2 and 3 may hold the page after chapter 1 is in
 /**
@@ -59,6 +66,7 @@ export function Preloader() {
     const timers: number[] = [];
     let raf = 0;
     let alive = true;
+    let choice: SoundChoice | null = null;
 
     // --- the wordmark fits the page's width, as in the design (FRANKFURT across 1423 of 1471)
     const fit = () => {
@@ -217,7 +225,20 @@ export function Preloader() {
         await decodeIn(status, 380, 0);
         await wait(220);
         if (!alive) return;
-        // hand over to chapter 1: the station comes in, in blocks, over the preloader, then sharp
+        // the preloader leaves in the transition's blocks; only once it has gone does the sound choice come in
+        const uncover = await pixelCover(PAGE_BG, 'up');
+        if (!alive) return uncover();
+        el.classList.add('is-choosing');
+        el.setAttribute('aria-busy', 'false');
+        choice = mountSoundChoice(q<HTMLElement>('.pl-sound'));
+        uncover();
+        const on = await choice.chosen;
+        if (!alive) return;
+        // the choice is the page's sound setting (the click is also the gesture audio needs to start)
+        story.setState({ sound: on });
+        audio.unlock();
+        audio.setEnabled(on);
+        // hand over to chapter 1: the station comes in, in blocks, over the sound choice, then sharp
         await pixelReveal('up', {
           onCovered: () => {
             // hidden at once (React removes it a moment later), so the fade to the sharp page shows the stage
@@ -236,6 +257,7 @@ export function Preloader() {
 
     return () => {
       alive = false;
+      choice?.cancel();
       cancelAnimationFrame(raf);
       stops.forEach((s) => s());
       timers.forEach((t) => window.clearTimeout(t));
@@ -283,6 +305,8 @@ export function Preloader() {
           </g>
         </svg>
       </div>
+      {/* the sound choice (soundChoice.ts), after the loading */}
+      <div className="pl-sound" />
     </div>
   );
 }

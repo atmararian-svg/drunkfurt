@@ -1,3 +1,4 @@
+import { RED } from '../../ui/palette';
 import { CanvasTexture, Matrix4, Mesh, MeshBasicMaterial, PlaneGeometry, SRGBColorSpace, Vector3 } from 'three';
 
 /**
@@ -28,7 +29,6 @@ const NORMAL = new Vector3(0, 0.26, -0.966).normalize();
 const SIZE = { w: 0.308, h: 0.104 };
 
 const FACE_FONT = "'Archivo', 'Arial Narrow', Arial, sans-serif";
-const RED = '#d4212b';
 const RIM = '#8d8d90';
 
 /** Polar to canvas: compass degrees (0 up, clockwise) around a dial centre in VIEW units. */
@@ -204,7 +204,7 @@ export function buildCluster(): Cluster {
     const x = cx - VIEW.x;
     const y = cy - VIEW.y;
     // a tapered red needle with a short tail, on a dark hub ringed in red
-    ctx.fillStyle = '#d4212b';
+    ctx.fillStyle = RED;
     ctx.beginPath();
     ctx.moveTo(x + dx * len, y + dy * len);
     ctx.lineTo(x - dy * 4.5 - dx * 18, y + dx * 4.5 - dy * 18);
@@ -216,7 +216,7 @@ export function buildCluster(): Cluster {
     ctx.fillStyle = '#1b1b1c';
     ctx.fill();
     ctx.lineWidth = 3;
-    ctx.strokeStyle = '#d4212b';
+    ctx.strokeStyle = RED;
     ctx.stroke();
   };
 

@@ -3,31 +3,36 @@ import { FIGHT_ART } from './fightArt';
 import { drawPixelated } from './pixelReveal';
 
 /**
- * The fight's printed prompts (Figma "Text-placement"):
+ * The story's action prompts, one system for every moment it asks for D
+ * (Figma "Text-placement" for the fight, "Text-placement-car-scene" for the
+ * car):
  *
- *  - ACTION, top left, the design's slanted lettering: it comes in through the
- *    scene-transition pixelation (pixelReveal.ts `drawPixelated`, 28 px blocks
- *    resolving to sharp) with an opacity fade, quickly (ACTION_MS), once per
- *    appearance;
- *  - PRESS [D] / TO DEFEND, bottom right, decoding in (decode.ts) with the
- *    arrow beside it sliding a little to the right and back while it shows
- *    (CSS, only while on).
+ *  - ACTION, top left, the design's slanted lettering: it comes in like a
+ *    stamped comic title, through the scene-transition pixelation
+ *    (pixelReveal.ts `drawPixelated`, 28 px blocks resolving to sharp) with an
+ *    opacity fade and a short settle from a little too big, once per
+ *    appearance (ACTION_MS);
+ *  - PRESS [D] / TO …, bottom right: the panel for the moment ('defend' in the
+ *    fight, 'rev' in the car), its words decoding in (decode.ts), the arrow
+ *    over the first letter of the second line nudging inwards and back while
+ *    it shows (CSS, only while on).
  *
- * `updateCombatPrompts` is called every frame by the overlay with whether each
- * should show (pure functions of the encounter); it only acts on changes. The
- * prompts never take input themselves beyond the D panel's own click (touch);
- * the D key is the overlay's one keyboard listener.
+ * `updateCombatPrompts` is called every frame by the overlay with what should
+ * show (pure functions of the story's state); it only acts on changes. The
+ * panels take no input themselves beyond their own press (touch); the D key is
+ * read by the overlay (defend) and the car (rev).
  */
+export type PromptPanel = 'defend' | 'rev';
 const ACTION_MS = 650;
 
 interface State {
   action: HTMLCanvasElement | null;
-  defend: HTMLElement | null;
+  panels: Partial<Record<PromptPanel, HTMLElement>>;
   actionOn: boolean;
-  defendOn: boolean;
+  panel: PromptPanel | null;
   raf: number;
 }
-const st: State = { action: null, defend: null, actionOn: false, defendOn: false, raf: 0 };
+const st: State = { action: null, panels: {}, actionOn: false, panel: null, raf: 0 };
 const sharp = document.createElement('canvas');
 const tiny = document.createElement('canvas');
 
@@ -35,18 +40,23 @@ const tiny = document.createElement('canvas');
 function clear() {
   cancelAnimationFrame(st.raf);
   st.action?.classList.remove('is-on');
-  if (st.action) st.action.style.opacity = '0';
-  st.defend?.classList.remove('is-on');
-  st.actionOn = st.defendOn = false;
+  if (st.action) {
+    st.action.style.opacity = '0';
+    st.action.style.transform = '';
+  }
+  Object.values(st.panels).forEach((p) => p?.classList.remove('is-on'));
+  st.actionOn = false;
+  st.panel = null;
 }
 
-export function mountCombatPrompts(action: HTMLCanvasElement, defend: HTMLElement) {
+export function mountCombatPrompts(action: HTMLCanvasElement, panels: Partial<Record<PromptPanel, HTMLElement>>) {
   st.action = action;
-  st.defend = defend;
+  st.panels = panels;
   clear();
   return () => {
     clear();
-    st.action = st.defend = null;
+    st.action = null;
+    st.panels = {};
   };
 }
 
@@ -86,13 +96,16 @@ function revealAction() {
       ctx.drawImage(sharp, 0, 0);
     } else drawPixelated(ctx, tiny, sharp, 28 + (1 - 28) * e, cssW, cssH);
     el.style.opacity = String(Math.min(1, u / 0.45));
+    // stamped on: in a touch too big and tilted, settling flat as it sharpens
+    const k = (1 - e) * (1 - e);
+    el.style.transform = u < 1 ? `scale(${(1 + 0.14 * k).toFixed(4)}) rotate(${(-2.5 * k).toFixed(3)}deg)` : '';
     if (u < 1) st.raf = requestAnimationFrame(frame);
   };
   el.style.opacity = '0';
   st.raf = requestAnimationFrame(frame);
 }
 
-export function updateCombatPrompts(action: boolean, defend: boolean) {
+export function updateCombatPrompts(action: boolean, panel: PromptPanel | null) {
   if (action !== st.actionOn && st.action) {
     st.actionOn = action;
     st.action.classList.toggle('is-on', action);
@@ -102,9 +115,13 @@ export function updateCombatPrompts(action: boolean, defend: boolean) {
       st.action.style.opacity = '0';
     }
   }
-  if (defend !== st.defendOn && st.defend) {
-    st.defendOn = defend;
-    st.defend.classList.toggle('is-on', defend);
-    if (defend) st.defend.querySelectorAll<HTMLElement>('[data-text]').forEach((t, i) => void decodeIn(t, 520, 120 + i * 90));
+  if (panel !== st.panel) {
+    if (st.panel) st.panels[st.panel]?.classList.remove('is-on');
+    st.panel = panel;
+    const el = panel ? st.panels[panel] : undefined;
+    if (el) {
+      el.classList.add('is-on');
+      el.querySelectorAll<HTMLElement>('[data-text]').forEach((t, i) => void decodeIn(t, 520, 120 + i * 90));
+    }
   }
 }

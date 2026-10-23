@@ -99,8 +99,8 @@ export const homeEpisode: EpisodeDef = {
     o.y = Math.min(o.y, 0.03);
   },
   captions: [
-    { from: 0.16, to: 0.38, place: 'tl', text: 'Crasigostraße 24. Everything I have built is on these screens. Time to show it.' },
-    { from: 0.74, to: 1, place: 'bl', tone: 'yellow', text: 'Click the screen, or a project on it.', when: () => monitor.armed && !monitor.entering },
+    { from: 0.16, to: 0.38, place: 'tl', text: 'CRASIGOSTRAẞE 24. EVERYTHING I HAVE BUILT IS ON THESE SCREENS. TIME TO SHOW IT.' },
+    { from: 0.74, to: 1, place: 'bl', tone: 'yellow', text: 'CLICK THE SCREEN.', when: () => monitor.armed && !monitor.entering },
   ],
   beats: [0, HOME_BEAT.opened, 0.32, HOME_BEAT.atChair, HOME_BEAT.gate],
 };

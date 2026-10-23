@@ -10,7 +10,7 @@ Three chapters are built (four episodes):
   towers, a stranger who wants your bag; then past him to a Mercedes at the kerb, into the
   driver's seat, and away (press D to rev).
 - **Chapter 3, The Cave** (episode 04): a back room full of surveillance screens; sit down at the
-  big one and click it, or a project on it, to go through to the real site, arianatmar.com.
+  big one and click it to go through to the real site, arianatmar.com.
 
 ![Arrival](docs/screens/01-arrival.png)
 
@@ -63,7 +63,21 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   while it loads "Drunk" is written: at the hand's pace up to 80% of the word, then only a
   slow creep (something always moves) until chapter 3 is really in, when the rest is written
   quickly; word and chapter 3 finish together (if chapter 3 was in first, its label waits for
-  the word). Then READY, and the pixel reveal brings chapter 1 in over the preloader by itself.
+  the word). Then READY; the preloader leaves in the transition's blocks (`pixelCover` in
+  `pixelReveal.ts`), and only then does the sound choice come in; once it is made, the pixel
+  reveal brings chapter 1 in over it.
+- **Sound choice** (`src/ui/soundChoice.ts`, Figma "Preloader-sound-default / -enable /
+  -disable"): ENABLE and DISABLE (the design's slanted lettering, cropped from its images,
+  `src/assets/sound-enable.webp`, `sound-disable.webp`) side by side at the top, SOUND along the
+  bottom, all coming in through the transition's pixelation (28 px blocks resolving; SOUND drawn
+  once into a canvas over its own letters for that). The page is split at the line between the
+  two words: the pointer on the left makes ENABLE the choice (SOUND curves into the arc under it,
+  DISABLE breaks into 16 px blocks), on the right the other way round; off both, SOUND lies
+  straight in the middle. The letters move between the design's own per-letter transforms (CSS
+  transitions); the words' blocks ease on the clock; 14 px of give at the line keeps it from
+  flickering. The two halves are real buttons (click, tap, or ← → and Enter); the choice sets the
+  page's sound (`story.sound`, `audio.setEnabled`), the same setting as the Sound on/off switch,
+  and the click is also the gesture the browser needs before any audio can start.
   No progress is invented. The page is the comic's print: near-black (#070707) with a soft-light
   grain and a fine grid of dots that, around the pointer, leave their places and orbit it, each
   on its own tilted orbit, larger and brighter the nearer they are (the supplied Framer
@@ -303,16 +317,19 @@ built from.
     design frame scaled to fit): ACTION, the design's slanted lettering, top left, from the
     moment he raises the knife (0.80) until the dark has covered the fight; it comes in through
     the scene-transition pixelation (`drawPixelated` from `pixelReveal.ts`, 28 px blocks
-    resolving in 0.65 s) with an opacity fade. PRESS [D] TO DEFEND, bottom right, while the story
-    waits at the gate: the words decode in (`decode.ts`), the D sits on a red key, and the arrow
-    beside them slides a little to the right and back (CSS, only while it shows). D is read by
+    resolving in 0.65 s) with an opacity fade, stamped on: a touch too big and tilted, settling
+    flat as it sharpens. PRESS [D] TO DEFEND, bottom right, while the story waits at the gate
+    (`PressPrompt.tsx`, the same panel the car uses for PRESS D TO REV): the words decode in
+    (`decode.ts`), the D sits exactly in the middle of the page's red square (the line box
+    trimmed to the capitals), and the arrow stands over the T of TO DEFEND and nudges inwards,
+    towards PRESS D, and back (CSS, only while it shows). D is read by
     the overlay's one keyboard handler; the prompt itself can also be clicked or tapped. (The
     design reads "TO DEFENCE"; the brief's text, TO DEFEND, is used.)
   - **The pixels** (`ui/scenePixels.ts`): the scene-transition effect reused at a steady block
     size: one canvas over the 3D picture, under everything printed, redrawn from the 3D canvas
     after every frame. Its look is a pure function of the scroll and the encounter
-    (`combatLook` in `Overlay.tsx`): 1 → 7 px blocks as he raises the knife, held through the
-    stand-off, with no blur and no dark; only once you have defended do the blocks grow coarse
+    (`combatLook` in `Overlay.tsx`): nothing while he walks up and threatens; only once you
+    have pressed D do the blocks grow coarse
     (to 26 px), blur (the same blocks drawn up smoothed over them) and darken (a dark layer to
     80%), complete at `BLOCK.dark` (0.3 s, before the first hit), which is what hides the fight;
     over the first 0.045 of the aftermath all of it resolves to the plain picture. At rest the
@@ -339,26 +356,32 @@ built from.
     defence, a crumpled sheet lies on the pavement by him (a ball of paper, flat-shaded facets);
     at 0.96 the story waits (a gate) with "Something fell out of his coat. A letter. Click it."
     The pointer over it lights it a little and shows the hand; a click (or Enter) opens it: the
-    page darkens and, in the middle, the supplied letter image (`src/assets/letter.png`, at its
-    own aspect ratio, up to 1.6 × its pixels, within 90% × 86% of the page) unfolds from a
-    crumpled ball into a flat print that keeps its creases, after Framer's "CrumpledPaper
-    Reveal". That component's code is not published (it is copied into Framer projects), so its
+    page darkens and the sheet is lifted from where it lies (its place and size on the page,
+    `letterSpot`): it rises off the pavement, travels to the middle of the page and unfolds from
+    a crumpled ball into a flat print that keeps its creases, all on one curve, so it is fully
+    open as it arrives (the supplied letter image, `src/assets/letter.webp`, 1592 × 2000, at its
+    own aspect ratio, within 90% × 86% of the page), after Framer's "CrumpledPaper Reveal".
+    Timing in `LETTER_REVEAL` (1.9 s open, 1.1 s close). That component's code is not published (it is copied into Framer projects), so its
     behaviour is rebuilt in WebGL with three.js: a subdivided sheet whose vertex shader moves each
     point between its place on a lumpy ball and the flat sheet (fine ridged creases and a corner
     curl kept), the middle unfolding first; faceted shading from screen-space normals, light
     leaning towards the pointer, plain paper on the back, a soft drop shadow. While it is open
-    the cursor is a CLICK TO CLOSE label, the scroll is held and nothing reaches the scene; a
-    click closes it (the sheet folds back up, the dark fades out), as do Escape and a visible
-    CLICK TO CLOSE button (shown on touch screens and to the keyboard). Without WebGL the image
+    the cursor is the design's close control (Figma "cursor-button": CLICK TO CLOSE in JetBrains
+    Mono Bold 14 px on a white tab, centred on the pointer), the scroll is held and nothing
+    reaches the scene; a click closes it (the sheet folds back up and is put down where it lay,
+    the dark fades out), as do Escape and a visible button of the same design (shown on touch
+    screens and to the keyboard). Only then does the invitation come. Without WebGL the image
     itself unfolds in CSS.
   - **Spoken words** (his "Your bag…", your invitation) are not balloons: they are typed at the
     bottom of the page like the thoughts in the car (centred, 32 px up, JetBrains Mono 16 px,
     capitals), with the supplied typewriter; the trail is drawn inline (no copy laid over the
     text) and the lines wrap plainly as they grow (no re-balancing per character), so nothing
-    shifts or overlaps on a phone. On a narrow page PRESS D TO DEFEND stands above them.
+    shifts or overlaps on a phone. On a narrow page PRESS D TO DEFEND stands above them. Each
+    line says who speaks, and to whom, in a yellow label over it (ATTACKER: / PROTAGONIST →
+    ATTACKER:), and a dialogue line is never wider than 600 px.
   - **The invitation**: once the letter is closed, you tell him, typed in with the
     supplied typewriter: "Hey! When you wake up, come to Crasigostraße 24. You don't have to rob
-    people. I'll help you fix your business." It cannot come before the letter is read; when it
+    people. I'll help you fix your website problem." It cannot come before the letter is read; when it
     is typed in full and has stood 1.6 s, the gate opens and the scroll goes on to the car. (The
     words are set in capitals; ß is set as ẞ so it survives them.)
   - Sounds are cues fired as the playback crosses them, forwards only. They never feed back
@@ -429,7 +452,7 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
 | 0.60–0.64 | the door shuts |
 | 0.642 | the story waits while the thoughts are typed at the bottom of the page (below) |
 | 0.645–0.66 | the cluster lights and the engine starts; your eyes drop to the cluster |
-| 0.66 | the story waits: press D to rev |
+| 0.66 | the story waits: ACTION, PRESS D TO REV |
 | after 6,000 rpm | by itself, without stopping: the launch through three gear changes (8.6 s, the rush in its last two seconds), the ink closing, the next page |
 
 - **The thoughts** (`scenes/car/thoughts.ts`): once the door has shut, the story waits (a gate
@@ -483,7 +506,9 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   the door opening's top below the roof line. All of it, door and lights included, is a
   function of the scroll, so scrolling back plays it backwards.
 - **The rev** (`getaway.ts`, `REV_SEQUENCE`): once you sit and the engine idles at 800 rpm, the
-  page holds at a gate, your eyes drop to the cluster, and a small card says: press D. The first
+  page holds at a gate, your eyes drop to the cluster, and the fight's prompt system asks for D:
+  ACTION top left, PRESS D TO REV bottom right (`RevPrompt.tsx` on `PressPrompt.tsx`, placed as
+  in Figma "Text-placement-car-scene"), its four throttle marks in the page's red. The first
   press starts one four-second sequence on the wall clock, on the key event itself (a tap shorter
   than a frame is not lost): four presses of the throttle, one a second (at 0, 1, 2 and 3 s), the
   pedal going down quickly and most of the way back up each time (the fourth stays down), the
@@ -594,15 +619,18 @@ you into the screen and out of the story, onto the real site.
   the room, right of the chair; 0.5 at its side; 0.5–0.66 turning in and lowering
   (1.65 → 1.155 m); 0.66–0.72 the settle (a 3.5 cm dip, then upright, eyes up to the screen).
   At 0.76 the story waits (a gate that never opens: the story ends here) with one caption,
-  "Click the screen, or a project on it". One of the wall's terminals, to the right of and
+  "CLICK THE SCREEN." (the cave's captions are set in capitals). One of the wall's terminals, to the right of and
   below the big screen (`screen_13`), shows a few lines about the author (`roomScreens.ts`
-  `ABOUT_TEXT`), steady and readable from the chair, at twice the other screens' resolution.
+  `ABOUT_TEXT`) as console text in capitals, steady and readable from the chair, at twice the
+  other screens' resolution.
   No credits are printed anywhere on the page (see Assets).
 - **Hover**: each frame the pointer is picked against the picture's own plane (not the bezel or
   the room). Over it, the camera leans 30 cm towards the screen and narrows 3°, and the picture
   comes up to 97 %; away, it eases back (damped, about a second either way). Over a project card
   (or About / All works in the picture's navigation) that link is marked with a faint yellow wash.
-- **Links** (`SCREEN_LINKS` in `monitor.ts`): the six project cards lead to their pages on the
+- **Links** (`SCREEN_LINKS` in `monitor.ts`) are switched off for now (`PROJECT_LINKS = false`):
+  the whole picture leads to the home page, with no mark on a card. Switched back on, the six
+  project cards lead to their pages on the
   real site (`/case/razed-mods`, `/case/som-power`, `/case/som`, `/case/the-performance-lab`,
   `/case/kanoi`, `/case/the-luxe-week`, read from the site's own links), About and All works to
   theirs; anywhere else on the picture leads to the home page. The address is taken from the
@@ -707,7 +735,10 @@ src/
   ui/fightArt.ts          ACTION, BAM, POW and the arrow, from the Figma file
   ui/scenePixels.ts       the fight's coarse pixels (the transition effect, held)
   ui/letterReveal.ts      reading the letter: the crumpled-paper reveal, the dark, CLICK TO CLOSE
-  ui/RevPrompt.tsx        the getaway's one instruction (press D) and its four throttle marks
+  ui/RevPrompt.tsx        the getaway's PRESS D TO REV and its four throttle marks
+  ui/PressPrompt.tsx      the action prompt panel (PRESS [D] / TO …), shared by fight and car
+  ui/soundChoice.ts       the sound choice after the loading (ENABLE / DISABLE / SOUND)
+  ui/palette.ts           the page's one red (the red of "Drunk"), also --red in styles.css
   scenes/station/         Episode 1: episode.ts (track, captions, beats) + the world
   scenes/city/            Episode 2: the street, the stranger, the encounter
   scenes/car/             Episode 3: the Mercedes (carRig.ts), its beats, rev and launch (getaway.ts)
@@ -747,8 +778,11 @@ wipe opens.
 - **Design** (Figma file "Drunkfurt", supplied): the preloader, the chapter cards and the handwritten
   "Drunk" path were taken from it (decoded from the .fig with kiwi-schema). From the second file
   ("Drunkfurt-2"): the Rock Salt "Drunk" (glyph outlines), ACTION, BAM, POW and the arrow
-  (vector paths), and the placement of the fight's prompts. The letter (`src/assets/letter.png`,
-  448 × 563) is the image supplied with that brief, used as it is.
+  (vector paths), and the placement of the fight's prompts. From the third ("Drunkfurt-3"): the
+  sound choice (ENABLE and DISABLE cropped from its images as Figma crops them, SOUND's per-letter
+  layouts), the car's prompt placement and the close cursor. The letter
+  (`src/assets/letter.webp`, 1592 × 2000) is the high-resolution image supplied with that brief,
+  used as it is.
 - **Episode 04**: the room is "Surveillance room" by wa_rouk
   (https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304), under
   the Sketchfab Standard licence according to the file's own metadata; it was supplied by the

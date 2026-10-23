@@ -4,6 +4,8 @@
   --paper: #f1f0e9;
   --grey: #8a8984;
   --yellow: #f5d21a;
+  /* the red of "Drunk" (ui/palette.ts RED): the one red of every interaction and its status */
+  --red: #cd1919;
   --display: 'Anton', 'Impact', 'Haettenschweiler', 'Arial Narrow Bold', sans-serif;
   --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
   --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
@@ -92,8 +94,9 @@ body { cursor: pointer; }
   right: auto;
   left: 50%;
   bottom: 32px;
-  width: min(880px, calc(100vw - 48px));
-  max-width: none;
+  /* dialogue: never wider than 600 px; long lines wrap */
+  width: min(600px, calc(100vw - 48px));
+  max-width: 600px;
   padding: 0;
   border: 0;
   box-shadow: none;
@@ -109,6 +112,15 @@ body { cursor: pointer; }
   font: 600 16px/1.45 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0.02em;
   text-transform: uppercase;
+}
+/* who is speaking, and to whom: a label over the words, in the page's yellow */
+.caption.caption--speech .caption-kicker {
+  margin-bottom: 8px;
+  color: var(--yellow);
+  font: 700 12px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.08em;
+  pointer-events: none;
+  cursor: default;
 }
 /* typed text wraps as it comes: no re-balancing of the lines with every character */
 .caption.caption--speech p { text-wrap: wrap; }
@@ -131,47 +143,11 @@ body { cursor: pointer; }
 .caption--br { bottom: max(11vh, 64px); right: max(72px, calc(env(safe-area-inset-right, 0px) + 56px)); }
 
 
-/* --- episode 3: hold D (the revs are on the car's own cluster) ------------ */
-.rev-prompt {
-  position: absolute;
-  left: 50%;
-  bottom: max(5vh, 22px);
-  padding: 10px 16px 9px;
-  background: var(--ink);
-  color: var(--paper);
-  box-shadow: 4px 4px 0 rgba(0, 0, 0, 0.55);
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  transform: translate(-50%, 8px) rotate(-1deg);
-  opacity: 0;
-  pointer-events: none;
-  touch-action: none;
-  user-select: none;
-  transition: opacity 0.35s var(--ease), transform 0.35s var(--ease);
-}
-.rev-prompt.is-on { opacity: 1; transform: translate(-50%, 0) rotate(-1deg); pointer-events: auto; }
-.rev-prompt kbd {
-  display: inline-block;
-  min-width: 1.7em;
-  margin: 0 0.25em;
-  padding: 3px 4px 2px;
-  border-radius: 2px;
-  background: var(--yellow);
-  color: var(--ink);
-  font: inherit;
-  text-align: center;
-}
-.rev-touch { display: none; }
-@media (hover: none) and (pointer: coarse) {
-  .rev-key { display: none; }
-  .rev-touch { display: inline; }
-}
+/* --- episode 3: PRESS D TO REV (ui/RevPrompt.tsx, in the action-prompt system below; the revs are on the car's cluster) */
+.rev-wrap { display: contents; }
 /* once D is pressed: four marks, one per throttle press, and the pedal's travel */
-.rev-run { display: none; align-items: center; gap: 12px; }
-.rev-prompt.is-revving .rev-ask { display: none; }
-.rev-prompt.is-revving .rev-run { display: inline-flex; }
+.rev-run { display: inline-flex; justify-self: end; align-items: center; gap: 12px; margin-top: calc(14 * var(--u)); visibility: hidden; }
+.rev-wrap.is-revving .rev-run { visibility: visible; }
 .rev-pips { display: inline-flex; gap: 5px; }
 .rev-pip {
   width: 14px;
@@ -180,7 +156,7 @@ body { cursor: pointer; }
   transform: skewX(-12deg);
   transition: background-color 0.12s linear, border-color 0.12s linear;
 }
-.rev-pip.is-lit { background: var(--yellow); border-color: var(--yellow); }
+.rev-pip.is-lit { background: var(--red); border-color: var(--red); }
 .rev-bar { position: relative; width: 64px; height: 4px; background: rgba(241, 240, 233, 0.18); overflow: hidden; }
 .rev-bar i { position: absolute; inset: 0; background: var(--paper); transform-origin: 0 50%; transform: scaleX(0); }
 
@@ -569,7 +545,7 @@ body { cursor: pointer; }
   height: 0.82em;
   margin-left: 0.06em;
   vertical-align: -0.1em;
-  background: #ff3b30;
+  background: var(--red);
   transition: opacity 120ms ease;
 }
 .tw-caret.is-off { opacity: 0; }
@@ -600,12 +576,12 @@ body { cursor: pointer; }
   transition: opacity 0.25s ease;
 }
 .fx-action.is-on { transition: none; }
-.fx-defend {
+.fx-press {
   position: absolute;
   right: calc(24 * var(--u));
   bottom: calc(24 * var(--u));
   display: grid;
-  justify-items: end;
+  width: max-content;
   gap: calc(6 * var(--u));
   padding: 0;
   border: 0;
@@ -619,10 +595,16 @@ body { cursor: pointer; }
   opacity: 0;
   pointer-events: none;
   cursor: pointer;
+  user-select: none;
   transition: opacity 0.3s ease;
 }
-.fx-defend.is-on { opacity: 1; pointer-events: auto; }
-.fx-row { display: flex; align-items: center; gap: calc(12 * var(--u)); }
+.fx-press.is-on { opacity: 1; pointer-events: auto; }
+.fx-press--rev { touch-action: none; }
+/* first line: the arrow at the start (over the first letter of the second line), PRESS [D] at the end */
+.fx-row { display: flex; align-items: center; justify-content: space-between; gap: calc(40 * var(--u)); }
+.fx-press-d { display: inline-flex; align-items: center; gap: calc(12 * var(--u)); }
+.fx-action-word { justify-self: end; }
+/* the key: the page's red square, the D exactly in its middle (the line box trimmed to the capitals) */
 .fx-key {
   display: grid;
   place-items: center;
@@ -630,26 +612,31 @@ body { cursor: pointer; }
   min-width: 26px;
   height: calc(73 * var(--u));
   min-height: 24px;
-  margin-left: calc(12 * var(--u));
   border-radius: calc(6 * var(--u));
-  background: #ce1919;
+  background: var(--red);
+  line-height: 1;
+}
+.fx-key-d { display: block; letter-spacing: 0; text-box: trim-both cap alphabetic; }
+@supports not (text-box: trim-both cap alphabetic) {
+  /* without trimming, the capitals sit high in the line box by about the descender's depth */
+  .fx-key-d { transform: translateY(0.06em); }
 }
 .fx-arrow {
   width: calc(58 * var(--u));
   min-width: 20px;
   height: auto;
-  margin-right: calc(94 * var(--u));
+  color: #fff;
 }
-/* the arrow nudges towards the key and back, gently, while the prompt shows */
-.fx-defend.is-on .fx-arrow { animation: fx-nudge 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+/* the arrow nudges inwards, towards PRESS D, and back, gently, while the prompt shows */
+.fx-press.is-on .fx-arrow { animation: fx-nudge 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
 @keyframes fx-nudge {
   0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(calc(14 * var(--u))); }
+  50% { transform: translateX(calc(16 * var(--u))); }
 }
-.fx-defend:focus-visible { outline: 2px dashed var(--yellow); outline-offset: 8px; }
+.fx-press:focus-visible { outline: 2px dashed var(--yellow); outline-offset: 8px; }
 /* on a narrow page the subtitles at the bottom take the whole width: the prompt stands above them */
 @media (max-width: 760px) {
-  .fx-defend { right: 16px; bottom: 116px; }
+  .fx-press { right: 16px; bottom: 116px; }
 }
 
 /* --- the thoughts in the car (scenes/car/thoughts.ts): bottom centre, 32 px up, JetBrains Mono 16 px, capitals */
@@ -694,16 +681,17 @@ body { cursor: pointer; }
 .letter-img { box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55); transform-origin: 50% 60%; opacity: 0; }
 /* the cursor: the label follows the pointer (a real pointer only) */
 .letter-cursor {
+  /* Figma "cursor-button": a white tab, 3 px corners, JetBrains Mono Bold 14 px in near-black, 10 px padding */
   position: fixed;
   left: 0;
   top: 0;
   z-index: 2;
-  padding: 7px 10px 6px;
-  margin: 14px 0 0 14px;
-  background: var(--yellow);
-  color: #0d0d0d;
-  font: 700 11px/1 var(--label);
-  letter-spacing: 0.16em;
+  padding: 10px;
+  border-radius: 3px;
+  background: #fff;
+  color: #111;
+  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.05em;
   white-space: nowrap;
   pointer-events: none;
   opacity: 0;
@@ -717,12 +705,13 @@ body { cursor: pointer; }
   left: 50%;
   bottom: max(18px, env(safe-area-inset-bottom, 0px));
   transform: translateX(-50%);
-  padding: 10px 14px 9px;
+  padding: 10px;
   border: 0;
-  background: var(--yellow);
-  color: #0d0d0d;
-  font: 700 12px/1 var(--label);
-  letter-spacing: 0.16em;
+  border-radius: 3px;
+  background: #fff;
+  color: #111;
+  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.05em;
   cursor: none;
   opacity: 0;
 }
@@ -731,3 +720,50 @@ body { cursor: pointer; }
   .letter-layer { cursor: auto; }
   .letter-close { opacity: 1; cursor: pointer; }
 }
+
+/* --- the sound choice, after the loading (ui/soundChoice.ts; Figma Preloader-sound-*) --------- */
+.pl-sound { display: none; }
+.preloader.is-choosing > :not(.pl-sound) { display: none; }
+.preloader.is-choosing .pl-sound { display: block; }
+.snd { position: absolute; inset: 0; cursor: pointer; }
+.snd-frame { position: absolute; pointer-events: none; }
+.snd-art { position: absolute; opacity: 0; }
+.snd-word {
+  position: absolute;
+  inset: 0;
+  color: #fff;
+  font-family: var(--headline);
+  font-weight: 800;
+  font-stretch: 125%;
+  letter-spacing: -0.05em;
+}
+/* each letter of SOUND: placed by its own transform (straight, or along the arc under the chosen word) */
+.snd-ch {
+  position: absolute;
+  left: 0;
+  top: 0;
+  line-height: 0.707;
+  white-space: pre;
+  transform-origin: 0 0;
+  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.snd-intro { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; image-rendering: pixelated; }
+/* the halves are the real controls: transparent, the whole page split at the line between the words */
+.snd-half {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: transparent;
+  font-size: 0;
+  cursor: pointer;
+}
+.snd-half--off { right: 0; width: auto; }
+.snd-half:focus-visible { outline: 2px dashed var(--yellow); outline-offset: -12px; }
+.snd.is-chosen .snd-half { cursor: default; }
+/* if the art cannot be shown, the two buttons are plain words */
+.snd.is-plain .snd-half { color: #fff; font: 700 14px/1 var(--label); letter-spacing: 0.08em; text-transform: uppercase; }

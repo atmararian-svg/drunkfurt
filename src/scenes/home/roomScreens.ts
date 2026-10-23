@@ -131,8 +131,9 @@ function plan(seed: number) {
 }
 
 /**
- * About the author, as one more terminal on the wall: in the log screens'
- * type, steady and bright enough to read from the chair, at twice the other
+ * About the author, as one more terminal on the wall: console text, in
+ * capitals, each paragraph a prompt line, steady and bright enough to read
+ * from the chair, at twice the other
  * screens' resolution so the small type stays sharp. Redrawn once the page's
  * mono face has loaded.
  */
@@ -154,8 +155,8 @@ function about() {
     const left = 28;
     const max = el.width - left * 2;
     let y = 46;
-    ABOUT_TEXT.forEach((para, i) => {
-      c.font = `${i === 0 ? 800 : 600} ${i === 0 ? 26 : 21}px 'JetBrains Mono', ui-monospace, monospace`;
+    ABOUT_TEXT.map((t) => t.toUpperCase()).forEach((para, i) => {
+      c.font = `${i === 0 ? 800 : 600} ${i === 0 ? 24 : 18}px 'JetBrains Mono', ui-monospace, monospace`;
       c.fillStyle = i === 0 ? '#e6c23a' : grey(222);
       // wrapped by words, each paragraph a prompt line and its continuation indented
       const words = para.split(' ');
@@ -171,9 +172,9 @@ function about() {
       lines.push(line);
       lines.forEach((l, j) => {
         c.fillText(`${j === 0 ? '> ' : '  '}${l}`, left, y);
-        y += i === 0 ? 34 : 28;
+        y += i === 0 ? 32 : 25;
       });
-      y += 12;
+      y += 11;
     });
     c.fillStyle = 'rgba(0,0,0,0.18)';
     for (let yy = 0; yy < el.height; yy += 4) c.fillRect(0, yy, el.width, 2);

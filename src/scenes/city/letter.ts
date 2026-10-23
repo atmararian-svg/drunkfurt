@@ -1,4 +1,4 @@
-import { Camera, Mesh, Raycaster, Vector2 } from 'three';
+import { Camera, Mesh, Raycaster, Vector2, Vector3 } from 'three';
 import { story } from '../../core/store';
 import { Gate, gates, localProgress, readScroll } from '../../core/timeline';
 import { BEAT } from './beats';
@@ -24,7 +24,7 @@ export const LETTER = {
   hold: 1600,
 };
 
-export const INVITATION = "Hey! When you wake up, come to Crasigostraße 24.\nYou don't have to rob people. I'll help you fix your business.";
+export const INVITATION = "Hey! When you wake up, come to Crasigostraße 24.\nYou don't have to rob people. I'll help you fix your website problem.";
 
 export const letter = {
   /** The reveal is open. */
@@ -96,4 +96,25 @@ export function pickLetter(clientX: number, clientY: number) {
   const s = mesh.geometry.boundingSphere!.clone().applyMatrix4(mesh.matrixWorld);
   s.radius *= 1.8;
   return ray.ray.intersectsSphere(s);
+}
+
+const at = new Vector3();
+const edge = new Vector3();
+
+/** Where the sheet lies on the page: its centre and its size across (CSS px), for the reveal to lift it from there. */
+export function letterSpot() {
+  const { mesh, camera } = letter;
+  if (!mesh || !camera) return undefined;
+  mesh.geometry.computeBoundingSphere();
+  const s = mesh.geometry.boundingSphere!;
+  mesh.updateWorldMatrix(true, false);
+  at.copy(s.center).applyMatrix4(mesh.matrixWorld);
+  const r = s.radius * mesh.matrixWorld.getMaxScaleOnAxis();
+  edge.copy(at).project(camera);
+  const x = ((edge.x + 1) / 2) * window.innerWidth;
+  const y = ((1 - edge.y) / 2) * window.innerHeight;
+  // its size: the projected distance to a point one radius up from the centre, doubled
+  edge.copy(at).setY(at.y + r).project(camera);
+  const size = 2 * Math.abs(((1 - edge.y) / 2) * window.innerHeight - y);
+  return { x, y, size: Math.max(12, size) };
 }

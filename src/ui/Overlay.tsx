@@ -14,39 +14,33 @@ import { RevPrompt } from './RevPrompt';
 import { mountCombatPrompts, updateCombatPrompts } from './combatPrompt';
 import { setScenePixels } from './scenePixels';
 import { createTypewriter, Typewriter } from './typewriter';
-import { letter, pickLetter } from '../scenes/city/letter';
+import { letter, letterSpot, pickLetter } from '../scenes/city/letter';
 import { closeLetterNow, openLetter } from './letterReveal';
 import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
-import { ARROW } from './fightArt';
+import { PressPrompt } from './PressPrompt';
 
-/** The stand-off's coarse pixels at their strongest (CSS px per block). */
-const PIXEL_PEAK = 7;
-/** Once you defend: the pixels grow coarse, blur and darken, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
+/** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
 const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
 
 /**
  * How the street looks around the fight: block size (CSS px; 1 = not
  * pixelated), blur and darkness, as pure functions of the progress and the
  * encounter, so a scrub, a revisit or a reset can never leave it stuck.
- *  - he raises the knife (cock → gate): the pixels grow, 1 → 7 px, and hold
- *    through the stand-off; no blur, no dark, until you act;
- *  - you defend: over the fight's first moments (to BLOCK.dark, before the
- *    first hit) the blocks grow coarse, blur and darken, hiding the fight;
- *  - the aftermath: all of it resolves, back to the plain picture before the letter.
+ * Nothing happens while he only approaches or threatens: it starts when you
+ * press D. Over the fight's first moments (to BLOCK.dark, before the first
+ * hit) the blocks grow coarse, blur and darken, hiding the fight; on the
+ * aftermath all of it resolves, back to the plain picture before the letter.
  */
 function combatLook(id: string, local: number) {
-  if (id !== 'city' || local < BEAT.cock) return { block: 1, blur: 0, dark: 0 };
+  const none = { block: 1, blur: 0, dark: 0 };
+  if (id !== 'city' || local < BEAT.gate) return none;
   const v = encounterAt(local);
-  const pre = local < BEAT.gate ? smoothstep(clamp((local - BEAT.cock) / (BEAT.gate - BEAT.cock), 0, 1)) : 1;
-  let hide = 0;
-  let out = 1;
-  if (v.outcome && local >= BEAT.gate) {
-    const black = v.outcome === 'blocked' ? BLOCK.dark : KO.dark;
-    hide = local < BEAT.aftermath ? smoothstep(clamp(v.t / black, 0, 1)) : 1;
-    if (local >= BEAT.aftermath) out = 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
-  }
-  const block = 1 + (PIXEL_PEAK - 1) * pre + (HIDE.block - PIXEL_PEAK) * hide;
-  return { block: 1 + (block - 1) * out, blur: HIDE.blur * hide * out, dark: HIDE.dark * hide * out };
+  if (!v.outcome) return none;
+  const black = v.outcome === 'blocked' ? BLOCK.dark : KO.dark;
+  const hide = local < BEAT.aftermath ? smoothstep(clamp(v.t / black, 0, 1)) : 1;
+  const out = local < BEAT.aftermath ? 1 : 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
+  const k = hide * out;
+  return { block: 1 + (HIDE.block - 1) * k, blur: HIDE.blur * k, dark: HIDE.dark * k };
 }
 
 /** ACTION is up from the moment he raises the knife until the dark has covered the fight. */
@@ -101,7 +95,10 @@ export function Overlay() {
     const thoughtTw = createTypewriter(thoughtEl, { content: 'lines', stableHeight: false, startDelay: 500, pauseAfterType: (t) => 900 + 24 * t.length });
     const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;
     let thoughtsOn = false;
-    const unmountPrompts = mountCombatPrompts(el.querySelector<HTMLCanvasElement>('.fx-action')!, el.querySelector<HTMLElement>('.fx-defend')!);
+    const unmountPrompts = mountCombatPrompts(el.querySelector<HTMLCanvasElement>('.fx-action')!, {
+      defend: el.querySelector<HTMLElement>('.fx-press--defend')!,
+      rev: el.querySelector<HTMLElement>('.fx-press--rev')!,
+    });
     const wipe = el.querySelector<HTMLCanvasElement>('.wipe')!;
     const hit = el.querySelector<HTMLCanvasElement>('.impact')!;
     const wctx = wipe.getContext('2d')!;
@@ -143,7 +140,9 @@ export function Overlay() {
         }
       });
       // the fight: ACTION and PRESS D TO DEFEND, and the street breaking into coarse pixels (blurred and dark once you defend)
-      updateCombatPrompts(actionShown(id, local), story.getState().prompt === 'defend');
+      // (the same ACTION and panel system asks for D in the car, to rev)
+      const ask = story.getState().prompt;
+      updateCombatPrompts(actionShown(id, local) || ask === 'rev', ask === 'defend' ? 'defend' : ask === 'rev' ? 'rev' : null);
       const look = combatLook(id, local);
       setScenePixels(look.block, look.blur, look.dark);
       // the thoughts in the car, once the door has shut (car/thoughts.ts holds the story until they are done)
@@ -242,7 +241,7 @@ export function Overlay() {
       }
       // after the fight: only a click on the letter does anything (Enter picks it up as well)
       if (story.getState().prompt === 'letter') {
-        if (!letter.open && (!e || pickLetter(e.clientX, e.clientY))) openLetter(() => (letter.read = true));
+        if (!letter.open && (!e || pickLetter(e.clientX, e.clientY))) openLetter(() => (letter.read = true), letterSpot());
         return;
       }
       // the invitation and the thoughts in the car play by themselves
@@ -272,7 +271,7 @@ export function Overlay() {
     };
     const onClick = (e: MouseEvent) => {
       unlock();
-      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.whiteout,.preloader,.letter-layer')) return;
+      if ((e.target as HTMLElement).closest('a,button,.fx-press,.whiteout,.preloader,.letter-layer')) return;
       next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -341,28 +340,16 @@ export function Overlay() {
 
       {/* the fight's prompts (Figma "Text-placement"): ACTION top left, PRESS D TO DEFEND bottom right (combatPrompt.ts) */}
       <canvas className="fx-action" aria-hidden />
-      <button
-        type="button"
-        className="fx-defend"
-        aria-hidden={prompt !== 'defend'}
-        aria-label="Press D to defend"
-        tabIndex={prompt === 'defend' ? 0 : -1}
+      <PressPrompt
+        kind="defend"
+        action="TO DEFEND"
+        on={prompt === 'defend'}
+        label="Press D to defend"
         onClick={(e) => {
           e.stopPropagation();
           defend();
         }}
-      >
-        <span className="fx-row">
-          <svg className="fx-arrow" viewBox={`0 0 ${ARROW.w} ${ARROW.h}`} aria-hidden>
-            <path d={ARROW.d} fill="currentColor" />
-          </svg>
-          <span className="fx-word" data-text="PRESS" />
-          <span className="fx-key">
-            <span data-text="D" />
-          </span>
-        </span>
-        <span className="fx-word" data-text="TO DEFEND" />
-      </button>
+      />
 
       {/* the thoughts in the car: bottom centre, typed (car/thoughts.ts) */}
       <div className="thoughts" aria-live="polite">
