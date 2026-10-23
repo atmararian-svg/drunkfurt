@@ -14,6 +14,8 @@ import { BEAT, cityTimeScale, disarm, encounter, updateEncounter } from './encou
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
 import { LaundryLight, Stranger, StrangerBoundary } from './Stranger';
+import { updateLetter } from './letter';
+import { LetterProp } from './LetterProp';
 import { Street } from './Street';
 import { StreetFurniture } from './StreetFurniture';
 
@@ -84,6 +86,7 @@ export function CityScene({ active }: { active: boolean }) {
   useFrame(() => {
     if (!active) return;
     updateEncounter();
+    updateLetter();
   });
 
   // leaving the episode backwards hides any pending prompt
@@ -110,6 +113,8 @@ export function CityScene({ active }: { active: boolean }) {
         <Stranger active={active} timeScale={timeScale} />
       </StrangerBoundary>
       <LaundryLight active={active} />
+      {/* the letter he dropped, after the fight */}
+      <LetterProp active={active} />
       {/* the getaway car stands at the kerb from the start; episode 3 is played with it */}
       <Mercedes />
       <Soundscape active={active} />

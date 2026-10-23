@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { audio } from '../audio/AudioDirector';
-import { clamp } from '../core/math';
+import { clamp, smoothstep } from '../core/math';
 import { story, useStory } from '../core/store';
 import { CHAPTERS } from '../core/chapters';
 import { chapterTurn, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
@@ -11,6 +11,40 @@ import { drawBrushWipe, drawHits, drawIgnite, drawKnockout, drawSpeedLines } fro
 import { launchAt } from '../scenes/car/getaway';
 import { enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
+import { mountCombatPrompts, updateCombatPrompts } from './combatPrompt';
+import { setScenePixels } from './scenePixels';
+import { createTypewriter, Typewriter } from './typewriter';
+import { letter, pickLetter } from '../scenes/city/letter';
+import { closeLetterNow, openLetter } from './letterReveal';
+import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
+import { ARROW } from './fightArt';
+
+/** The fight's coarse pixels at their strongest (CSS px per block). */
+const PIXEL_PEAK = 7;
+
+/**
+ * How pixelated the street is (block size, CSS px; 1 = not at all): a pure
+ * function of the progress and the encounter, so a scrub, a revisit or a reset
+ * can never leave it stuck. It grows as he raises the knife (cock → gate),
+ * holds through the stand-off and the fight, and resolves as the dark opens on
+ * the aftermath, back to normal before the letter.
+ */
+function combatPixels(id: string, local: number) {
+  if (id !== 'city' || local < BEAT.cock) return 1;
+  let level: number;
+  if (local < BEAT.gate) level = smoothstep(clamp((local - BEAT.cock) / (BEAT.gate - BEAT.cock), 0, 1));
+  else if (!encounter.outcome || local < BEAT.aftermath) level = 1;
+  else level = 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.04, 0, 1));
+  return 1 + (PIXEL_PEAK - 1) * level;
+}
+
+/** ACTION is up from the moment he raises the knife until the dark has covered the fight. */
+function actionShown(id: string, local: number) {
+  if (id !== 'city' || local < BEAT.cock || local >= BEAT.aftermath) return false;
+  const v = encounterAt(local);
+  if (!v.outcome) return true;
+  return v.t < (v.outcome === 'blocked' ? BLOCK.dark : KO.dark);
+}
 
 /**
  * Ink over the whole frame at a given progress: the fight's conceal (the dark
@@ -47,7 +81,8 @@ export function Overlay() {
   const prompt = useStory((s) => s.prompt);
   const sound = useStory((s) => s.sound);
   const root = useRef<HTMLDivElement>(null);
-  const episodes = builtEpisodes();
+  // one list for the page's life: the effects below must not re-run (and restart what they drive) on every re-render
+  const episodes = useMemo(builtEpisodes, []);
 
   useEffect(() => {
     let raf = 0;
@@ -59,12 +94,29 @@ export function Overlay() {
     const outro = el.querySelector<HTMLElement>('.outro')!;
     const rail = Array.from(el.querySelectorAll<HTMLElement>('.rail li'));
     const chapterNow = (id: string) => CHAPTERS.find((c) => (c.episodes as string[]).includes(id))?.number ?? CHAPTERS.length;
+    // balloons are typed in (the supplied typewriter); the thoughts in the car as well, line by line
+    const typed = new Map<HTMLElement, { tw: Typewriter; on: boolean }>();
+    captions.forEach((c) => {
+      const p = c.querySelector<HTMLElement>('[data-type]');
+      if (p) typed.set(c, { tw: createTypewriter(p, { startDelay: 250 }), on: false });
+    });
+    const thoughtEl = el.querySelector<HTMLElement>('.thoughts-text')!;
+    const thoughtTw = createTypewriter(thoughtEl, { content: 'lines', stableHeight: false, startDelay: 500, pauseAfterType: (t) => 900 + 24 * t.length });
+    const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;
+    let thoughtsOn = false;
+    const unmountPrompts = mountCombatPrompts(el.querySelector<HTMLCanvasElement>('.fx-action')!, el.querySelector<HTMLElement>('.fx-defend')!);
     const wipe = el.querySelector<HTMLCanvasElement>('.wipe')!;
     const hit = el.querySelector<HTMLCanvasElement>('.impact')!;
     const wctx = wipe.getContext('2d')!;
     const hctx = hit.getContext('2d')!;
     let last = '';
-    let lastHit = '';
+    // (anything left on the canvases from before this effect ran is cleared on the first frame)
+    let lastHit = '\u0000';
+    let idle = 0;
+    const restored = () => {
+      last = '';
+      lastHit = '\u0000';
+    };
     const size = () => {
       const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
       for (const c of [wipe, hit]) {
@@ -75,6 +127,8 @@ export function Overlay() {
     };
     size();
     hit.style.opacity = '1';
+    wipe.addEventListener('contextrestored', restored);
+    hit.addEventListener('contextrestored', restored);
     window.addEventListener('resize', size);
 
     const loop = () => {
@@ -84,7 +138,32 @@ export function Overlay() {
         const when = capDefs[i].when;
         const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to) && (!when || when());
         c.classList.toggle('is-on', on);
+        const t = typed.get(c);
+        if (t && t.on !== on) {
+          t.on = on;
+          // (balloons are lettered in capitals: ß is set as its capital, ẞ, which the capitals keep as it is)
+          if (on) void t.tw.play((c.dataset.text ?? '').replace(/ß/g, 'ẞ')).then(() => capDefs[i].onTyped?.());
+          else t.tw.stop();
+        }
       });
+      // the fight: ACTION and PRESS D TO DEFEND, and the street breaking into coarse pixels
+      updateCombatPrompts(actionShown(id, local), story.getState().prompt === 'defend');
+      setScenePixels(combatPixels(id, local));
+      // the thoughts in the car, once the door has shut (car/thoughts.ts holds the story until they are done)
+      const think = id === 'car' && updateThoughts();
+      if (think !== thoughtsOn) {
+        thoughtsOn = think;
+        thoughtBox.classList.toggle('is-on', think);
+        if (!think) {
+          thoughtTw.stop();
+          if (!thoughts.done) thoughts.started = false;
+        }
+      }
+      if (think && !thoughts.started) {
+        thoughts.started = true;
+        if (thoughts.done) thoughtTw.show(MONOLOGUE);
+        else void thoughtTw.play(MONOLOGUE).then(thoughtsTyped);
+      }
       fill.style.transform = `scaleY(${p})`;
       cue.classList.toggle('is-on', p < 0.004);
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
@@ -93,6 +172,7 @@ export function Overlay() {
 
       const ink = inkAt(p);
       const key = `${ink.w.toFixed(3)}${ink.mode}${ink.kind}${wipe.width}`;
+      if (ink.w <= 0 && idle % 60 === 30) last = '';
       if (key !== last) {
         if (ink.kind === 'ignite') drawIgnite(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode);
         else drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, 7);
@@ -107,6 +187,9 @@ export function Overlay() {
       const run = id === 'car' ? launchAt(local) : null;
       const rush = run && run.rpm >= 0 ? run.rush : 0;
       const hitKey = hitT >= 0 ? `${v!.outcome}${hitT.toFixed(3)}${hit.width}` : rush > 0 ? `rush${rush.toFixed(2)}${Math.floor(run!.t * 24)}${hit.width}` : '';
+      // (an empty layer is cleared again now and then: a canvas whose context was restored by the browser can come back
+      // with an old picture on it, and nothing else would draw over it)
+      if (hitKey === '' && ++idle % 60 === 0) lastHit = '\u0000';
       if (hitKey !== lastHit) {
         hctx.clearRect(0, 0, hit.width, hit.height);
         if (hitT >= 0 && v!.outcome === 'knockedOut') drawKnockout(hctx, hit.width, hit.height, hitT, KO.dark);
@@ -120,6 +203,14 @@ export function Overlay() {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('resize', size);
+      wipe.removeEventListener('contextrestored', restored);
+      hit.removeEventListener('contextrestored', restored);
+      typed.forEach((t) => t.tw.stop());
+      thoughtTw.stop();
+      if (!thoughts.done) thoughts.started = false;
+      unmountPrompts();
+      setScenePixels(1);
+      closeLetterNow();
     };
   }, [episodes]);
 
@@ -154,6 +245,13 @@ export function Overlay() {
         defend();
         return;
       }
+      // after the fight: only a click on the letter does anything (Enter picks it up as well)
+      if (story.getState().prompt === 'letter') {
+        if (!letter.open && (!e || pickLetter(e.clientX, e.clientY))) openLetter(() => (letter.read = true));
+        return;
+      }
+      // the invitation and the thoughts in the car play by themselves
+      if (story.getState().prompt === 'invite' || story.getState().prompt === 'thought') return;
       // revving starts with D (or a press on its card), not with a click
       if (story.getState().prompt === 'rev') return;
       const { id, local } = locate(timeline.target);
@@ -165,6 +263,13 @@ export function Overlay() {
     };
     const onKey = (e: KeyboardEvent) => {
       unlock();
+      // D defends (the one keyboard handler of the story; the car listens for its own D, only to rev)
+      if (e.code === 'KeyD' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && story.getState().prompt === 'defend') {
+        e.preventDefault();
+        defend();
+        return;
+      }
+      if (letter.open) return;
       if (e.code === 'Enter' || (e.code === 'Space' && story.getState().prompt)) {
         e.preventDefault();
         next();
@@ -172,7 +277,7 @@ export function Overlay() {
     };
     const onClick = (e: MouseEvent) => {
       unlock();
-      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.whiteout,.preloader')) return;
+      if ((e.target as HTMLElement).closest('a,button,.rev-prompt,.whiteout,.preloader,.letter-layer')) return;
       next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -231,26 +336,43 @@ export function Overlay() {
             data-ep={ep.id}
             data-from={c.from}
             data-to={c.to}
+            data-text={c.text}
           >
             {c.kicker && <span className="caption-kicker" data-decode data-text={c.kicker} />}
-            <p data-decode data-text={c.text} />
+            {c.tone === 'speech' ? <p data-type data-text={c.text} /> : <p data-decode data-text={c.text} />}
           </aside>
         )),
       )}
 
+      {/* the fight's prompts (Figma "Text-placement"): ACTION top left, PRESS D TO DEFEND bottom right (combatPrompt.ts) */}
+      <canvas className="fx-action" aria-hidden />
       <button
         type="button"
-        className={`act ${prompt === 'defend' ? 'is-on' : ''}`}
+        className="fx-defend"
         aria-hidden={prompt !== 'defend'}
+        aria-label="Press D to defend"
         tabIndex={prompt === 'defend' ? 0 : -1}
         onClick={(e) => {
           e.stopPropagation();
           defend();
         }}
       >
-        <span className="act-word">Defend</span>
-        <span className="act-hint">Click to defend</span>
+        <span className="fx-row">
+          <svg className="fx-arrow" viewBox={`0 0 ${ARROW.w} ${ARROW.h}`} aria-hidden>
+            <path d={ARROW.d} fill="currentColor" />
+          </svg>
+          <span className="fx-word" data-text="PRESS" />
+          <span className="fx-key">
+            <span data-text="D" />
+          </span>
+        </span>
+        <span className="fx-word" data-text="TO DEFEND" />
       </button>
+
+      {/* the thoughts in the car: bottom centre, typed (car/thoughts.ts) */}
+      <div className="thoughts" aria-live="polite">
+        <div className="thoughts-text" />
+      </div>
 
       <canvas className="impact" aria-hidden />
 

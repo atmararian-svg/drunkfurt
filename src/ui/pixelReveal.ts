@@ -51,6 +51,32 @@ const stage = () => document.querySelector<HTMLElement>('.stage');
 let active: { cancel: () => void } | null = null;
 
 /**
+ * The reference's drawing, shared by everything pixelated here (the page
+ * reveal, the fight's coarse pixels, the ACTION title): `src` shrunk to one
+ * pixel per block of `block` CSS px into `tiny` (smoothed, so each block is
+ * that area's average), then drawn back up over all of `ctx`'s canvas without
+ * smoothing.
+ */
+export function drawPixelated(ctx: CanvasRenderingContext2D, tiny: HTMLCanvasElement, src: CanvasImageSource & { width: number; height: number }, block: number, cssW: number, cssH: number) {
+  const tctx = tiny.getContext('2d');
+  if (!tctx) return;
+  const tw = Math.max(1, Math.round(cssW / Math.max(1, block)));
+  const th = Math.max(1, Math.round(cssH / Math.max(1, block)));
+  if (tiny.width !== tw || tiny.height !== th) {
+    tiny.width = tw;
+    tiny.height = th;
+  }
+  tctx.imageSmoothingEnabled = true;
+  tctx.imageSmoothingQuality = 'high';
+  tctx.clearRect(0, 0, tw, th);
+  tctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, tw, th);
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(tiny, 0, 0, tw, th, 0, 0, ctx.canvas.width, ctx.canvas.height);
+}
+
+/**
  * Plays the reveal of the live stage over whatever is on screen now (the
  * outgoing page lies above the stage: `outgoing`, removed once the blocks
  * cover it; or a layer the caller removes in `onCovered`). Resolves when the
@@ -76,11 +102,10 @@ export function pixelReveal(dir: RevealDirection, opts: { outgoing?: HTMLElement
   document.body.appendChild(overlay);
   const ctx = overlay.getContext('2d');
   const tiny = document.createElement('canvas');
-  const tctx = tiny.getContext('2d');
   // one cell per block of the coarsest grid: which are in yet (alpha), for the cover phase
   const mask = document.createElement('canvas');
   const mctx = mask.getContext('2d');
-  if (!ctx || !tctx || !mctx) {
+  if (!ctx || !mctx) {
     overlay.remove();
     covered();
     return Promise.resolve();
@@ -112,20 +137,7 @@ export function pixelReveal(dir: RevealDirection, opts: { outgoing?: HTMLElement
     /** The live page, pixelated at this moment's block size, drawn into the overlay. */
     const draw = (src: HTMLCanvasElement) => {
       const r = raw();
-      const block = P.from + (P.to - P.from) * smooth(r);
-      const tw = Math.max(1, Math.round(cssW / block));
-      const th = Math.max(1, Math.round(cssH / block));
-      if (tiny.width !== tw || tiny.height !== th) {
-        tiny.width = tw;
-        tiny.height = th;
-      }
-      tctx.imageSmoothingEnabled = true;
-      tctx.imageSmoothingQuality = 'high';
-      tctx.drawImage(src, 0, 0, src.width, src.height, 0, 0, tw, th);
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.clearRect(0, 0, overlay.width, overlay.height);
-      ctx.imageSmoothingEnabled = false;
-      ctx.drawImage(tiny, 0, 0, tw, th, 0, 0, overlay.width, overlay.height);
+      drawPixelated(ctx, tiny, src, P.from + (P.to - P.from) * smooth(r), cssW, cssH);
       if (!isCovered) {
         // only the cells that are in: the rest of the overlay stays clear, the outgoing page shows there
         const k = r / P.cover;

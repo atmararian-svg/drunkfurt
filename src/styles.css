@@ -285,62 +285,6 @@ body { cursor: pointer; }
 .outro.is-on { opacity: 1; }
 .outro .title-name { font-size: clamp(48px, 8vw, 120px); }
 
-/* --- the one action the story asks for ---------------------------------- */
-.act {
-  position: absolute;
-  /* off-centre, so his face and the knife stay in view */
-  left: 73%;
-  bottom: max(12vh, 72px);
-  display: grid;
-  justify-items: center;
-  gap: 10px;
-  padding: 14px 26px 16px;
-  border: 0;
-  background: var(--ink);
-  color: var(--paper);
-  box-shadow: 6px 6px 0 rgba(0, 0, 0, 0.55);
-  transform: translate(-50%, 10px) rotate(-1.5deg);
-  opacity: 0;
-  pointer-events: none;
-  cursor: pointer;
-  transition: opacity 0.5s var(--ease), transform 0.5s var(--ease);
-}
-.act.is-on {
-  opacity: 1;
-  transform: translate(-50%, 0) rotate(-1.5deg);
-  pointer-events: auto;
-  transition-delay: 0.1s;
-}
-.act::before {
-  /* a strip of tape holding the panel down */
-  content: '';
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  width: 70px;
-  height: 18px;
-  background: rgba(245, 210, 26, 0.85);
-  transform: translateX(-50%) rotate(4deg);
-}
-.act-word {
-  font: 400 clamp(48px, 9vw, 92px)/0.9 var(--display);
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-.act-hint {
-  padding-bottom: 3px;
-  border-bottom: 2px solid var(--yellow);
-  font: 600 11px/1 var(--mono);
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-}
-.act:focus-visible { outline: 2px dashed var(--yellow); outline-offset: 6px; }
-.act.is-on .act-hint { animation: breathe 2.4s ease-in-out 1.4s infinite; }
-@keyframes breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
 .sound {
   position: absolute;
   top: max(20px, env(safe-area-inset-top, 0px));
@@ -363,7 +307,6 @@ body { cursor: pointer; }
   .rail { display: none; }
   .caption--tr, .caption--br { right: 20px; }
   .caption--tl, .caption--bl { left: 20px; }
-  .act { left: 50%; bottom: 40px; }
   .caption p { font-size: 14px; }
 }
 
@@ -550,20 +493,8 @@ body { cursor: pointer; }
   pointer-events: none;
 }
 .pl-grain { background-image: var(--grain); background-size: 180px 180px; opacity: 0.45; mix-blend-mode: soft-light; }
-.pl-dots { background-image: var(--halftone-paper); background-size: 6px 6px; opacity: 0.6; }
-/* …and under the pointer a denser, darker-inked screen shows through, feathered at the edge */
-.pl-dots::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image: radial-gradient(circle, rgba(241, 240, 233, 0.16) 1px, transparent 1.6px);
-  background-size: 4px 4px;
-  opacity: 0;
-  transition: opacity 0.4s var(--ease);
-  -webkit-mask-image: radial-gradient(circle 150px at var(--px, -999px) var(--py, -999px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
-  mask-image: radial-gradient(circle 150px at var(--px, -999px) var(--py, -999px), #000 0%, rgba(0, 0, 0, 0.55) 45%, transparent 100%);
-}
-.preloader.has-pointer .pl-dots::after { opacity: 1; }
+/* …and a fine grid of dots that orbit the pointer (ui/dotGrid.ts, after the supplied DotGridBackground) */
+.pl-dots { width: 100%; height: 100%; }
 .pl-status {
   position: absolute;
   top: var(--pl-pad);
@@ -634,4 +565,183 @@ body { cursor: pointer; }
 }
 @media (prefers-reduced-motion: reduce) {
   .pl-ellipsis i { animation: none; }
+}
+
+/* --- typed text (ui/typewriter.ts, after the supplied TypewriterText) ------- */
+.tw { display: grid; }
+.tw > .tw-ghost,
+.tw > .tw-live { grid-area: 1 / 1; min-width: 0; }
+.tw-ghost { visibility: hidden; }
+.tw-row { position: relative; white-space: pre-wrap; overflow-wrap: break-word; }
+/* the last characters typed, in a red gradient over the solid text; it fades out once the line is complete */
+.tw-trail { position: absolute; inset: 0; pointer-events: none; transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+.tw-trail.is-done { opacity: 0; }
+.tw-trail-pre { color: transparent; }
+.tw-trail-tip { color: transparent; background: linear-gradient(90deg, #ff8a80, #ff3b30); -webkit-background-clip: text; background-clip: text; }
+/* the block caret: 0.62 × 0.82 em, blinking slowly (BLINK_MS), with a short fade between states */
+.tw-caret {
+  display: inline-block;
+  width: 0.62em;
+  height: 0.82em;
+  margin-left: 0.06em;
+  vertical-align: -0.1em;
+  background: #ff3b30;
+  transition: opacity 120ms ease;
+}
+.tw-caret.is-off { opacity: 0; }
+
+/* --- the fight's coarse pixels (ui/scenePixels.ts): over the 3D picture, under everything printed */
+.scene-pixels {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+}
+
+/* --- the fight's prompts (ui/combatPrompt.ts), placed as in Figma "Text-placement" on a 1920 × 1080 frame:
+   --u is one design pixel, the frame scaled to fit the page */
+.overlay { --u: min(calc(100vw / 1920), calc(100vh / 1080)); }
+.fx-action {
+  position: absolute;
+  left: calc(24 * var(--u));
+  top: calc(24 * var(--u));
+  width: calc(889 * var(--u));
+  height: calc(558 * var(--u));
+  min-width: 240px;
+  min-height: 151px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+}
+.fx-action.is-on { transition: none; }
+.fx-defend {
+  position: absolute;
+  right: calc(24 * var(--u));
+  bottom: calc(24 * var(--u));
+  display: grid;
+  justify-items: end;
+  gap: calc(6 * var(--u));
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: 900 max(26px, calc(80 * var(--u))) / 1 'Arial Black', 'Archivo', 'Helvetica Neue', Arial, sans-serif;
+  font-stretch: 100%;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  text-align: right;
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+.fx-defend.is-on { opacity: 1; pointer-events: auto; }
+.fx-row { display: flex; align-items: center; gap: calc(12 * var(--u)); }
+.fx-key {
+  display: grid;
+  place-items: center;
+  width: calc(79 * var(--u));
+  min-width: 26px;
+  height: calc(73 * var(--u));
+  min-height: 24px;
+  margin-left: calc(12 * var(--u));
+  border-radius: calc(6 * var(--u));
+  background: #ce1919;
+}
+.fx-arrow {
+  width: calc(58 * var(--u));
+  min-width: 20px;
+  height: auto;
+  margin-right: calc(94 * var(--u));
+}
+/* the arrow nudges towards the key and back, gently, while the prompt shows */
+.fx-defend.is-on .fx-arrow { animation: fx-nudge 1.25s cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+@keyframes fx-nudge {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(calc(14 * var(--u))); }
+}
+.fx-defend:focus-visible { outline: 2px dashed var(--yellow); outline-offset: 8px; }
+
+/* --- the thoughts in the car (scenes/car/thoughts.ts): bottom centre, 32 px up, JetBrains Mono 16 px, capitals */
+.thoughts {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  width: min(880px, calc(100vw - 48px));
+  color: #f1f0e9;
+  font: 600 16px/1.45 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+.thoughts.is-on { opacity: 1; }
+.thoughts .tw-row { text-align: center; }
+
+/* --- the letter on the pavement, and reading it (ui/letterReveal.ts) */
+.is-over-letter body { cursor: pointer; }
+.letter-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  cursor: none;
+}
+.letter-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(6, 6, 7, 0.8);
+  opacity: 0;
+}
+.letter-stage {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+.letter-canvas { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.55)); }
+.letter-img { box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55); transform-origin: 50% 60%; opacity: 0; }
+/* the cursor: the label follows the pointer (a real pointer only) */
+.letter-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 2;
+  padding: 7px 10px 6px;
+  margin: 14px 0 0 14px;
+  background: var(--yellow);
+  color: #0d0d0d;
+  font: 700 11px/1 var(--label);
+  letter-spacing: 0.16em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.letter-layer.has-pointer .letter-cursor { opacity: 1; }
+.letter-layer.is-closing .letter-cursor { opacity: 0; }
+/* the visible close control: always there for the keyboard; on screens without a hovering pointer, the way out */
+.letter-close {
+  position: absolute;
+  left: 50%;
+  bottom: max(18px, env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  padding: 10px 14px 9px;
+  border: 0;
+  background: var(--yellow);
+  color: #0d0d0d;
+  font: 700 12px/1 var(--label);
+  letter-spacing: 0.16em;
+  cursor: none;
+  opacity: 0;
+}
+.letter-close:focus-visible { opacity: 1; outline: 2px dashed #fff; outline-offset: 3px; }
+@media (hover: none), (pointer: coarse) {
+  .letter-layer { cursor: auto; }
+  .letter-close { opacity: 1; cursor: pointer; }
 }

@@ -52,18 +52,23 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   decoding, then resolving and stepping left when it is really ready; centre "Once upon a time
   in" with its dots counting one, two, three; along the bottom FRANKFURT, revealed letter by
   letter (a staggered, eased reveal with seeded irregularity, each letter rising and fading in
-  through a few stand-in glyphs), over which "Drunk" is written in red: the design's own brush
-  path (decoded from the .fig file's vector network, `src/ui/drunkStroke.ts`), five strokes
-  drawn on as one continuous line (`stroke-dashoffset`), the pen's speed eased so it never
-  stops or jumps. The order follows the real loading: the title decodes in with chapter 1;
+  through a few stand-in glyphs), over which "Drunk" is written in red: the design's Rock Salt
+  lettering (Figma "Drunkfurt-2"; the glyph outlines exactly as Figma laid them out, taken from
+  the .fig, so no font is loaded, `src/ui/drunkWord.ts`), uncovered by a pen: the letters'
+  centre lines (the glyphs rasterised, thinned to one-pixel skeletons, traced into lines, the
+  rough edge's spurs pruned, joined in the order a hand writes them, smoothed) drawn on as one
+  continuous line (`stroke-dashoffset`) inside an SVG mask over the glyphs, the pen's speed
+  eased so it never stops or jumps. The order follows the real loading: the title decodes in with chapter 1;
   chapter 1 resolves when it is ready and chapter 2 decodes in its place; then chapter 3, and
   while it loads "Drunk" is written: at the hand's pace up to 80% of the word, then only a
   slow creep (something always moves) until chapter 3 is really in, when the rest is written
   quickly; word and chapter 3 finish together (if chapter 3 was in first, its label waits for
   the word). Then READY, and the pixel reveal brings chapter 1 in over the preloader by itself.
-  No progress is invented. The page is the comic's print in CSS: near-black (#070707) with a
-  faint halftone and soft-light grain, and under the pointer a denser screen shows through a
-  feathered circle (CSS variables, no re-render, gone when the pointer leaves).
+  No progress is invented. The page is the comic's print: near-black (#070707) with a soft-light
+  grain and a fine grid of dots that, around the pointer, leave their places and orbit it, each
+  on its own tilted orbit, larger and brighter the nearer they are (the supplied Framer
+  "DotGridBackground", ported to a plain canvas in `src/ui/dotGrid.ts`; its frame loop only runs
+  while something moves).
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
   station no longer waits for the street's models) and a marker after it that reports when
   everything in it has loaded and drawn twice; a world that fails is caught by its own error
@@ -224,8 +229,10 @@ built from.
 | He stops square in front of you; his face hardens; he shifts his weight | 0.735–0.80 |
 | He draws a knife and holds it on you: "Your bag. Give it to me. Now." | 0.74–0.83 |
 | He commits: the city drops to a tenth of real speed | 0.822 |
-| DEFEND, CLICK TO DEFEND: he stands and threatens in slow motion; the story waits here | 0.83 |
-| Black; BAM! WHAM!; the page opens on him lying on the pavement | real time, ~2 s |
+| ACTION; the street breaks into coarse pixels | 0.80– |
+| PRESS D TO DEFEND: he stands and threatens in slow motion; the story waits here | 0.83 |
+| Black; BAM, POW; the page opens on him lying on the pavement, the pixels resolve | real time, ~2 s |
+| A crumpled letter by him: click it, read it, close it; you tell him where to find you | 0.96 (waits) |
 
 - **The world**:
   - the station's head building with its arched portal;
@@ -287,14 +294,32 @@ built from.
   | 0.735–0.80 | he squares up and holds your eye; the knife comes out |
   | 0.80–0.822 | he raises it and holds it on you; he tells you to hand over your bag |
   | 0.822–0.83 | time slows to a tenth |
-  | 0.83 | DEFEND: the story waits for your click ("Click to defend") |
+  | 0.80–0.83 | ACTION; the street pixelates (blocks 1 → 7 px) |
+  | 0.83 | PRESS D TO DEFEND: the story waits for D (or a click on the prompt) |
   | 0.83–0.905 | the outcome, spread over this stretch of the scroll |
-  | 0.905–1 | the aftermath |
+  | 0.905–1 | the aftermath; the pixels resolve by 0.945; at 0.96 the story waits for the letter |
 
-  - **Defended** (you click in time): the fight is not shown. The page goes black at once,
-    before anyone moves, and the two hits are printed into the dark as comic sound effects
-    (`drawHits` in `ui/brush.ts`): BAM! and WHAM! burst in on jagged paper stars, each with its
-    sound. When the ink opens again he is on his back on the pavement, the knife beside his
+  - **The prompts** (Figma "Text-placement", `ui/combatPrompt.ts`, placed on the 1920 × 1080
+    design frame scaled to fit): ACTION, the design's slanted lettering, top left, from the
+    moment he raises the knife (0.80) until the dark has covered the fight; it comes in through
+    the scene-transition pixelation (`drawPixelated` from `pixelReveal.ts`, 28 px blocks
+    resolving in 0.65 s) with an opacity fade. PRESS [D] TO DEFEND, bottom right, while the story
+    waits at the gate: the words decode in (`decode.ts`), the D sits on a red key, and the arrow
+    beside them slides a little to the right and back (CSS, only while it shows). D is read by
+    the overlay's one keyboard handler; the prompt itself can also be clicked or tapped. (The
+    design reads "TO DEFENCE"; the brief's text, TO DEFEND, is used.)
+  - **The pixels** (`ui/scenePixels.ts`): the scene-transition effect reused at a steady block
+    size: one canvas over the 3D picture, under everything printed, redrawn from the 3D canvas
+    after every frame. Its block size is a pure function of the scroll and the encounter
+    (`combatPixels` in `Overlay.tsx`): 1 → 7 px as he raises the knife, held through the
+    stand-off and the fight, back to 1 over the first 0.04 of the aftermath; at 1 the canvas and
+    its frame watcher are removed. Nothing can leave it stuck: a scrub, a revisit or a reset
+    recomputes it.
+  - **Defended** (you press D in time): the fight is not shown. The dark spreads over the page
+    before anyone moves, and the two hits are printed into it (`drawHits` in `ui/brush.ts`):
+    the design's BAM (top left, with the first hit) and POW (bottom right, with the second),
+    each popping in, with its sound (the existing recordings: no new hit sounds came with the
+    design). When the ink opens again he is on his back on the pavement, the knife beside his
     hand, and your bag is still with you.
   - **Knocked out** is switched off for now (`STRIKES` in `encounter.ts`): he never strikes, and
     the story waits at the gate until you defend. Its sequence is kept: with `STRIKES` on, the
@@ -305,8 +330,29 @@ built from.
     the fight is a position on the scroll, so scrolling back rewinds it: into the middle of the
     fight you see that moment, and before he walks up he is back in his doorway. Scrolling
     forward again replays the same outcome. The prompt does not come back once you have decided.
-  - The DEFEND prompt waits as long as you like. Scroll back before the gate and it closes;
-    the moment is postponed, not decided.
+  - The prompt waits as long as you like. Scroll back before the gate and it closes; the moment
+    is postponed, not decided.
+  - **The letter** (`scenes/city/letter.ts`, `LetterProp.tsx`, `ui/letterReveal.ts`): after a
+    defence, a crumpled sheet lies on the pavement by him (a ball of paper, flat-shaded facets);
+    at 0.96 the story waits (a gate) with "Something fell out of his coat. A letter. Click it."
+    The pointer over it lights it a little and shows the hand; a click (or Enter) opens it: the
+    page darkens and, in the middle, the supplied letter image (`src/assets/letter.png`, at its
+    own aspect ratio, up to 1.6 × its pixels, within 90% × 86% of the page) unfolds from a
+    crumpled ball into a flat print that keeps its creases, after Framer's "CrumpledPaper
+    Reveal". That component's code is not published (it is copied into Framer projects), so its
+    behaviour is rebuilt in WebGL with three.js: a subdivided sheet whose vertex shader moves each
+    point between its place on a lumpy ball and the flat sheet (fine ridged creases and a corner
+    curl kept), the middle unfolding first; faceted shading from screen-space normals, light
+    leaning towards the pointer, plain paper on the back, a soft drop shadow. While it is open
+    the cursor is a CLICK TO CLOSE label, the scroll is held and nothing reaches the scene; a
+    click closes it (the sheet folds back up, the dark fades out), as do Escape and a visible
+    CLICK TO CLOSE button (shown on touch screens and to the keyboard). Without WebGL the image
+    itself unfolds in CSS.
+  - **The invitation**: once the letter is closed, you tell him, in a balloon typed in with the
+    supplied typewriter: "Hey! When you wake up, come to Crasigostraße 24. You don't have to rob
+    people. I'll help you fix your business." It cannot come before the letter is read; when it
+    is typed in full and has stood 1.6 s, the gate opens and the scroll goes on to the car. (The
+    balloon is lettered in capitals; ß is set as ẞ so it survives them.)
   - Sounds are cues fired as the playback crosses them, forwards only. They never feed back
     into what is drawn, and scrubbing never repeats them.
 - **Time**: everything in the city (people, cars, the stranger) runs on a time scale that eases
@@ -379,9 +425,25 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
 | 0.27–0.31 | as you reach it, its lights come up and the central locking clacks |
 | 0.40–0.47 | the driver's door opens |
 | 0.47–0.60 | into the car: you duck under the roof line, through the door opening, and sit, turning to face the windscreen |
-| 0.60–0.66 | the door shuts; 0.645 the cluster lights and the engine starts; your eyes drop to the cluster |
+| 0.60–0.64 | the door shuts |
+| 0.642 | the story waits while the thoughts are typed at the bottom of the page (below) |
+| 0.645–0.66 | the cluster lights and the engine starts; your eyes drop to the cluster |
 | 0.66 | the story waits: press D to rev |
 | after 6,000 rpm | by itself, without stopping: the launch through three gear changes (8.6 s, the rush in its last two seconds), the ink closing, the next page |
+
+- **The thoughts** (`scenes/car/thoughts.ts`): once the door has shut, the story waits (a gate
+  at 0.642, before the ignition) while four lines are typed at the bottom of the page, centred,
+  32 px up, JetBrains Mono 16 px, in capitals, with no box: "This can't keep happening." /
+  "Good businesses shouldn't have to struggle because they can't show the world what they're
+  worth." / "There has to be a better way." / "It's time the world saw what I've built." They
+  are typed with the supplied typewriter (`ui/typewriter.ts`, a plain-DOM port of the Framer
+  "TypewriterText": its phases, speeds, smart pauses after punctuation, deleting each line
+  before the next, the red trail on the last characters that fades into the text when a line
+  is complete, the block caret), each line standing for 0.9 s + 24 ms per character before it
+  is deleted; the caret blinks every 1,250 ms instead of 500 ms (2.5 × slower), the typing
+  speed is the component's own. When the last line is in and has stood 1.3 s, the gate opens:
+  the engine starts and the rev prompt follows (about 18 s in all). Scrolling back out of the
+  seat, or the chapter starting again, forgets them; they play again next time.
 
 - **The car** is the supplied Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`, 2.2 MB),
   converted from the supplied FBX by `tools/mercedes2glb.mjs`, then welded, simplified and
@@ -637,7 +699,13 @@ src/
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
   ui/titleCards.ts        the glass chapter cards, in and out
   ui/decode.ts            decoding text: reveal, loading loop, pointer zone
-  ui/drunkStroke.ts       the "Drunk" brush path from the Figma file
+  ui/drunkWord.ts         the preloader's "Drunk": glyphs and pen strokes from the Figma file
+  ui/dotGrid.ts           the preloader's dot grid around the pointer (supplied DotGridBackground)
+  ui/typewriter.ts        typed text (supplied TypewriterText): balloons and the thoughts in the car
+  ui/combatPrompt.ts      ACTION and PRESS D TO DEFEND
+  ui/fightArt.ts          ACTION, BAM, POW and the arrow, from the Figma file
+  ui/scenePixels.ts       the fight's coarse pixels (the transition effect, held)
+  ui/letterReveal.ts      reading the letter: the crumpled-paper reveal, the dark, CLICK TO CLOSE
   ui/RevPrompt.tsx        the getaway's one instruction (press D) and its four throttle marks
   scenes/station/         Episode 1: episode.ts (track, captions, beats) + the world
   scenes/city/            Episode 2: the street, the stranger, the encounter
@@ -676,7 +744,10 @@ wipe opens.
   `gear-shift.mp3` (the launch), `door-open.mp3`, `engine-start.mp3`, `engine-default.mp3` (the
   car). Not supplied: a night-station ambience (synthesised until one is added).
 - **Design** (Figma file "Drunkfurt", supplied): the preloader, the chapter cards and the handwritten
-  "Drunk" path were taken from it (decoded from the .fig with kiwi-schema).
+  "Drunk" path were taken from it (decoded from the .fig with kiwi-schema). From the second file
+  ("Drunkfurt-2"): the Rock Salt "Drunk" (glyph outlines), ACTION, BAM, POW and the arrow
+  (vector paths), and the placement of the fight's prompts. The letter (`src/assets/letter.png`,
+  448 × 563) is the image supplied with that brief, used as it is.
 - **Episode 04**: the room is "Surveillance room" by wa_rouk
   (https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304), under
   the Sketchfab Standard licence according to the file's own metadata; it was supplied by the

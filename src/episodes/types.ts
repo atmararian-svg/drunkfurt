@@ -16,6 +16,8 @@ export interface Caption {
   tone?: 'yellow' | 'paper' | 'speech';
   /** Only shown when this holds (e.g. one caption per outcome of an interaction). */
   when?: () => boolean;
+  /** A balloon's text is typed in (ui/typewriter.ts); called each time it has been typed in full. */
+  onTyped?: () => void;
 }
 
 export interface EpisodeDef {

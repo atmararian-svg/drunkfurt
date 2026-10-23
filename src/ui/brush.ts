@@ -1,4 +1,5 @@
 import { mulberry32 } from '../core/math';
+import { Art, FIGHT_ART, FRAME } from './fightArt';
 
 /**
  * Ink-brush wipes, drawn on a canvas: a handful of broad, ragged black strokes
@@ -241,46 +242,34 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
   ctx.clearRect(0, 0, W, H);
   if (t < 0) return;
   // (the dark itself is the conceal's, drawIgnite, under this)
-  const u = Math.min(W, H);
-  const word = (text: string, at: number, cx: number, cy: number, tilt: number, seed: number) => {
+  // the design's own words (Figma "fight-scene"), placed as there on a 1920 × 1080 frame scaled to fit:
+  // BAM from the top left with the first hit, POW from the bottom right with the second
+  const k = Math.min(W / FRAME.w, H / FRAME.h);
+  const word = (art: Art, at: number, anchor: 'tl' | 'br') => {
     const age = t - at;
     if (age < 0) return;
     // pops in a little too big, settles
-    const pop = age < 0.1 ? 1.35 - 0.35 * (age / 0.1) : 1;
-    const r = u * 0.2 * pop;
-    const rnd = mulberry32(seed);
+    const pop = age < 0.1 ? 1.3 - 0.3 * (age / 0.1) : 1;
+    const x = anchor === 'tl' ? art.x * k : W - (FRAME.w - art.x) * k;
+    const y = anchor === 'tl' ? art.y * k : H - (FRAME.h - art.y) * k;
     ctx.save();
-    ctx.translate(cx, cy);
-    ctx.rotate(tilt);
-    // the burst: a jagged star in paper white with an ink edge
-    ctx.beginPath();
-    const n = 15;
-    for (let i = 0; i <= n * 2; i++) {
-      const a = (i / (n * 2)) * Math.PI * 2;
-      const rr = i % 2 === 0 ? r * (0.95 + rnd() * 0.25) : r * (0.55 + rnd() * 0.12);
-      ctx.lineTo(Math.cos(a) * rr * 1.25, Math.sin(a) * rr);
-    }
-    ctx.closePath();
-    ctx.fillStyle = '#f1f0e9';
-    ctx.fill();
-    ctx.lineWidth = u * 0.008;
-    ctx.strokeStyle = '#101010';
-    ctx.stroke();
-    // the word: heavy condensed letters in the yellow accent, inked
-    ctx.font = `${Math.round(r * 0.62)}px Anton, Impact, 'Arial Narrow Bold', sans-serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.lineJoin = 'round';
-    ctx.lineWidth = u * 0.014;
-    ctx.strokeStyle = '#101010';
-    ctx.strokeText(text, 0, r * 0.04);
-    ctx.fillStyle = '#f5d21a';
-    ctx.fillText(text, 0, r * 0.04);
+    ctx.translate(x + (art.w * k) / 2, y + (art.h * k) / 2);
+    ctx.scale(k * pop, k * pop);
+    ctx.translate(-art.w / 2, -art.h / 2);
+    ctx.fillStyle = '#fefefe';
+    ctx.fill(artPath(art));
     ctx.restore();
   };
-  word('BAM!', beats.hit1, W * 0.36, H * 0.4, -0.16, 3);
-  word('WHAM!', beats.hit2, W * 0.64, H * 0.6, 0.12, 8);
+  word(FIGHT_ART.BAM, beats.hit1, 'tl');
+  word(FIGHT_ART.POW, beats.hit2, 'br');
 }
+
+const paths = new Map<Art, Path2D>();
+const artPath = (art: Art) => {
+  let p = paths.get(art);
+  if (!p) paths.set(art, (p = new Path2D(art.d)));
+  return p;
+};
 
 /**
  * Knocked out, from your own eyes: a white-red flash with the speed lines of

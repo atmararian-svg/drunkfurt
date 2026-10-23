@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { CHAPTERS, Readiness, chapterReadiness } from '../core/chapters';
 import { pinScroll } from '../core/timeline';
 import { decodeIn, decodeLoop, splitChars } from './decode';
-import { DRUNK_STROKES, WORDMARK_STROKE } from './drunkStroke';
+import { DRUNK_BOX, DRUNK_COLOR, DRUNK_GLYPHS, DRUNK_PEN, DRUNK_SIZE, DRUNK_STROKES } from './drunkWord';
+import { mountDotGrid } from './dotGrid';
 import { pixelReveal } from './pixelReveal';
 import { showTitleCard } from './titleCards';
 
@@ -18,8 +19,10 @@ import { showTitleCard } from './titleCards';
  *  - centre, "Once upon a time in" with its three dots counting up;
  *  - along the bottom, FRANKFURT, revealed letter by letter, over which
  *    "Drunk" is written in red by hand while chapter 3 loads: the design's
- *    five brush strokes drawn on as one continuous line, the pen's speed
- *    eased (no stops), holding back the end until chapter 3 is really in.
+ *    Rock Salt lettering (Figma "Drunkfurt-2"), uncovered by a pen moving
+ *    along the letters' centre lines in writing order, as one continuous
+ *    line at an eased speed (no stops), holding back the end until chapter 3
+ *    is really in.
  *
  * The order: the title decodes in with chapter 1; chapter 1 resolves when it
  * is ready and chapter 2 takes its place; then chapter 3, while the word is
@@ -51,7 +54,7 @@ export function Preloader() {
     const status = q<HTMLElement>('.pl-status');
     const list = q<HTMLElement>('.pl-chapters');
     const word = q<HTMLElement>('.pl-word');
-    const strokes = Array.from(el.querySelectorAll<SVGPathElement>('.pl-stroke path'));
+    const strokes = Array.from(el.querySelectorAll<SVGPathElement>('.pl-pen path'));
     const stops: (() => void)[] = [];
     const timers: number[] = [];
     let raf = 0;
@@ -68,24 +71,17 @@ export function Preloader() {
     window.addEventListener('resize', fit);
     document.fonts?.ready.then(() => alive && fit());
 
-    // --- the comic texture leans in under the pointer (CSS variables, no re-render)
-    const pointer = (e: PointerEvent) => {
-      el.style.setProperty('--px', `${e.clientX}px`);
-      el.style.setProperty('--py', `${e.clientY}px`);
-      el.classList.add('has-pointer');
-    };
-    const away = () => el.classList.remove('has-pointer');
-    el.addEventListener('pointermove', pointer);
-    el.addEventListener('pointerleave', away);
+    // --- the print screen: a grid of dots that orbit the pointer (the supplied DotGridBackground, dotGrid.ts)
+    const unmountDots = mountDotGrid(q<HTMLCanvasElement>('.pl-dots'));
 
-    // --- the writing: the five strokes as one continuous line, drawn on along their length
+    // --- the writing: the pen's strokes as one continuous line, drawn on along their length
     const lengths = strokes.map((p) => p.getTotalLength());
     const total = lengths.reduce((a, b) => a + b, 0);
     strokes.forEach((p, i) => {
       p.style.strokeDasharray = `${lengths[i]} ${lengths[i]}`;
       p.style.strokeDashoffset = `${lengths[i]}`;
     });
-    let written = 0; // 0..1 along all five strokes
+    let written = 0; // 0..1 along all the pen's strokes
     let speed = 0; // the pen's speed now (of the whole word per second), eased, so it never jumps
     let writing = false; // chapter 3 is loading (or in): the hand is at work
     let finishBy = 0; // chapter 3 is in: the time (ms) the word should be complete by
@@ -244,8 +240,7 @@ export function Preloader() {
       stops.forEach((s) => s());
       timers.forEach((t) => window.clearTimeout(t));
       window.removeEventListener('resize', fit);
-      el.removeEventListener('pointermove', pointer);
-      el.removeEventListener('pointerleave', away);
+      unmountDots();
       document.documentElement.classList.remove('is-preloading');
       // (development re-runs effects: start again from a clean page)
       list.replaceChildren();
@@ -256,7 +251,7 @@ export function Preloader() {
   return (
     <div className="preloader" ref={root} role="progressbar" aria-label="Loading DRUNKFURT" aria-busy="true">
       <div className="pl-grain" aria-hidden />
-      <div className="pl-dots" aria-hidden />
+      <canvas className="pl-dots" aria-hidden />
       <p className="pl-status" data-text="LOADING CHAPTERS" />
       <div className="pl-chapters" aria-hidden />
       <p className="pl-once">
@@ -269,18 +264,22 @@ export function Preloader() {
       </p>
       <div className="pl-mark">
         <span className="pl-word" data-text="FRANKFURT" />
-        <svg className="pl-stroke" viewBox="0 0 1423 135" preserveAspectRatio="xMinYMin meet" aria-hidden>
-          <defs>
-            {/* the brush's dry, broken edge */}
-            <filter id="pl-brush" x="-5%" y="-5%" width="110%" height="110%">
-              <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="4" result="n" />
-              <feDisplacementMap in="SourceGraphic" in2="n" scale="5" />
-            </filter>
-          </defs>
-          <g transform={`${WORDMARK_STROKE.matrix} ${WORDMARK_STROKE.scale}`} filter="url(#pl-brush)">
-            {DRUNK_STROKES.map((d, i) => (
-              <path key={i} d={d} fill="none" stroke={WORDMARK_STROKE.color} strokeWidth={WORDMARK_STROKE.width} strokeLinecap="round" strokeLinejoin="round" />
-            ))}
+        {/* "Drunk" (Figma Preloader-Final), placed as there over FRANKFURT (whose frame, 1872 × 178, is the
+            viewBox): the glyphs, uncovered by a pen drawn along their centre lines (drunkWord.ts) */}
+        <svg className="pl-stroke" viewBox="0 0 1872 178" preserveAspectRatio="xMinYMin meet" aria-hidden>
+          <g transform={`translate(${DRUNK_BOX.x - 24} ${DRUNK_BOX.y - 886})`}>
+            <mask id="pl-pen" maskUnits="userSpaceOnUse" x={-40} y={-40} width={DRUNK_BOX.w + 80} height={DRUNK_BOX.h + 80}>
+              <g className="pl-pen">
+                {DRUNK_STROKES.map((d, i) => (
+                  <path key={i} d={d} fill="none" stroke="#fff" strokeWidth={DRUNK_PEN} strokeLinecap="round" strokeLinejoin="round" />
+                ))}
+              </g>
+            </mask>
+            <g mask="url(#pl-pen)" fill={DRUNK_COLOR}>
+              {DRUNK_GLYPHS.map((g, i) => (
+                <path key={i} d={g.d} transform={`translate(${g.x} ${g.y}) scale(${DRUNK_SIZE} ${-DRUNK_SIZE})`} />
+              ))}
+            </g>
           </g>
         </svg>
       </div>

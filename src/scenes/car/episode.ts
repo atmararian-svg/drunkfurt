@@ -6,6 +6,7 @@ import { localProgress } from '../../core/timeline';
 import type { EpisodeDef } from '../../episodes/types';
 import { DRIVER_EYE } from './carRig';
 import { CAR_BEAT, PARK, carAt, getaway, launchAt, resetGetaway } from './getaway';
+import { resetThoughts } from './thoughts';
 
 /**
  * Episode 3 camera. It starts exactly where episode 2's last shot is (you,
@@ -20,8 +21,9 @@ import { CAR_BEAT, PARK, carAt, getaway, launchAt, resetGetaway } from './getawa
  *  0.40–0.47  the door opens
  *  0.47–0.60  in: duck under the roof line, through the door opening, into
  *             the seat, turning to face the windscreen
- *  0.60–0.64  the door shuts; 0.645 ignition; your eyes go to the instrument
- *             cluster; 0.66 the story waits: hold D
+ *  0.60–0.64  the door shuts; the story waits while your thoughts are typed
+ *             at the bottom of the page (thoughts.ts); then 0.645 ignition;
+ *             your eyes go to the instrument cluster; 0.66 the story waits: D
  *  0.66–      the launch (played by itself once you reach 6,000 rpm)
  *
  * Positions inside and around the car are worked out from its own frame
@@ -109,7 +111,10 @@ export const carEpisode: EpisodeDef = {
   World: NoWorld,
   sharesWorld: 'city',
   track: carTrack,
-  reset: resetGetaway,
+  reset: () => {
+    resetGetaway();
+    resetThoughts();
+  },
   adjustPose: ride,
   // in the seat, the head stays inside the cabin (the rig already scales it down)
   clampHead: (_base, o) => {
@@ -123,5 +128,5 @@ export const carEpisode: EpisodeDef = {
     { from: 0.15, to: 0.3, place: 'tl', text: 'The bag stayed on my shoulder. The car was waiting.' },
     { from: 0.67, to: 0.95, place: 'tl', tone: 'yellow', text: 'Time to get out of Drunkfurt.' },
   ],
-  beats: [0, CAR_BEAT.turn, CAR_BEAT.walk, CAR_BEAT.doorOpened, CAR_BEAT.doorClosed, CAR_BEAT.rev, 1],
+  beats: [0, CAR_BEAT.turn, CAR_BEAT.walk, CAR_BEAT.doorOpened, CAR_BEAT.doorClosed + 0.002, CAR_BEAT.rev, 1],
 };
