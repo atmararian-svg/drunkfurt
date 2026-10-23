@@ -40,6 +40,8 @@ export interface TypewriterOptions {
 
 const SMART = { comma: 140, period: 320, ellipsis: 520, line: 260 };
 const TRAIL = 3;
+/** The trail's gradient (#ff8a80 → #ff3b30), one step per character. */
+const TRAIL_COLOURS = ['#ff8a80', '#ff6358', '#ff3b30'];
 
 export interface Typewriter {
   /** Types `text` (split into blocks by the content mode); resolves when the last block is fully typed. */
@@ -98,32 +100,32 @@ export function createTypewriter(host: HTMLElement, opts: TypewriterOptions = {}
   let complete = false;
   const later = (fn: () => void, ms: number) => timers.push(window.setTimeout(fn, Math.max(0, ms)));
 
-  /** Draws `value`: one row per line, the trail on the active line's last characters, the caret after it. */
+  /**
+   * Draws `value`: one row per line; on the active line the last characters are the trail, each in
+   * its own step of the gradient, inline in the same text (no copy laid over it, so nothing can
+   * slip out of place when a line wraps); the caret after them.
+   */
   const render = () => {
     const lines = value.split('\n');
     const rows = lines.map((line, i) => {
       const row = document.createElement('div');
       row.className = 'tw-row';
+      const active = i === lines.length - 1;
+      const keep = active ? line.slice(0, Math.max(0, line.length - TRAIL)) : line;
       const text = document.createElement('span');
       text.className = 'tw-text';
-      text.textContent = line || ' ';
+      text.textContent = keep || (line ? '' : '\u00a0');
       row.append(text);
-      const active = i === lines.length - 1;
-      if (active && line) {
-        // the trail: the same line over the solid one, only its last characters showing, in the gradient
-        const trail = document.createElement('span');
-        trail.className = 'tw-trail';
-        const keep = line.slice(0, Math.max(0, line.length - TRAIL));
-        const hidden = document.createElement('span');
-        hidden.className = 'tw-trail-pre';
-        hidden.textContent = keep;
-        const tip = document.createElement('span');
-        tip.className = 'tw-trail-tip';
-        tip.textContent = line.slice(keep.length);
-        trail.append(hidden, tip);
-        if (complete) trail.classList.add('is-done');
-        row.append(trail);
-        row.classList.add('is-active');
+      if (active && line.length > keep.length) {
+        const tip = line.slice(keep.length);
+        Array.from(tip).forEach((ch, k) => {
+          const c = document.createElement('span');
+          c.className = `tw-tip${complete ? ' is-done' : ''}`;
+          // from the gradient's light end to its deep end, towards the caret
+          c.style.setProperty('--tw-c', TRAIL_COLOURS[Math.min(TRAIL_COLOURS.length - 1, k + (TRAIL - tip.length))]);
+          c.textContent = ch;
+          row.append(c);
+        });
       }
       if (active) row.append(caret);
       return row;
@@ -166,7 +168,7 @@ export function createTypewriter(host: HTMLElement, opts: TypewriterOptions = {}
           complete = true;
           host.classList.remove('is-typing');
           // the line is complete: its trail fades into the solid colour (the original's "fade" completion)
-          requestAnimationFrame(() => live.querySelector('.tw-trail')?.classList.add('is-done'));
+          requestAnimationFrame(() => live.querySelectorAll('.tw-tip').forEach((c) => c.classList.add('is-done')));
           resolve();
           return;
         }

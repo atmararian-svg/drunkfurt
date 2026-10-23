@@ -3,7 +3,9 @@ import { drawPixelated } from './pixelReveal';
 
 /**
  * The fight's coarse pixels: the scene-transition effect (pixelReveal.ts),
- * reused at a steady block size instead of a reveal. One canvas over the
+ * reused at a steady block size instead of a reveal; once you defend, the
+ * same layer also blurs (the blocks drawn up smoothed) and darkens, which is
+ * what hides the fight. One canvas over the
  * stage, under the page's printed matter; after every drawn frame the 3D
  * canvas is shrunk to one pixel per block and drawn back up, unsmoothed.
  *
@@ -18,6 +20,8 @@ let ctx: CanvasRenderingContext2D | null = null;
 let stopWatching: (() => void) | null = null;
 const tiny = document.createElement('canvas');
 let block = 1;
+let soft = 0;
+let dark = 0;
 
 const draw = (src: HTMLCanvasElement) => {
   if (!canvas || !ctx) return;
@@ -28,12 +32,19 @@ const draw = (src: HTMLCanvasElement) => {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
-  drawPixelated(ctx, tiny, src, block, w, h);
+  drawPixelated(ctx, tiny, src, block, w, h, soft);
+  if (dark > 0.005) {
+    ctx.fillStyle = `rgba(5, 5, 6, ${Math.min(1, dark).toFixed(3)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
 };
 
-export function setScenePixels(next: number) {
+/** `next`: block size (CSS px); `blur` 0 … 1: the blocks smoothed over (a blur); `shade` 0 … 1: a dark layer over it. */
+export function setScenePixels(next: number, blur = 0, shade = 0) {
   block = next;
-  if (next <= 1.02) {
+  soft = blur;
+  dark = shade;
+  if (next <= 1.02 && blur <= 0.01 && shade <= 0.005) {
     stopWatching?.();
     stopWatching = null;
     canvas?.remove();

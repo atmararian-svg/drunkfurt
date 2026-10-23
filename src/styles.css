@@ -84,49 +84,35 @@ body { cursor: pointer; }
   border-color: #1d1d1c;
   border-left: 3px solid var(--yellow);
 }
-/* a speech balloon: his words, with a tail down towards him */
-.caption--speech {
-  background-image: none;
-  background-color: var(--paper);
-  padding: 14px 20px 15px;
-  border-radius: 50% / 46%;
-  box-shadow: none;
-  transform: translateY(6px);
-}
-.caption--speech.is-on { transform: none; }
-.caption--speech p { font: 400 clamp(18px, 2.2vw, 24px)/1.15 var(--display); text-transform: uppercase; letter-spacing: 0.02em; text-align: center; }
-.caption--speech::before,
-.caption--speech::after {
-  content: '';
-  position: absolute;
-  pointer-events: none;
-}
-.caption--speech::before {
+/* spoken words (his, and yours to him): typed at the bottom of the page like the thoughts in the car, no balloon,
+   no panel: centred, 32 px up, JetBrains Mono 16 px, capitals */
+.caption.caption--speech {
+  position: fixed;
   top: auto;
-  bottom: -26px;
-  left: 22%;
-  width: 0;
-  height: 0;
-  background: none;
-  border-style: solid;
-  border-width: 28px 26px 0 0;
-  border-color: var(--ink) transparent transparent transparent;
-  mix-blend-mode: normal;
-  transform: skewX(28deg);
-}
-.caption--speech::after {
-  bottom: -20px;
-  left: calc(22% + 4px);
   right: auto;
-  width: 0;
-  height: 0;
+  left: 50%;
+  bottom: 32px;
+  width: min(880px, calc(100vw - 48px));
+  max-width: none;
+  padding: 0;
+  border: 0;
+  box-shadow: none;
   background: none;
-  border-style: solid;
-  border-width: 22px 19px 0 0;
-  border-color: var(--paper) transparent transparent transparent;
-  mix-blend-mode: normal;
-  transform: skewX(28deg);
+  color: #f1f0e9;
+  text-align: center;
+  transform: translateX(-50%);
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
 }
+.caption.caption--speech.is-on { transform: translateX(-50%); }
+.caption.caption--speech p,
+.thoughts {
+  font: 600 16px/1.45 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+/* typed text wraps as it comes: no re-balancing of the lines with every character */
+.caption.caption--speech p { text-wrap: wrap; }
+.tw .tw-row { text-wrap: wrap; }
 .caption p {
   margin: 0;
   font: 500 15px/1.38 var(--mono);
@@ -307,7 +293,7 @@ body { cursor: pointer; }
   .rail { display: none; }
   .caption--tr, .caption--br { right: 20px; }
   .caption--tl, .caption--bl { left: 20px; }
-  .caption p { font-size: 14px; }
+  .caption:not(.caption--speech) p { font-size: 14px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -573,11 +559,9 @@ body { cursor: pointer; }
 .tw > .tw-live { grid-area: 1 / 1; min-width: 0; }
 .tw-ghost { visibility: hidden; }
 .tw-row { position: relative; white-space: pre-wrap; overflow-wrap: break-word; }
-/* the last characters typed, in a red gradient over the solid text; it fades out once the line is complete */
-.tw-trail { position: absolute; inset: 0; pointer-events: none; transition: opacity 320ms cubic-bezier(0.22, 1, 0.36, 1); }
-.tw-trail.is-done { opacity: 0; }
-.tw-trail-pre { color: transparent; }
-.tw-trail-tip { color: transparent; background: linear-gradient(90deg, #ff8a80, #ff3b30); -webkit-background-clip: text; background-clip: text; }
+/* the last characters typed, in steps of a red gradient; they fade into the text's colour once the line is complete */
+.tw-tip { color: var(--tw-c); transition: color 320ms cubic-bezier(0.22, 1, 0.36, 1); }
+.tw-tip.is-done { color: inherit; }
 /* the block caret: 0.62 × 0.82 em, blinking slowly (BLINK_MS), with a short fade between states */
 .tw-caret {
   display: inline-block;
@@ -663,6 +647,10 @@ body { cursor: pointer; }
   50% { transform: translateX(calc(14 * var(--u))); }
 }
 .fx-defend:focus-visible { outline: 2px dashed var(--yellow); outline-offset: 8px; }
+/* on a narrow page the subtitles at the bottom take the whole width: the prompt stands above them */
+@media (max-width: 760px) {
+  .fx-defend { right: 16px; bottom: 116px; }
+}
 
 /* --- the thoughts in the car (scenes/car/thoughts.ts): bottom centre, 32 px up, JetBrains Mono 16 px, capitals */
 .thoughts {
@@ -672,10 +660,8 @@ body { cursor: pointer; }
   transform: translateX(-50%);
   width: min(880px, calc(100vw - 48px));
   color: #f1f0e9;
-  font: 600 16px/1.45 'JetBrains Mono', ui-monospace, monospace;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
   text-align: center;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
   opacity: 0;
   transition: opacity 0.4s ease;
   pointer-events: none;

@@ -122,118 +122,7 @@ export function drawBrushWipe(ctx: CanvasRenderingContext2D, W: number, H: numbe
 }
 
 /**
- * The fight's conceal, after Framer's "Ignite Reveal" without the fire: the
- * dark spreads over the frame from a few points as an irregular, organic
- * front (distance from the points, broken up by fractal noise), its edge a
- * soft ash grey, and later recedes the same way, opening from other points.
- * `c` is the coverage (0 … 1; the share of the frame that is dark, exactly,
- * because the field is ranked); 'close' spreads it, 'open' is what is left of
- * it while it recedes. At 1 the frame is solid black, so nothing shows.
- */
-interface Field {
-  w: number;
-  h: number;
-  rank: Float32Array;
-}
-const fields = new Map<string, Field>();
-const IGNITE = { cells: 220, edge: 0.07, ink: [10, 10, 10], ash: [70, 70, 68] };
-
-function igniteField(w: number, h: number, seed: number): Field {
-  const key = `${w}x${h}:${seed}`;
-  const known = fields.get(key);
-  if (known) return known;
-  const rnd = mulberry32(seed);
-  // value noise on a few lattices, summed (fBm)
-  const lattice = (n: number) => {
-    const g = Array.from({ length: (n + 2) * (n + 2) }, () => rnd());
-    return (x: number, y: number) => {
-      const fx = x * n;
-      const fy = y * n;
-      const ix = Math.floor(fx);
-      const iy = Math.floor(fy);
-      const tx = fx - ix;
-      const ty = fy - iy;
-      const sx = tx * tx * (3 - 2 * tx);
-      const sy = ty * ty * (3 - 2 * ty);
-      const at = (i: number, j: number) => g[Math.min(n + 1, j) * (n + 2) + Math.min(n + 1, i)];
-      const a = at(ix, iy) + (at(ix + 1, iy) - at(ix, iy)) * sx;
-      const b = at(ix, iy + 1) + (at(ix + 1, iy + 1) - at(ix, iy + 1)) * sx;
-      return a + (b - a) * sy;
-    };
-  };
-  const octaves = [lattice(4), lattice(9), lattice(19), lattice(41)];
-  const seeds = Array.from({ length: 3 }, () => [0.15 + rnd() * 0.7, 0.15 + rnd() * 0.7]);
-  const aspect = w / h;
-  const raw = new Float32Array(w * h);
-  for (let y = 0; y < h; y++)
-    for (let x = 0; x < w; x++) {
-      const u = x / (w - 1);
-      const v = y / (h - 1);
-      let d = 9;
-      for (const [sx, sy] of seeds) d = Math.min(d, Math.hypot((u - sx) * aspect, v - sy));
-      let n = 0;
-      let amp = 0.5;
-      for (const o of octaves) {
-        n += o(u, v) * amp;
-        amp *= 0.5;
-      }
-      raw[y * w + x] = d + n * 0.55;
-    }
-  // ranked: a field value is the share of the frame below it, so coverage is area
-  const order = Array.from(raw.keys()).sort((a, b) => raw[a] - raw[b]);
-  const rank = new Float32Array(w * h);
-  order.forEach((i, k) => (rank[i] = k / (order.length - 1)));
-  const f = { w, h, rank };
-  fields.set(key, f);
-  return f;
-}
-
-let igniteTiny: HTMLCanvasElement | null = null;
-
-export function drawIgnite(ctx: CanvasRenderingContext2D, W: number, H: number, c: number, mode: 'close' | 'open', seed = 11) {
-  ctx.clearRect(0, 0, W, H);
-  if (c <= 0.001) return;
-  const [ir, ig, ib] = IGNITE.ink;
-  if (c >= 0.999) {
-    ctx.fillStyle = `rgb(${ir},${ig},${ib})`;
-    ctx.fillRect(0, 0, W, H);
-    return;
-  }
-  const gw = IGNITE.cells;
-  const gh = Math.max(1, Math.round((gw * H) / W));
-  // spreading and receding start from different points
-  const field = igniteField(gw, gh, mode === 'close' ? seed : seed + 17);
-  igniteTiny ??= document.createElement('canvas');
-  const tiny = igniteTiny;
-  if (tiny.width !== gw || tiny.height !== gh) {
-    tiny.width = gw;
-    tiny.height = gh;
-  }
-  const tctx = tiny.getContext('2d')!;
-  const img = tctx.createImageData(gw, gh);
-  const e = IGNITE.edge;
-  const [ar, ag, ab] = IGNITE.ash;
-  // closing: dark where the field is below the front; opening: the holes grow where it is below the front
-  const front = mode === 'close' ? c * (1 + e) : (1 - c) * (1 + e) - e;
-  for (let i = 0; i < field.rank.length; i++) {
-    const f = field.rank[i];
-    // 1 deep in the dark … 0 outside it, across the edge band
-    const k = mode === 'close' ? Math.min(1, Math.max(0, (front - f) / e)) : Math.min(1, Math.max(0, (f - front) / e));
-    // the edge is ash grey, thin and soft; deep inside, ink
-    const ash = k > 0 && k < 1 ? Math.sin(k * Math.PI) * 0.7 : 0;
-    img.data[i * 4] = ir + (ar - ir) * ash;
-    img.data[i * 4 + 1] = ig + (ag - ig) * ash;
-    img.data[i * 4 + 2] = ib + (ab - ib) * ash;
-    img.data[i * 4 + 3] = Math.round(255 * Math.min(1, k * 1.6));
-  }
-  tctx.putImageData(img, 0, 0);
-  ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(tiny, 0, 0, gw, gh, 0, 0, W, H);
-}
-
-/**
- * The fight you do not see: the page goes black first (drawIgnite), then the two hits are
+ * The fight you do not see: the street goes dark and blurred first (the pixel layer, ui/scenePixels.ts), then the two hits are
  * printed into the dark as comic sound effects (a jagged burst with a word on
  * it), each popping in as it lands. `t` in seconds of the fight; `beats` gives
  * when the black is complete and when each hit lands.
@@ -241,7 +130,7 @@ export function drawIgnite(ctx: CanvasRenderingContext2D, W: number, H: number, 
 export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, beats: { dark: number; hit1: number; hit2: number }) {
   ctx.clearRect(0, 0, W, H);
   if (t < 0) return;
-  // (the dark itself is the conceal's, drawIgnite, under this)
+  // (the dark itself is the street's own pixels, blurred and shaded, under this)
   // the design's own words (Figma "fight-scene"), placed as there on a 1920 × 1080 frame scaled to fit:
   // BAM from the top left with the first hit, POW from the bottom right with the second
   const k = Math.min(W / FRAME.w, H / FRAME.h);

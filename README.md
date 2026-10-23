@@ -276,7 +276,7 @@ built from.
   the blade up and leaning towards you so it reads along its length: two-bone IK on his arm
   places the hand and the wrist turns the blade with about 20° of bend, a hold a real wrist
   takes without strain. As he raises it your eyes drop to it (the camera pitches down and
-  widens), and the DEFEND card sits off-centre so his face and the knife stay in view. He does not strike; a speech balloon (`tone: 'speech'` captions) carries what he
+  widens), and the DEFEND card sits off-centre so his face and the knife stay in view. He does not strike; his words (`tone: 'speech'` captions, typed at the bottom of the page) carry what he
   says: "Your bag. Give it to me. Now."
 - **His walk** is sampled straight from the clip's keyframe tracks every frame, not through an
   `AnimationMixer`: the mixer only writes a bone whose value changed since its last write, and
@@ -310,16 +310,19 @@ built from.
     design reads "TO DEFENCE"; the brief's text, TO DEFEND, is used.)
   - **The pixels** (`ui/scenePixels.ts`): the scene-transition effect reused at a steady block
     size: one canvas over the 3D picture, under everything printed, redrawn from the 3D canvas
-    after every frame. Its block size is a pure function of the scroll and the encounter
-    (`combatPixels` in `Overlay.tsx`): 1 → 7 px as he raises the knife, held through the
-    stand-off and the fight, back to 1 over the first 0.04 of the aftermath; at 1 the canvas and
-    its frame watcher are removed. Nothing can leave it stuck: a scrub, a revisit or a reset
-    recomputes it.
-  - **Defended** (you press D in time): the fight is not shown. The dark spreads over the page
-    before anyone moves, and the two hits are printed into it (`drawHits` in `ui/brush.ts`):
+    after every frame. Its look is a pure function of the scroll and the encounter
+    (`combatLook` in `Overlay.tsx`): 1 → 7 px blocks as he raises the knife, held through the
+    stand-off, with no blur and no dark; only once you have defended do the blocks grow coarse
+    (to 26 px), blur (the same blocks drawn up smoothed over them) and darken (a dark layer to
+    80%), complete at `BLOCK.dark` (0.3 s, before the first hit), which is what hides the fight;
+    over the first 0.045 of the aftermath all of it resolves to the plain picture. At rest the
+    canvas and its frame watcher are removed. Nothing can leave it stuck: a scrub, a revisit or
+    a reset recomputes it. (The earlier spreading "Ignite" dark is gone.)
+  - **Defended** (you press D in time): the fight is not shown. The street blurs and darkens in
+    its own pixels before anyone moves, and the two hits are printed over it (`drawHits` in `ui/brush.ts`):
     the design's BAM (top left, with the first hit) and POW (bottom right, with the second),
     each popping in, with its sound (the existing recordings: no new hit sounds came with the
-    design). When the ink opens again he is on his back on the pavement, the knife beside his
+    design). When the picture clears again he is on his back on the pavement, the knife beside his
     hand, and your bag is still with you.
   - **Knocked out** is switched off for now (`STRIKES` in `encounter.ts`): he never strikes, and
     the story waits at the gate until you defend. Its sequence is kept: with `STRIKES` on, the
@@ -348,11 +351,16 @@ built from.
     click closes it (the sheet folds back up, the dark fades out), as do Escape and a visible
     CLICK TO CLOSE button (shown on touch screens and to the keyboard). Without WebGL the image
     itself unfolds in CSS.
-  - **The invitation**: once the letter is closed, you tell him, in a balloon typed in with the
+  - **Spoken words** (his "Your bag…", your invitation) are not balloons: they are typed at the
+    bottom of the page like the thoughts in the car (centred, 32 px up, JetBrains Mono 16 px,
+    capitals), with the supplied typewriter; the trail is drawn inline (no copy laid over the
+    text) and the lines wrap plainly as they grow (no re-balancing per character), so nothing
+    shifts or overlaps on a phone. On a narrow page PRESS D TO DEFEND stands above them.
+  - **The invitation**: once the letter is closed, you tell him, typed in with the
     supplied typewriter: "Hey! When you wake up, come to Crasigostraße 24. You don't have to rob
     people. I'll help you fix your business." It cannot come before the letter is read; when it
     is typed in full and has stood 1.6 s, the gate opens and the scroll goes on to the car. (The
-    balloon is lettered in capitals; ß is set as ẞ so it survives them.)
+    words are set in capitals; ß is set as ẞ so it survives them.)
   - Sounds are cues fired as the playback crosses them, forwards only. They never feed back
     into what is drawn, and scrubbing never repeats them.
 - **Time**: everything in the city (people, cars, the stranger) runs on a time scale that eases
@@ -392,13 +400,6 @@ built from.
     tyre noise from passing cars (panned), two impacts and a slow heartbeat at the climax.
   - The ambience thins and muffles (a low-pass sweep) as the stranger approaches.
   - A "Sound on/off" switch sits top right.
-- **The fight's conceal** (`drawIgnite` in `ui/brush.ts`), after Framer's "Ignite Reveal"
-  without the fire: from the decision the dark spreads over the frame from a few points as an
-  irregular, organic front (distance from the points broken up by fractal noise, ranked so the
-  coverage is exactly the dark share of the frame), its edge a soft ash grey; it is complete at
-  `BLOCK.dark` (0.3 s, before the first hit at 0.42 s), the hits are printed into it, and on the
-  aftermath it recedes the same way from other points. It is drawn on the overlay only; the
-  fight's logic and timing are untouched (apart from `BLOCK.dark`, when he goes down, under it).
 - **The flicker at the chapter's start**, fixed at its cause: the two corner blocks facing the
   square were placed from the kerb line (x = ±9.5) like the boulevard's blocks, and overlapped
   the first boulevard blocks over z −25…−41, so their fronts, shopfronts and cornices lay in the
@@ -701,7 +702,7 @@ src/
   ui/decode.ts            decoding text: reveal, loading loop, pointer zone
   ui/drunkWord.ts         the preloader's "Drunk": glyphs and pen strokes from the Figma file
   ui/dotGrid.ts           the preloader's dot grid around the pointer (supplied DotGridBackground)
-  ui/typewriter.ts        typed text (supplied TypewriterText): balloons and the thoughts in the car
+  ui/typewriter.ts        typed text (supplied TypewriterText): spoken words and the thoughts in the car
   ui/combatPrompt.ts      ACTION and PRESS D TO DEFEND
   ui/fightArt.ts          ACTION, BAM, POW and the arrow, from the Figma file
   ui/scenePixels.ts       the fight's coarse pixels (the transition effect, held)

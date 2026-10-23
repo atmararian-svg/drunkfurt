@@ -6,8 +6,8 @@ import { CHAPTERS } from '../core/chapters';
 import { chapterTurn, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { builtEpisodes } from '../episodes';
 import { hoverDecode } from './decode';
-import { BEAT, BLOCK, KO, defend, encounter, encounterAt } from '../scenes/city/encounter';
-import { drawBrushWipe, drawHits, drawIgnite, drawKnockout, drawSpeedLines } from './brush';
+import { BEAT, BLOCK, KO, defend, encounterAt } from '../scenes/city/encounter';
+import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
 import { enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
@@ -19,23 +19,34 @@ import { closeLetterNow, openLetter } from './letterReveal';
 import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
 import { ARROW } from './fightArt';
 
-/** The fight's coarse pixels at their strongest (CSS px per block). */
+/** The stand-off's coarse pixels at their strongest (CSS px per block). */
 const PIXEL_PEAK = 7;
+/** Once you defend: the pixels grow coarse, blur and darken, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
+const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
 
 /**
- * How pixelated the street is (block size, CSS px; 1 = not at all): a pure
- * function of the progress and the encounter, so a scrub, a revisit or a reset
- * can never leave it stuck. It grows as he raises the knife (cock → gate),
- * holds through the stand-off and the fight, and resolves as the dark opens on
- * the aftermath, back to normal before the letter.
+ * How the street looks around the fight: block size (CSS px; 1 = not
+ * pixelated), blur and darkness, as pure functions of the progress and the
+ * encounter, so a scrub, a revisit or a reset can never leave it stuck.
+ *  - he raises the knife (cock → gate): the pixels grow, 1 → 7 px, and hold
+ *    through the stand-off; no blur, no dark, until you act;
+ *  - you defend: over the fight's first moments (to BLOCK.dark, before the
+ *    first hit) the blocks grow coarse, blur and darken, hiding the fight;
+ *  - the aftermath: all of it resolves, back to the plain picture before the letter.
  */
-function combatPixels(id: string, local: number) {
-  if (id !== 'city' || local < BEAT.cock) return 1;
-  let level: number;
-  if (local < BEAT.gate) level = smoothstep(clamp((local - BEAT.cock) / (BEAT.gate - BEAT.cock), 0, 1));
-  else if (!encounter.outcome || local < BEAT.aftermath) level = 1;
-  else level = 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.04, 0, 1));
-  return 1 + (PIXEL_PEAK - 1) * level;
+function combatLook(id: string, local: number) {
+  if (id !== 'city' || local < BEAT.cock) return { block: 1, blur: 0, dark: 0 };
+  const v = encounterAt(local);
+  const pre = local < BEAT.gate ? smoothstep(clamp((local - BEAT.cock) / (BEAT.gate - BEAT.cock), 0, 1)) : 1;
+  let hide = 0;
+  let out = 1;
+  if (v.outcome && local >= BEAT.gate) {
+    const black = v.outcome === 'blocked' ? BLOCK.dark : KO.dark;
+    hide = local < BEAT.aftermath ? smoothstep(clamp(v.t / black, 0, 1)) : 1;
+    if (local >= BEAT.aftermath) out = 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
+  }
+  const block = 1 + (PIXEL_PEAK - 1) * pre + (HIDE.block - PIXEL_PEAK) * hide;
+  return { block: 1 + (block - 1) * out, blur: HIDE.blur * hide * out, dark: HIDE.dark * hide * out };
 }
 
 /** ACTION is up from the moment he raises the knife until the dark has covered the fight. */
@@ -47,27 +58,13 @@ function actionShown(id: string, local: number) {
 }
 
 /**
- * Ink over the whole frame at a given progress: the fight's conceal (the dark
- * spreads over the frame before the hits, drawIgnite, and recedes on the
- * aftermath) and the closing card. Moving between chapters is the chapter
- * transition's (chapterTransition.ts), not ink.
+ * Ink over the whole frame at a given progress: the closing card. The fight is
+ * hidden by the street's own pixels (combatLook), and moving between chapters
+ * is the chapter transition's (chapterTransition.ts), not ink.
  */
-function inkAt(p: number): { w: number; mode: 'close' | 'open'; kind: 'ignite' | 'brush' } {
-  const { id, local } = locate(p);
-  if (id === 'outro') return { w: 1, mode: 'close', kind: 'brush' };
-  if (id === 'city' && encounter.outcome) {
-    // the dark spreads from the decision and is complete at the outcome's `dark` (BLOCK.dark, KO.dark): the
-    // fight itself happens under it; the page stays dark until the aftermath, where it recedes
-    const t = encounterAt(local).t;
-    const black = encounter.outcome === 'blocked' ? BLOCK.dark : KO.dark;
-    const lead = encounter.outcome === 'blocked' ? BLOCK.dark : 0.45;
-    if (t >= 0 && local < BEAT.aftermath) return { w: clamp((t - (black - lead)) / lead, 0, 1), mode: 'close', kind: 'ignite' };
-    if (local >= BEAT.aftermath && local < BEAT.aftermath + OPEN) return { w: 1 - (local - BEAT.aftermath) / OPEN, mode: 'open', kind: 'ignite' };
-  }
-  return { w: 0, mode: 'open', kind: 'brush' };
+function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
+  return locate(p).id === 'outro' ? { w: 1, mode: 'close' } : { w: 0, mode: 'open' };
 }
-/** How much of the city episode the conceal takes to recede on the aftermath. */
-const OPEN = 0.045;
 
 const pad = (n: number) => String(n).padStart(2, '0');
 
@@ -112,7 +109,6 @@ export function Overlay() {
     let last = '';
     // (anything left on the canvases from before this effect ran is cleared on the first frame)
     let lastHit = '\u0000';
-    let idle = 0;
     const restored = () => {
       last = '';
       lastHit = '\u0000';
@@ -146,9 +142,10 @@ export function Overlay() {
           else t.tw.stop();
         }
       });
-      // the fight: ACTION and PRESS D TO DEFEND, and the street breaking into coarse pixels
+      // the fight: ACTION and PRESS D TO DEFEND, and the street breaking into coarse pixels (blurred and dark once you defend)
       updateCombatPrompts(actionShown(id, local), story.getState().prompt === 'defend');
-      setScenePixels(combatPixels(id, local));
+      const look = combatLook(id, local);
+      setScenePixels(look.block, look.blur, look.dark);
       // the thoughts in the car, once the door has shut (car/thoughts.ts holds the story until they are done)
       const think = id === 'car' && updateThoughts();
       if (think !== thoughtsOn) {
@@ -171,12 +168,11 @@ export function Overlay() {
       rail.forEach((li) => li.classList.toggle('is-here', Number(li.dataset.chapter) === chapterNow(id)));
 
       const ink = inkAt(p);
-      const key = `${ink.w.toFixed(3)}${ink.mode}${ink.kind}${wipe.width}`;
-      if (ink.w <= 0 && idle % 60 === 30) last = '';
+      const key = `${ink.w.toFixed(3)}${ink.mode}${wipe.width}`;
       if (key !== last) {
-        if (ink.kind === 'ignite') drawIgnite(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode);
-        else drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, 7);
+        drawBrushWipe(wctx, wipe.width, wipe.height, clamp(ink.w, 0, 1), ink.mode, 7);
         last = key;
+        wipe.style.visibility = ink.w > 0.001 ? 'visible' : 'hidden';
       }
       // the fight frames, a function of where the fight is (its time comes from the progress):
       // defended, the page goes black and the two hits are printed into the dark;
@@ -187,15 +183,14 @@ export function Overlay() {
       const run = id === 'car' ? launchAt(local) : null;
       const rush = run && run.rpm >= 0 ? run.rush : 0;
       const hitKey = hitT >= 0 ? `${v!.outcome}${hitT.toFixed(3)}${hit.width}` : rush > 0 ? `rush${rush.toFixed(2)}${Math.floor(run!.t * 24)}${hit.width}` : '';
-      // (an empty layer is cleared again now and then: a canvas whose context was restored by the browser can come back
-      // with an old picture on it, and nothing else would draw over it)
-      if (hitKey === '' && ++idle % 60 === 0) lastHit = '\u0000';
       if (hitKey !== lastHit) {
         hctx.clearRect(0, 0, hit.width, hit.height);
         if (hitT >= 0 && v!.outcome === 'knockedOut') drawKnockout(hctx, hit.width, hit.height, hitT, KO.dark);
         else if (hitT >= 0) drawHits(hctx, hit.width, hit.height, hitT, BLOCK);
         else if (rush > 0) drawSpeedLines(hctx, hit.width, hit.height, rush, run!.t);
         lastHit = hitKey;
+        // nothing to show: the layer is taken off the page as well as cleared, so no earlier picture on it can stay up
+        hit.style.visibility = hitKey ? 'visible' : 'hidden';
       }
       raf = requestAnimationFrame(loop);
     };

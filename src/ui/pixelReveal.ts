@@ -55,9 +55,18 @@ let active: { cancel: () => void } | null = null;
  * reveal, the fight's coarse pixels, the ACTION title): `src` shrunk to one
  * pixel per block of `block` CSS px into `tiny` (smoothed, so each block is
  * that area's average), then drawn back up over all of `ctx`'s canvas without
- * smoothing.
+ * smoothing; with `soft`, also drawn up smoothed over that (a blur of the
+ * same blocks).
  */
-export function drawPixelated(ctx: CanvasRenderingContext2D, tiny: HTMLCanvasElement, src: CanvasImageSource & { width: number; height: number }, block: number, cssW: number, cssH: number) {
+export function drawPixelated(
+  ctx: CanvasRenderingContext2D,
+  tiny: HTMLCanvasElement,
+  src: CanvasImageSource & { width: number; height: number },
+  block: number,
+  cssW: number,
+  cssH: number,
+  soft = 0,
+) {
   const tctx = tiny.getContext('2d');
   if (!tctx) return;
   const tw = Math.max(1, Math.round(cssW / Math.max(1, block)));
@@ -74,6 +83,14 @@ export function drawPixelated(ctx: CanvasRenderingContext2D, tiny: HTMLCanvasEle
   ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
   ctx.imageSmoothingEnabled = false;
   ctx.drawImage(tiny, 0, 0, tw, th, 0, 0, ctx.canvas.width, ctx.canvas.height);
+  // `soft` (0 … 1): the same blocks drawn up again smoothed, over them: the picture blurs as well as breaking up
+  if (soft > 0.01) {
+    ctx.globalAlpha = Math.min(1, soft);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(tiny, 0, 0, tw, th, 0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.globalAlpha = 1;
+  }
 }
 
 /**
