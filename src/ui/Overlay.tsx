@@ -16,6 +16,7 @@ import { setScenePixels } from './scenePixels';
 import { createTypewriter, Typewriter } from './typewriter';
 import { letter, letterSpot, pickLetter } from '../scenes/city/letter';
 import { closeLetterNow, openLetter } from './letterReveal';
+import { goToChapter } from './chapterTransition';
 import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
 import { PressPrompt } from './PressPrompt';
 
@@ -371,15 +372,27 @@ export function Overlay() {
         </div>
         <ol>
           {CHAPTERS.map((c) => (
-            <li key={c.number} className="is-built" data-chapter={c.number} title={c.title}>
-              <span>{pad(c.number)}</span>
+            <li key={c.number} className="is-built" data-chapter={c.number}>
+              {/* a chapter number takes you to that chapter's beginning (chapterTransition.ts goToChapter) */}
+              <button
+                type="button"
+                className="rail-go"
+                aria-label={`Chapter ${c.number}: ${c.title}`}
+                title={c.title}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  goToChapter(c.number);
+                }}
+              >
+                {pad(c.number)}
+              </button>
             </li>
           ))}
         </ol>
       </nav>
 
       <button type="button" className="sound" onClick={toggleSound} aria-pressed={sound}>
-        Sound {sound ? 'on' : 'off'}
+        SOUND {sound ? 'ON' : 'OFF'}
       </button>
 
 

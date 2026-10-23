@@ -11,10 +11,11 @@ import { drawPixelated } from './pixelReveal';
  *    resolve from 28 px blocks, SOUND too (drawn once into a canvas over its
  *    letters for that, then the letters themselves take over).
  *  - The page is split in two at the line between ENABLE and DISABLE. With the
- *    pointer on the left, ENABLE is the choice: SOUND curves into the arc
- *    under it, and DISABLE breaks into coarse pixels; on the right the other
- *    way round (DISABLE chosen, ENABLE pixelated, SOUND in the opposite arc
- *    under DISABLE). Off both, SOUND lies straight in the middle. A little
+ *    pointer on the left, ENABLE is the choice: SOUND bends into a smile, and
+ *    DISABLE breaks into coarse pixels; on the right the other way round
+ *    (DISABLE chosen, ENABLE pixelated, SOUND bent the opposite way). Off
+ *    both, SOUND lies straight. The word stays where it is and only bends,
+ *    the letters gliding between the curves. A little
  *    hysteresis at the line keeps it from flickering there.
  *  - A click (or a tap) on a half chooses it; the two halves are real buttons
  *    (keyboard: Tab or ← →, then Enter). The promise resolves with the choice,
@@ -29,25 +30,42 @@ const ENABLE = { x: 24, y: 24, w: 846, h: 412 };
 const DISABLE = { x: 921, y: 24, w: 975, h: 412 };
 /** The line between the two words (design px). */
 const SPLIT = (ENABLE.x + ENABLE.w + DISABLE.x) / 2;
-/** SOUND's letters: the layout's own transforms (a, b, c, d, x, y; design px) in each state. */
-type M = [number, number, number, number, number, number];
+/**
+ * SOUND's letters in each state: where each stands (its box's top left) and
+ * its tilt, in design px. The arcs are the design's (its per-letter
+ * transforms in the -enable and -disable frames), moved so the word stays
+ * where it is (centred on its straight layout): choosing only bends it, a
+ * smile under ENABLE, the opposite curve under DISABLE, and the letters glide
+ * between the curves instead of crossing the page.
+ */
+type Place = { x: number; y: number; deg: number };
+const STRAIGHT: Place[] = [0, 73, 163.7, 252.3, 337].map((x) => ({ x: 749 + x, y: 958, deg: 0 }));
+const fromDesign = (letters: [number, number, number, number][]): Place[] => {
+  // [a, b, x, y] of each letter's transform: the tilt is atan2(b, a); the group is centred on the straight word
+  const mx = (ps: { x: number; y: number }[]) => ps.reduce((s, p) => s + p.x, 0) / ps.length;
+  const my = (ps: { x: number; y: number }[]) => ps.reduce((s, p) => s + p.y, 0) / ps.length;
+  const pts = letters.map(([a, b, x, y]) => ({ x, y, deg: (Math.atan2(b, a) * 180) / Math.PI }));
+  const dx = mx(STRAIGHT) - mx(pts);
+  const dy = my(STRAIGHT) - my(pts);
+  return pts.map((p) => ({ x: p.x + dx, y: p.y + dy, deg: p.deg }));
+};
 const SOUND_SIZE = 93.275;
-const LAYOUT: Record<'none' | 'on' | 'off', M[]> = {
-  none: [0, 73, 163.7, 252.3, 337].map((x) => [1, 0, 0, 1, 749 + x, 958] as M),
-  on: [
-    [0.9535, 0.3014, -0.3014, 0.9535, 234 + 19.89, 934 + 4.63],
-    [0.9878, 0.1555, -0.1555, 0.9878, 234 + 83.9, 934 + 25.98],
-    [1.0, -0.0041, 0.0041, 1.0, 234 + 167.12, 934 + 39.43],
-    [0.9867, -0.1623, 0.1623, 0.9867, 234 + 248.0, 934 + 39.38],
-    [0.9469, -0.3215, 0.3215, 0.9469, 234 + 322.68, 934 + 27.65],
-  ],
-  off: [
-    [0.9444, -0.3289, 0.3289, 0.9444, 1261 + 0, 934 + 44.79],
-    [0.983, -0.1834, 0.1834, 0.983, 1261 + 72.47, 934 + 19.14],
-    [0.9997, -0.0247, 0.0247, 0.9997, 1261 + 165.46, 934 + 2.22],
-    [0.9912, 0.1323, -0.1323, 0.9912, 1261 + 256.61, 934 + 0.42],
-    [0.9569, 0.2904, -0.2904, 0.9569, 1261 + 342.05, 934 + 12.05],
-  ],
+const LAYOUT: Record<'none' | 'on' | 'off', Place[]> = {
+  none: STRAIGHT,
+  on: fromDesign([
+    [0.9535, 0.3014, 19.89, 4.63],
+    [0.9878, 0.1555, 83.9, 25.98],
+    [1.0, -0.0041, 167.12, 39.43],
+    [0.9867, -0.1623, 248.0, 39.38],
+    [0.9469, -0.3215, 322.68, 27.65],
+  ]),
+  off: fromDesign([
+    [0.9444, -0.3289, 0, 44.79],
+    [0.983, -0.1834, 72.47, 19.14],
+    [0.9997, -0.0247, 165.46, 2.22],
+    [0.9912, 0.1323, 256.61, 0.42],
+    [0.9569, 0.2904, 342.05, 12.05],
+  ]),
 };
 /** Block size of the word not chosen (design px), and of everything as it comes in. */
 const INACTIVE_BLOCK = 16;
@@ -153,9 +171,10 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
 
   const placeLetters = (animate: boolean) => {
     letters.forEach((s, i) => {
-      const [a, b, c, d, x, y] = LAYOUT[state][i];
+      const { x, y, deg } = LAYOUT[state][i];
       s.style.transition = animate ? '' : 'none';
-      s.style.transform = `translate(${(x * u).toFixed(2)}px, ${(y * u).toFixed(2)}px) matrix(${a}, ${b}, ${c}, ${d}, 0, 0)`;
+      // the same functions in every state (translate, rotate), so the browser glides between them
+      s.style.transform = `translate(${(x * u).toFixed(2)}px, ${(y * u).toFixed(2)}px) rotate(${deg.toFixed(2)}deg)`;
     });
   };
 

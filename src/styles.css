@@ -189,7 +189,7 @@ body { cursor: pointer; }
   to { background-position: 0 34px; }
 }
 
-/* --- episode rail ------------------------------------------------------- */
+/* --- chapter rail: where you are, in the page's red; each number takes you to its chapter --- */
 .rail {
   position: absolute;
   top: 50%;
@@ -197,17 +197,18 @@ body { cursor: pointer; }
   display: flex;
   gap: 10px;
   transform: translateY(-50%);
+  pointer-events: auto;
 }
 .rail-line {
   width: 2px;
   height: 180px;
-  background: rgba(241, 240, 233, 0.18);
+  background: rgba(205, 25, 25, 0.28);
   overflow: hidden;
 }
 .rail-fill {
   width: 100%;
   height: 100%;
-  background: var(--yellow);
+  background: var(--red);
   transform-origin: top;
   transform: scaleY(0);
 }
@@ -215,14 +216,26 @@ body { cursor: pointer; }
   display: flex;
   flex-direction: column;
   justify-content: space-between;
-  margin: 0;
+  margin: 0 0 0 -6px;
   padding: 0;
   list-style: none;
-  font: 500 9px/1 var(--mono);
-  letter-spacing: 0.1em;
-  color: rgba(241, 240, 233, 0.32);
 }
-.rail li.is-built { color: var(--paper); }
+.rail-go {
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: rgba(241, 240, 233, 0.45);
+  font: 700 11px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.rail-go:hover,
+.rail-go:focus-visible { color: #fff; background: var(--red); outline: none; }
+.rail li.is-here .rail-go { color: var(--red); }
+.rail li.is-here .rail-go:hover,
+.rail li.is-here .rail-go:focus-visible { color: #fff; }
 
 /* --- ink wipe (canvas brush strokes) and outro ------------------------- */
 .wipe,
@@ -248,22 +261,24 @@ body { cursor: pointer; }
 .outro .title-name { font-size: clamp(48px, 8vw, 120px); }
 
 .sound {
+  /* in the manner of the letter's close control (Figma "cursor-button"): a white tab, JetBrains Mono Bold */
   position: absolute;
   top: max(20px, env(safe-area-inset-top, 0px));
   right: max(22px, env(safe-area-inset-right, 0px));
-  padding: 6px 0;
+  padding: 10px;
   border: 0;
-  border-bottom: 1px solid rgba(241, 240, 233, 0.35);
-  background: none;
-  color: rgba(241, 240, 233, 0.75);
-  font: 500 10px/1 var(--mono);
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
+  border-radius: 3px;
+  background: #fff;
+  color: #111;
+  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.05em;
   pointer-events: auto;
   cursor: pointer;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
-.sound[aria-pressed='true'] { border-bottom-color: var(--yellow); }
-.sound:focus-visible { outline: 1px dashed var(--yellow); outline-offset: 4px; }
+.sound[aria-pressed='false'],
+.sound:hover { background: var(--red); color: #fff; }
+.sound:focus-visible { outline: 2px dashed var(--red); outline-offset: 3px; }
 
 @media (max-width: 640px) {
   .rail { display: none; }
@@ -645,7 +660,7 @@ body { cursor: pointer; }
   left: 50%;
   bottom: 32px;
   transform: translateX(-50%);
-  width: min(880px, calc(100vw - 48px));
+  width: min(600px, calc(100vw - 48px));
   color: #f1f0e9;
   text-align: center;
   text-shadow: 0 1px 6px rgba(0, 0, 0, 0.85);
@@ -745,7 +760,7 @@ body { cursor: pointer; }
   line-height: 0.707;
   white-space: pre;
   transform-origin: 0 0;
-  transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: transform 0.6s cubic-bezier(0.33, 1, 0.68, 1);
 }
 .snd-intro { position: fixed; inset: 0; width: 100vw; height: 100vh; pointer-events: none; image-rendering: pixelated; }
 /* the halves are the real controls: transparent, the whole page split at the line between the words */

@@ -1,6 +1,6 @@
 import { CHAPTERS, chapterOf } from '../core/chapters';
 import { story } from '../core/store';
-import { PageTurn, chapterTurn, holdScroll, jumpTo, locate, pinScroll, timeline } from '../core/timeline';
+import { PageTurn, chapterStarts, chapterTurn, gates, globalProgress, holdScroll, jumpTo, locate, pinScroll, stopAutoplay, timeline } from '../core/timeline';
 import { EPISODES } from '../episodes';
 import { grabFrame } from '../render/FrameGrab';
 import { pixelReveal } from './pixelReveal';
@@ -46,13 +46,33 @@ export function resetChapter(n: number) {
   }
 }
 
-async function run(z: PageTurn, forward: boolean) {
+function run(z: PageTurn, forward: boolean) {
+  return turnTo(forward ? z.to : z.back, forward);
+}
+
+/**
+ * Goes to a chapter's opening shot from anywhere (the chapter rail): the same
+ * transition, forwards or back. Going forwards past chapters not yet played,
+ * their waits are passed (their gates opened), so the scroll can stand at the
+ * new chapter; going back into a chapter resets it, as scrolling back does.
+ * The chapter you are in starts again from its beginning.
+ */
+export function goToChapter(n: number) {
+  if (chapterTurn.busy) return;
+  const target = chapterStarts()[n - 1];
+  if (target === undefined) return;
+  const forward = target > timeline.progress + 1e-4;
+  if (forward) for (const g of gates) if (globalProgress(g.episode, g.at) < target) g.open = true;
+  void turnTo(target, forward);
+}
+
+async function turnTo(target: number, forward: boolean) {
   chapterTurn.busy = true;
+  stopAutoplay(true);
   pinScroll(true);
   // stand still where we are while the frame is copied
   timeline.target = timeline.progress;
   hideTitleCard();
-  const target = forward ? z.to : z.back;
   const dir = forward ? 'up' : 'down';
   const chapter = chapterOf(locate(target).id);
   let outgoing: HTMLCanvasElement | null = null;

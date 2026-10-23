@@ -71,10 +71,11 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   `src/assets/sound-enable.webp`, `sound-disable.webp`) side by side at the top, SOUND along the
   bottom, all coming in through the transition's pixelation (28 px blocks resolving; SOUND drawn
   once into a canvas over its own letters for that). The page is split at the line between the
-  two words: the pointer on the left makes ENABLE the choice (SOUND curves into the arc under it,
-  DISABLE breaks into 16 px blocks), on the right the other way round; off both, SOUND lies
-  straight in the middle. The letters move between the design's own per-letter transforms (CSS
-  transitions); the words' blocks ease on the clock; 14 px of give at the line keeps it from
+  two words: the pointer on the left makes ENABLE the choice (SOUND bends into a smile, DISABLE
+  breaks into 16 px blocks), on the right the other way round (SOUND bent the opposite way);
+  off both, SOUND lies straight. The word stays in place and only bends: the curves are the
+  design's per-letter transforms, centred on the straight word, and the letters glide between
+  them (CSS transitions of the same translate + rotate); the words' blocks ease on the clock; 14 px of give at the line keeps it from
   flickering. The two halves are real buttons (click, tap, or ← → and Enter); the choice sets the
   page's sound (`story.sound`, `audio.setEnabled`), the same setting as the Sound on/off switch,
   and the click is also the gesture the browser needs before any audio can start.
@@ -83,6 +84,12 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   on its own tilted orbit, larger and brighter the nearer they are (the supplied Framer
   "DotGridBackground", ported to a plain canvas in `src/ui/dotGrid.ts`; its frame loop only runs
   while something moves).
+- **The chapter rail and the sound switch** (right side, `Overlay.tsx`): the rail shows where you
+  are in the page's red; each chapter number is a button that takes you to that chapter's opening
+  shot through the chapter transition (`goToChapter` in `chapterTransition.ts`). Forwards, the
+  waits of the chapters passed over are opened so the page can stand at the new chapter; back,
+  the chapter entered is reset, as scrolling back does. The sound switch (SOUND ON / SOUND OFF)
+  is a white tab in the manner of the letter's close control; off, and under the pointer, red.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
   station no longer waits for the street's models) and a marker after it that reports when
   everything in it has loaded and drawn twice; a world that fails is caught by its own error
@@ -377,8 +384,8 @@ built from.
     capitals), with the supplied typewriter; the trail is drawn inline (no copy laid over the
     text) and the lines wrap plainly as they grow (no re-balancing per character), so nothing
     shifts or overlaps on a phone. On a narrow page PRESS D TO DEFEND stands above them. Each
-    line says who speaks, and to whom, in a yellow label over it (ATTACKER: / PROTAGONIST →
-    ATTACKER:), and a dialogue line is never wider than 600 px.
+    line says who speaks, in a yellow label over it (ATTACKER: for him, ME: for you), and a
+    dialogue line is never wider than 600 px.
   - **The invitation**: once the letter is closed, you tell him, typed in with the
     supplied typewriter: "Hey! When you wake up, come to Crasigostraße 24. You don't have to rob
     people. I'll help you fix your website problem." It cannot come before the letter is read; when it
@@ -457,9 +464,9 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
 
 - **The thoughts** (`scenes/car/thoughts.ts`): once the door has shut, the story waits (a gate
   at 0.642, before the ignition) while four lines are typed at the bottom of the page, centred,
-  32 px up, JetBrains Mono 16 px, in capitals, with no box: "This can't keep happening." /
-  "Good businesses shouldn't have to struggle because they can't show the world what they're
-  worth." / "There has to be a better way." / "It's time the world saw what I've built." They
+  32 px up, JetBrains Mono 16 px, in capitals, with no box, never wider than 600 px: "This
+  can't keep happening." / "Good businesses shouldn't struggle to show their worth." / "There
+  has to be a better way." / "It's time the world saw what I've built." They
   are typed with the supplied typewriter (`ui/typewriter.ts`, a plain-DOM port of the Framer
   "TypewriterText": its phases, speeds, smart pauses after punctuation, deleting each line
   before the next, the red trail on the last characters that fades into the text when a line
