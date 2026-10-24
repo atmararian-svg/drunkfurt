@@ -102,7 +102,10 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     current chapter's title left of it (◂ and JetBrains Mono 12), and, open, the chapter tabs.
   - **Chapter titles**: on every entry into a chapter (after the preloader, forwards, back, a
     jump), CHAPTER ONE / TWO / THREE at once, then after 2 s decoded (decode.ts) to CH.1 / 2 / 3,
-    which stays until the next entry. The entry is the chapter changing, nothing else (a scroll
+    which stays until the next entry. The title sits in a slot it rolls through: when another
+    chapter's marker reaches the frame (turning it by hand, or an entry), the old characters
+    leave and the new come in, each 45 ms after the one before (320 ms each), the way the scale
+    turns (down going forward); let go on the same chapter, it rolls back. The entry is the chapter changing, nothing else (a scroll
     within it, a re-render do not replay it); a new entry before the decode cancels it.
   - **Chapter tabs** (open only): a frosted panel (157 × 50, r 40, white 20 %, a 10 % white edge,
     background blur while open) clipping a strip of three tabs (ARRIVAL, NO WELCOME, THE CAVE;
@@ -110,8 +113,9 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     under the pointer: white text (nothing selected); the current chapter: white with near-black
     text. The panel grows in slightly as the selector opens, then stands still; only the strip
     moves, following (eased) the pointer's place across the panel, wherever the pointer is over
-    the selector: right → the strip slides left to show THE CAVE, left → back to ARRIVAL, never
-    further than the strip's own ends. A click on a tab goes to that chapter.
+    the selector: right → the strip slides left to show THE CAVE, left → back to ARRIVAL. Only
+    the middle 70 % of the panel steers it: from its 15 % mark the strip is at one end, from its
+    85 % mark at the other (so the ends need no reaching for), never further than its own ends. A click on a tab goes to that chapter.
   - **The turn is the scroll's**: `position(p)` is 1 at chapter 1's opening shot, 2 at chapter 2's,
     3 at chapter 3's, linear through a chapter up to where its transition begins; the scale group
     turns 120° per unit round the centre, the markings moving down past the frame going forward
@@ -129,9 +133,10 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   - Open (pointer over it, a first tap on a touch screen, keyboard focus): it slides in to the
     open frame and the page behind dims and breaks into pixels (the scene's pixel layer and an
     SVG pixel filter over the printed matter). It stays open while a drag or a wheel gesture runs.
-- **The sound switch** (top right, `Overlay.tsx`): SOUND ON is a white tab with near-black text;
-  SOUND OFF steps back: frosted glass (white 14 %, a 12 % white edge, background blur) and white
-  text, the same size and place, no red. The pointer coming on (and going off) decodes the whole
+- **The sound switch** (top right, `Overlay.tsx`): its label says what a click does: SOUND OFF
+  while the sound plays (a white tab, near-black text), SOUND ON while it is off (stepping back:
+  frosted glass, white 14 %, a 12 % white edge, background blur, white text; the same size and
+  place, no red). The pointer coming on (and going off) decodes the whole
   word at once (`decodeAll`, decode.ts: every character scrambles together and settles at its
   own scattered moment), and changes nothing else; a click switches the sound.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the

@@ -303,7 +303,8 @@ export function Overlay() {
   const soundShown = useRef('');
   useEffect(() => {
     const el = soundText.current!;
-    const text = `SOUND ${sound ? 'ON' : 'OFF'}`;
+    // (the label says what a click does: SOUND OFF while it plays, SOUND ON while it is off)
+    const text = `SOUND ${sound ? 'OFF' : 'ON'}`;
     if (!soundShown.current) splitChars(el);
     else void decodeAll(el, 380);
     soundShown.current = text;
@@ -395,7 +396,7 @@ export function Overlay() {
         aria-pressed={sound}
         aria-label={`Sound ${sound ? 'on' : 'off'}`}
       >
-        <span ref={soundText} data-text={`SOUND ${sound ? 'ON' : 'OFF'}`} aria-hidden />
+        <span ref={soundText} data-text={`SOUND ${sound ? 'OFF' : 'ON'}`} aria-hidden />
       </button>
 
 

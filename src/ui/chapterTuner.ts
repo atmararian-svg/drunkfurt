@@ -63,6 +63,8 @@ const NAMES = ['ONE', 'TWO', 'THREE'];
 const TABS = ['ARRIVAL', 'NO WELCOME', 'THE CAVE'];
 /** How long the full title stands before it decodes to CH.n (ms). */
 const FULL_MS = 2000;
+/** The title's roll from one chapter to the next: each character's move (ms), and the delay between characters. */
+const ROLL = { ms: 320, stagger: 45 };
 /** Drag: degrees of turn per px of drag (a third of a turn in about 150 px at full size). */
 const DRAG_DEG_PER_PX = 0.8;
 /** Wheel / trackpad: px of scroll for one chapter, and the quiet time that ends a gesture (ms). */
@@ -187,10 +189,14 @@ export function mountChapterTuner(): () => void {
   const head = document.createElement('div');
   head.className = 'tuner-head';
   head.style.right = `${F.w - TITLE.right}px`;
-  const title = document.createElement('span');
+  // a slot the title rolls through (old out, new in, letter by letter: the reference's stagger)
+  const slot = document.createElement('span');
+  slot.className = 'tuner-slot';
+  slot.setAttribute('aria-live', 'polite');
+  let title = document.createElement('span');
   title.className = 'tuner-title';
-  title.setAttribute('aria-live', 'polite');
-  head.append(title);
+  slot.append(title);
+  head.append(slot);
   body.append(head);
 
   // the chapter tabs: a frosted panel clipping a strip of three tabs
@@ -246,14 +252,59 @@ export function mountChapterTuner(): () => void {
     s = clamp(Math.min(window.innerWidth / 1920, window.innerHeight / 1080), 0.62, 1.25);
     root.style.setProperty('--s', String(s));
   };
-  /** A chapter entered: its full title at once, then (unless another is entered first) decoded to CH.n. */
+  /** The chapter the title shows (0: none yet). */
+  let shownLabel = 0;
+  /** The slot fits the text it shows (monospace: one `ch` a character). */
+  const fit = (...texts: string[]) => (slot.style.width = `${Math.max(...texts.map((t) => t.length))}ch`);
+  /**
+   * The title rolls to new text, as in the reference: the old characters
+   * leave and the new ones come in through the slot, each a little after the
+   * one before. `dir` 1: the way the scale turns going forward (down), -1 up.
+   */
+  const rollTo = (text: string, dir: number) => {
+    window.clearTimeout(titleTimer);
+    const old = title;
+    const next = document.createElement('span');
+    next.className = 'tuner-title';
+    next.dataset.text = text;
+    splitChars(next);
+    slot.append(next);
+    title = next;
+    fit(old.dataset.text ?? '', text);
+    if (reduced) {
+      old.remove();
+      fit(text);
+      return;
+    }
+    const ease = 'cubic-bezier(0.65, 0, 0.35, 1)';
+    const out = Array.from(old.querySelectorAll<HTMLElement>('.dc-ch'));
+    const inn = Array.from(next.querySelectorAll<HTMLElement>('.dc-ch'));
+    out.forEach((c, i) =>
+      c.animate([{ transform: 'translateY(0)' }, { transform: `translateY(${dir * 115}%)` }], { duration: ROLL.ms, delay: i * ROLL.stagger, easing: ease, fill: 'forwards' }),
+    );
+    inn.forEach((c, i) =>
+      c.animate([{ transform: `translateY(${-dir * 115}%)` }, { transform: 'translateY(0)' }], { duration: ROLL.ms, delay: i * ROLL.stagger, easing: ease, fill: 'backwards' }),
+    );
+    window.setTimeout(() => {
+      old.remove();
+      if (title === next) fit(text);
+    }, ROLL.ms + ROLL.stagger * Math.max(out.length, inn.length));
+  };
+  /** A chapter entered: its full title (rolled in, if another was showing), then (unless another comes first) decoded to CH.n. */
   const announce = (n: number) => {
     window.clearTimeout(titleTimer);
-    title.dataset.text = `CHAPTER ${NAMES[n - 1]}`;
-    splitChars(title);
+    const full = `CHAPTER ${NAMES[n - 1]}`;
+    if (shownLabel && shownLabel !== n) rollTo(full, Math.sign(n - shownLabel));
+    else {
+      title.dataset.text = full;
+      splitChars(title);
+      fit(full);
+    }
+    shownLabel = n;
     titleTimer = window.setTimeout(() => {
-      if (entered !== n) return;
+      if (entered !== n || shownLabel !== n || drag || wheel) return;
       title.dataset.text = `CH.${n}`;
+      fit(title.dataset.text);
       void decodeIn(title, reduced ? 1 : 520, 0, { rise: 0 });
     }, FULL_MS);
   };
@@ -304,7 +355,8 @@ export function mountChapterTuner(): () => void {
     // the strip follows the pointer's place across the open panel (anywhere over the selector)
     const r = panel.getBoundingClientRect();
     if (r.width > 0) {
-      const f = clamp((e.clientX - r.left) / r.width, 0, 1);
+      // only the middle 70 % of the panel steers it: from its 15 % mark the strip is at one end, from its 85 % mark at the other
+      const f = clamp((e.clientX - r.left - 0.15 * r.width) / (0.7 * r.width), 0, 1);
       const room = Math.min(0, PANEL.w - PANEL.inset - strip.offsetWidth);
       stripTo = PANEL.inset + (room - PANEL.inset) * f;
     }
@@ -414,6 +466,12 @@ export function mountChapterTuner(): () => void {
     // forward, the markings move down on the left: the next marker (above) comes to the axis
     scale.setAttribute('transform', `rotate(${(-(shownPos - 1) * STEP).toFixed(3)} ${C.x} ${C.y})`);
     const preview = drag || wheel ? Math.round(shownPos) : held ? held.pos : 0;
+    // turning it by hand: the marker that reaches the frame takes the title, rolling in; let go on the same chapter, it rolls back
+    const atFrame = drag || wheel ? preview : held ? held.pos : active;
+    if (entered && atFrame !== shownLabel) {
+      rollTo(`CH.${atFrame}`, Math.sign(atFrame - shownLabel));
+      shownLabel = atFrame;
+    }
     for (let i = 0; i < 3; i++) {
       markers[i].classList.toggle('is-on', i + 1 === active);
       // the other chapters' names ride with their markers: half strength at their place beside the axis, gone on it and behind
