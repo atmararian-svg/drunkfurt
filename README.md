@@ -122,7 +122,7 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     (0.8° per px: a chapter in about 150 px at full size); the wheel or trackpad over it (the page
     does not scroll there): a wheel notch is one chapter, a trackpad's stream turns the scale in
     proportion, never more than one chapter per gesture, and settles on the nearest when it goes
-    quiet (220 ms); a click on a chapter's name or tab; the tabs from the keyboard (Tab, ← →,
+    quiet (300 ms); a click on a chapter's name or tab; the tabs from the keyboard (Tab, ← →,
     Enter). The scale settles on the chosen marker and holds there until the scene changes. The
     current chapter is never restarted; nothing turns it during a transition, a scripted beat,
     the open letter or the flight into the screen.

@@ -66,7 +66,7 @@ const FULL_MS = 2000;
 /** Drag: degrees of turn per px of drag (a third of a turn in about 150 px at full size). */
 const DRAG_DEG_PER_PX = 0.8;
 /** Wheel / trackpad: px of scroll for one chapter, and the quiet time that ends a gesture (ms). */
-const WHEEL = { perChapter: 240, settle: 220 };
+const WHEEL = { perChapter: 240, settle: 300 };
 
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const rad = Math.PI / 180;
