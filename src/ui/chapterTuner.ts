@@ -63,6 +63,8 @@ const NAMES = ['ONE', 'TWO', 'THREE'];
 const TABS = ['ARRIVAL', 'NO WELCOME', 'THE CAVE'];
 /** How long the full title stands before it decodes to CH.n (ms). */
 const FULL_MS = 2000;
+/** After a drag or a wheel gesture ends, the scene changes this much later (ms). */
+const COMMIT_MS = 550;
 /** The title's roll from one chapter to the next: each character's move (ms), and the delay between characters. */
 const ROLL = { ms: 320, stagger: 45 };
 /** Drag: degrees of turn per px of drag (a third of a turn in about 150 px at full size). */
@@ -145,11 +147,13 @@ export function mountChapterTuner(): () => void {
   el('rect', { x: 0, y: 0, width: F.w, height: F.h, fill: 'url(#tuner-fade)' }, mask);
   // the page behind it, pixelated (its printed matter: the scene has its own pixel layer)
   const pix = el('filter', { id: 'df-pixelate', x: 0, y: 0, width: 1, height: 1 }, defs);
-  el('feFlood', { x: 3, y: 3, width: 1, height: 1 }, pix);
-  el('feComposite', { width: 7, height: 7 }, pix);
+  // (its block size grows with the backdrop, so the pixels come on gradually: see `update`)
+  const pixFlood = el('feFlood', { x: 1, y: 1, width: 1, height: 1 }, pix);
+  const pixCell = el('feComposite', { width: 2, height: 2 }, pix);
   el('feTile', { result: 'grid' }, pix);
   el('feComposite', { in: 'SourceGraphic', in2: 'grid', operator: 'in' }, pix);
-  el('feMorphology', { operator: 'dilate', radius: 3.5 }, pix);
+  const pixGrow = el('feMorphology', { operator: 'dilate', radius: 1 }, pix);
+  let pixBlock = 2;
 
   // the scale: one group, turned as a whole round the centre
   const faded = el('g', { mask: 'url(#tuner-mask)' }, svg);
@@ -238,6 +242,10 @@ export function mountChapterTuner(): () => void {
   let focused = false;
   let open = false;
   let openK = 0;
+  /** The page behind: dims and pixelates on its own, slower curve (in over 0.8 s, out over 0.5 s). */
+  let backK = 0;
+  /** After a drag or a wheel gesture: the chapter change waits this long, so the scene never turns while the hand is still on it. */
+  let commitTimer = 0;
   /** Direct input (a drag, or a wheel / trackpad gesture): the position it asks for, in chapter units. */
   let drag: { id: number; y0: number; pos0: number; moved: boolean } | null = null;
   let wheel: { base: number; acc: number; timer: number } | null = null;
@@ -345,6 +353,7 @@ export function mountChapterTuner(): () => void {
     if ((e.target as Element).closest('.tuner-tabs, .lb') || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (!safeToTurn()) return;
     e.preventDefault();
+    window.clearTimeout(commitTimer);
     held = null;
     drag = { id: e.pointerId, y0: e.clientY, pos0: shownPos, moved: false };
     body.setPointerCapture(e.pointerId);
@@ -366,11 +375,23 @@ export function mountChapterTuner(): () => void {
     // down moves the markings down: towards the next chapter, as scrolling forward does
     shownPos = clamp(drag.pos0 + (dy / s) * (DRAG_DEG_PER_PX / STEP), 1, CHAPTERS.length);
   };
+  /**
+   * A gesture has ended: the scale settles on the nearest chapter at once, and
+   * the scene follows a moment later (COMMIT_MS), unless another gesture has
+   * begun meanwhile; the page never changes chapter under a hand still turning it.
+   */
   const settle = (to: number) => {
     const n = clamp(Math.round(to), 1, CHAPTERS.length);
-    held = { pos: n, until: performance.now() + 6000 };
-    if (n !== chapterNow()) commit(n);
-    else held = null;
+    window.clearTimeout(commitTimer);
+    if (n === chapterNow()) {
+      held = null;
+      return;
+    }
+    held = { pos: n, until: performance.now() + 6000 + COMMIT_MS };
+    commitTimer = window.setTimeout(() => {
+      commitTimer = 0;
+      if (!drag && !wheel && held?.pos === n) commit(n);
+    }, COMMIT_MS);
   };
   const up = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
@@ -392,6 +413,7 @@ export function mountChapterTuner(): () => void {
     if (story.getState().phase !== 'ready' || drag || !safeToTurn()) return;
     const notch = e.deltaMode === 1 || (Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY));
     if (!wheel) {
+      window.clearTimeout(commitTimer);
       held = null;
       wheel = { base: Math.round(shownPos), acc: 0, timer: 0 };
       setOpen();
@@ -493,6 +515,20 @@ export function mountChapterTuner(): () => void {
     if (openK !== target)
       openK = target > openK ? Math.min(1, openK + (reduced ? 1 : dt / 0.42)) : Math.max(0, openK - (reduced ? 1 : dt / 0.36));
     const e = openK * openK * (3 - 2 * openK);
+    // the page behind follows on its own, slower: it darkens and its pixels grow block by block
+    if (backK !== target)
+      backK = target > backK ? Math.min(1, backK + (reduced ? 1 : dt / 0.8)) : Math.max(0, backK - (reduced ? 1 : dt / 0.5));
+    const bk = backK * backK * (3 - 2 * backK);
+    const block = clamp(Math.round(1 + 6 * bk), 2, 7);
+    if (block !== pixBlock) {
+      pixBlock = block;
+      const half = Math.floor(block / 2);
+      pixFlood.setAttribute('x', String(half));
+      pixFlood.setAttribute('y', String(half));
+      pixCell.setAttribute('width', String(block));
+      pixCell.setAttribute('height', String(block));
+      pixGrow.setAttribute('radius', String(block / 2));
+    }
     const show = SHOW.compact + (SHOW.open - SHOW.compact) * e;
     body.style.transform = `translateX(${(-show * s).toFixed(1)}px) scale(${s})`;
     root.style.setProperty('--open', e.toFixed(3));
@@ -503,9 +539,10 @@ export function mountChapterTuner(): () => void {
 
   tuner = {
     update,
-    backdrop: () => openK * openK * (3 - 2 * openK),
+    backdrop: () => backK * backK * (3 - 2 * backK),
     dispose() {
       window.clearTimeout(titleTimer);
+      window.clearTimeout(commitTimer);
       if (wheel) window.clearTimeout(wheel.timer);
       window.removeEventListener('pointerdown', outside, true);
       window.removeEventListener('resize', layout);

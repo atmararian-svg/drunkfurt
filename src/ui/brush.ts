@@ -137,8 +137,9 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
   const word = (art: Art, at: number, anchor: 'tl' | 'br') => {
     const age = t - at;
     if (age < 0) return;
-    // pops in a little too big, settles
-    const pop = age < 0.1 ? 1.3 - 0.3 * (age / 0.1) : 1;
+    // comes in a touch large and settles, fading up (no hard snap)
+    const u = Math.min(1, age / 0.18);
+    const pop = 1.12 - 0.12 * (1 - Math.pow(1 - u, 3));
     const x = anchor === 'tl' ? art.x * k : W - (FRAME.w - art.x) * k;
     const y = anchor === 'tl' ? art.y * k : H - (FRAME.h - art.y) * k;
     ctx.save();
@@ -146,6 +147,7 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
     ctx.scale(k * pop, k * pop);
     ctx.translate(-art.w / 2, -art.h / 2);
     ctx.fillStyle = '#fefefe';
+    ctx.globalAlpha = Math.min(1, age / 0.09);
     ctx.fill(artPath(art));
     ctx.restore();
   };

@@ -37,19 +37,20 @@ function combatLook(id: string, local: number) {
   if (id !== 'city' || local < BEAT.gate) return none;
   const v = encounterAt(local);
   if (!v.outcome) return none;
-  const black = v.outcome === 'blocked' ? BLOCK.dark : KO.dark;
-  const hide = local < BEAT.aftermath ? smoothstep(clamp(v.t / black, 0, 1)) : 1;
+  // defended: the pixels begin once ACTION has gone (BLOCK.veil), and are complete by BLOCK.dark, before the first hit
+  const [from, black] = v.outcome === 'blocked' ? [BLOCK.veil, BLOCK.dark] : [0, KO.dark];
+  const hide = local < BEAT.aftermath ? smoothstep(clamp((v.t - from) / (black - from), 0, 1)) : 1;
   const out = local < BEAT.aftermath ? 1 : 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
   const k = hide * out;
   return { block: 1 + (HIDE.block - 1) * k, blur: HIDE.blur * k, dark: HIDE.dark * k };
 }
 
-/** ACTION is up from the moment he raises the knife until the dark has covered the fight. */
+/** ACTION is up from the moment he raises the knife until you act: it leaves first, before the pixels and the hits. */
 function actionShown(id: string, local: number) {
   if (id !== 'city' || local < BEAT.cock || local >= BEAT.aftermath) return false;
   const v = encounterAt(local);
   if (!v.outcome) return true;
-  return v.t < (v.outcome === 'blocked' ? BLOCK.dark : KO.dark);
+  return v.outcome === 'knockedOut' && v.t < KO.dark;
 }
 
 /**
@@ -147,7 +148,8 @@ export function Overlay() {
       updateTuner();
       const tk = tunerBackdrop();
       setScenePixels(Math.max(look.block, 1 + 7 * tk), Math.max(look.blur, 0.35 * tk), Math.max(look.dark, 0.45 * tk));
-      el.style.filter = tk > 0.02 ? `url(#df-pixelate) brightness(${(1 - 0.55 * tk).toFixed(3)})` : '';
+      // (the printed matter's pixels only once they are at least 2 px: before that it only darkens, so nothing snaps on)
+      el.style.filter = tk > 0.005 ? `${tk > 0.12 ? 'url(#df-pixelate) ' : ''}brightness(${(1 - 0.55 * tk).toFixed(3)})` : '';
       // the thoughts in the car, once the door has shut (car/thoughts.ts holds the story until they are done)
       const think = id === 'car' && updateThoughts();
       if (think !== thoughtsOn) {

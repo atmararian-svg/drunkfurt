@@ -54,7 +54,8 @@ export function updateLetter() {
   const local = localProgress('city');
   // only the defended outcome has a letter; otherwise nothing waits here
   gate.open = encounter.outcome !== 'blocked' || letter.invited;
-  const waiting = !gate.open && local >= LETTER.gate - 0.004;
+  // (it can be picked up as soon as the street is clear again after the fight: the fight's own playback ends there, no scroll needed)
+  const waiting = !gate.open && local >= LETTER.from + 0.04;
   const want = waiting ? (letter.read ? 'invite' : 'letter') : null;
   const now = story.getState().prompt;
   if (want !== now && (now === null || now === 'letter' || now === 'invite')) story.setState({ prompt: want });

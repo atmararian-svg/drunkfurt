@@ -127,12 +127,16 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     does not scroll there): a wheel notch is one chapter, a trackpad's stream turns the scale in
     proportion, never more than one chapter per gesture, and settles on the nearest when it goes
     quiet (300 ms); a click on a chapter's name or tab; the tabs from the keyboard (Tab, ← →,
-    Enter). The scale settles on the chosen marker and holds there until the scene changes. The
+    Enter). After a drag or a wheel gesture the scale settles on the chosen marker at once, and
+    the scene follows 550 ms later, only if no new gesture has begun: the page never changes
+    chapter under a hand still turning it. It holds there until the scene changes. The
     current chapter is never restarted; nothing turns it during a transition, a scripted beat,
     the open letter or the flight into the screen.
   - Open (pointer over it, a first tap on a touch screen, keyboard focus): it slides in to the
-    open frame and the page behind dims and breaks into pixels (the scene's pixel layer and an
-    SVG pixel filter over the printed matter). It stays open while a drag or a wheel gesture runs.
+    open frame and the page behind dims and breaks into pixels, gradually, on its own slower
+    curve (in over 0.8 s, out over 0.5 s): the scene's pixel layer grows its blocks, and the SVG
+    pixel filter over the printed matter steps up from 2 to 7 px, only after the dimming has
+    begun. It stays open while a drag or a wheel gesture runs.
 - **The sound switch** (top right, `Overlay.tsx`): its label says what a click does: SOUND OFF
   while the sound plays (a white tab, near-black text), SOUND ON while it is off (stepping back:
   frosted glass, white 14 %, a 12 % white edge, background blur, white text; the same size and
@@ -385,16 +389,16 @@ built from.
     size: one canvas over the 3D picture, under everything printed, redrawn from the 3D canvas
     after every frame. Its look is a pure function of the scroll and the encounter
     (`combatLook` in `Overlay.tsx`): nothing while he walks up and threatens; only once you
-    have pressed D do the blocks grow coarse
+    have pressed D, and ACTION has gone (`BLOCK.veil`, 0.18 s), do the blocks grow coarse
     (to 26 px), blur (the same blocks drawn up smoothed over them) and darken (a dark layer to
-    80%), complete at `BLOCK.dark` (0.3 s, before the first hit), which is what hides the fight;
+    80%), complete at `BLOCK.dark` (0.75 s, before the first hit), which is what hides the fight;
     over the first 0.045 of the aftermath all of it resolves to the plain picture. At rest the
     canvas and its frame watcher are removed. Nothing can leave it stuck: a scrub, a revisit or
     a reset recomputes it. (The earlier spreading "Ignite" dark is gone.)
   - **Defended** (you press D in time): the fight is not shown. The street blurs and darkens in
     its own pixels before anyone moves, and the two hits are printed over it (`drawHits` in `ui/brush.ts`):
-    the design's BAM (top left, with the first hit) and POW (bottom right, with the second),
-    each popping in, with its sound (the existing recordings: no new hit sounds came with the
+    the design's BAM (top left, with the first hit, at 1.0 s) and POW (bottom right, with the
+    second, at 1.55 s), each fading up a touch large and settling (no hard snap), with its sound (the existing recordings: no new hit sounds came with the
     design). When the picture clears again he is on his back on the pavement, the knife beside his
     hand, and your bag is still with you.
   - **Knocked out** is switched off for now (`STRIKES` in `encounter.ts`): he never strikes, and
@@ -410,7 +414,8 @@ built from.
     is postponed, not decided.
   - **The letter** (`scenes/city/letter.ts`, `LetterProp.tsx`, `ui/letterReveal.ts`): after a
     defence, a crumpled sheet lies on the pavement by him (a ball of paper, flat-shaded facets);
-    at 0.96 the story waits (a gate) with "Something fell out of his coat. A letter. Click it."
+    the fight's own playback ends where it can be picked up (from 0.945, no scroll needed; the
+    story waits at 0.96, a gate) with "Something fell out of his coat. A letter. Click it."
     The pointer over it lights it a little and shows the hand; a click (or Enter) opens it: the
     page darkens and the sheet is lifted from where it lies (its place and size on the page,
     `letterSpot`): it rises off the pavement, travels to the middle of the page and unfolds from
@@ -465,7 +470,8 @@ built from.
   two hits, at 0.925 and 1.165 s of the file) and `exhales.mp3` ("Выдохи": two exhales, at 0.87
   and 1.15 s). Each sound is played as its own slice of its file, started so its transient falls
   30 ms after its cue; each exhale is cued with its hit, so the two land together. The first hit
-  is recorded much quieter and is raised to sit with the second. The knockout's sounds are still
+  is recorded much quieter and is raised to sit with the second (2.3 ×; the second at 0.7 ×), each
+  slice fading in over 14 ms so its start never clicks; nothing is sped up. The knockout's sounds are still
   synthesised. In detail:
   - in the dark of a defence, a dull, bony knock with BAM!, then a hard crack with a deep thump
     with WHAM!; each exhale is laid over its hit, at the same moment;

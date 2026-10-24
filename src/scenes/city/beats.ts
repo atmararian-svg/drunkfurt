@@ -31,13 +31,16 @@ export const KO = {
 } as const;
 
 /**
- * You defended: the page goes black before anything is shown, two hits land in
- * the dark (printed as BAM! and WHAM!), and it opens on him lying there.
- * Seconds of the fight's own clock after the click (spread over gate → aftermath).
+ * You defended: ACTION goes first, then (from `veil`) the street breaks into
+ * pixels and darkens until `dark`; only in that dark do the two hits land
+ * (printed as BAM and POW), with room between them, and it opens on him lying
+ * there. Seconds of the fight's own clock after the press (spread over
+ * gate → aftermath). Unhurried on purpose: one thing after the other.
  */
 export const BLOCK = {
-  dark: 0.3,
-  hit1: 0.42,
-  hit2: 0.86,
-  resolve: 2.1,
+  veil: 0.18,
+  dark: 0.75,
+  hit1: 1.0,
+  hit2: 1.55,
+  resolve: 3.0,
 } as const;

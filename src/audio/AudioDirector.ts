@@ -73,8 +73,8 @@ export type CueId = keyof typeof cues;
  * the cue, so a hit and its exhale, cued together, land together.
  */
 const FIGHT_SLICES = {
-  block: { cue: 'fightHits', from: 0.88, to: 1.12, at: 0.925, level: 3.2 },
-  punch: { cue: 'fightHits', from: 1.12, to: 1.58, at: 1.165, level: 0.85 },
+  block: { cue: 'fightHits', from: 0.88, to: 1.12, at: 0.925, level: 2.3 },
+  punch: { cue: 'fightHits', from: 1.12, to: 1.58, at: 1.165, level: 0.7 },
   exhale1: { cue: 'fightExhales', from: 0.82, to: 1.12, at: 0.87, level: 0.9 },
   exhale2: { cue: 'fightExhales', from: 1.12, to: 1.73, at: 1.15, level: 0.9 },
 } as const;
@@ -628,9 +628,9 @@ class AudioDirector {
     const t = ctx.currentTime;
     const start = Math.max(sl.from, sl.at - FIGHT_LEAD);
     const level = ((cues[sl.cue] as CueDef).gain ?? 1) * sl.level;
-    // a 6 ms fade in (the slice starts mid-file) and a short fade at its end
+    // a 14 ms fade in (the slice starts mid-file; a shorter one clicks) and a short fade at its end
     g.gain.setValueAtTime(0, t);
-    g.gain.linearRampToValueAtTime(level, t + 0.006);
+    g.gain.linearRampToValueAtTime(level, t + 0.014);
     g.gain.setValueAtTime(level, t + (sl.to - start) - 0.03);
     g.gain.linearRampToValueAtTime(0, t + (sl.to - start));
     src.connect(g).connect(this.buses.get('body')!);
