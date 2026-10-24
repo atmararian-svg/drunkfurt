@@ -137,10 +137,10 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     curve (in over 0.8 s, out over 0.5 s): the scene's pixel layer grows its blocks, and the SVG
     pixel filter over the printed matter steps up from 2 to 7 px, only after the dimming has
     begun. It stays open while a drag or a wheel gesture runs.
-- **The sound switch** (top right, `Overlay.tsx`): its label says what a click does: SOUND OFF
-  while the sound plays (a white tab, near-black text), SOUND ON while it is off (stepping back:
-  frosted glass, white 14 %, a 12 % white edge, background blur, white text; the same size and
-  place, no red). The pointer coming on (and going off) decodes the whole
+- **The sound switch** (top right, `Overlay.tsx`): its label says what a click does, and its look
+  goes with the label: SOUND ON (while the sound is off) is the white tab with near-black text;
+  SOUND OFF (while it plays) is the secondary action and steps back: frosted glass, white 14 %,
+  a 12 % white edge, background blur, white text; the same size and place, no red. The pointer coming on (and going off) decodes the whole
   word at once (`decodeAll`, decode.ts: every character scrambles together and settles at its
   own scattered moment), and changes nothing else; a click switches the sound.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
