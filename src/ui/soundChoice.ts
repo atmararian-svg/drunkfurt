@@ -12,7 +12,7 @@ import { DISABLE_PATH, ENABLE_PATH } from './soundWords';
  *    letters for that, then the letters themselves take over).
  *  - The page is split in two at the line between ENABLE and DISABLE. With the
  *    pointer on the left, ENABLE is the choice: SOUND bends into a smile, and
- *    DISABLE breaks into fine pixels; on the right the other way round
+ *    DISABLE breaks into fine pixels and darkens by half; on the right the other way round
  *    (DISABLE chosen, ENABLE pixelated, SOUND bent the opposite way). The
  *    letters glide between the curves eased in and out: slow start, quick
  *    middle, slow end. Off both, SOUND lies straight. A little hysteresis at
@@ -80,6 +80,7 @@ const INTRO_BLOCK = 28;
 const INTRO_MS = 700;
 
 type State = 'none' | 'on' | 'off';
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
 const WORDS = { enable: { box: ENABLE, path: ENABLE_PATH }, disable: { box: DISABLE, path: DISABLE_PATH } };
 
@@ -138,6 +139,7 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   let raf = 0;
   let introAt = -1; // when the intro began (ms), -1 before the fonts are in
   const block = { enable: INTRO_BLOCK, disable: INTRO_BLOCK };
+  let introOver = false;
   const tiny = document.createElement('canvas');
   const sharp = { enable: document.createElement('canvas'), disable: document.createElement('canvas') };
   const paths = { enable: new Path2D(WORDS.enable.path), disable: new Path2D(WORDS.disable.path) };
@@ -208,6 +210,11 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
       else moving = true;
       word.style.transform = `translateX(${followAt.toFixed(1)}px)`;
     }
+    // the intro's last frame may never be drawn (a slow page): its end is sharp words, whatever frame came last
+    if (intoK >= 1 && !introOver) {
+      introOver = true;
+      block.enable = block.disable = 1;
+    }
     for (const key of ['enable', 'disable'] as const) {
       const c = key === 'enable' ? enable : disable;
       const r = key === 'enable' ? ENABLE : DISABLE;
@@ -224,6 +231,9 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
         ctx.drawImage(sharp[key], 0, 0);
       } else drawPixelated(ctx, tiny, sharp[key], block[key] * u, r.w * u, r.h * u);
       c.style.opacity = String(Math.min(1, intoK / 0.45));
+      // the word not chosen also darkens, by half at its coarsest, in step with its blocks (and back as they resolve)
+      const off = intoK < 1 ? 0 : clamp01((block[key] - 1) / (INACTIVE_BLOCK - 1));
+      c.style.filter = off > 0.005 ? `brightness(${(1 - 0.5 * off).toFixed(3)})` : '';
     }
     if (intoK < 1) {
       moving = true;

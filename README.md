@@ -80,7 +80,7 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   flickering. SOUND hangs at its height as if on a line across the page: it slides left and right
   after the pointer (eased on the clock, like a weight on a rope), never up or down; its curves
   are centred on it, so it bends where it is; the whole word moves, so this never fights the
-  letters' glide into a curve. The word not chosen breaks into fine 6 px blocks. The screen stands on the preloader's own ground:
+  letters' glide into a curve. The word not chosen breaks into fine 6 px blocks and darkens by half (brightness, in step with its blocks; both undone when the pointer leaves). The screen stands on the preloader's own ground:
   its grain and its dot grid (`dotGrid.ts`) stay on under the words. The two halves are real buttons (click, tap, or ← → and Enter); the choice sets the
   page's sound (`story.sound`, `audio.setEnabled`), the same setting as the Sound on/off switch,
   and the click is also the gesture the browser needs before any audio can start.
@@ -89,30 +89,37 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   on its own tilted orbit, larger and brighter the nearer they are (the supplied Framer
   "DotGridBackground", ported to a plain canvas in `src/ui/dotGrid.ts`; its frame loop only runs
   while something moves).
-- **The chapter tuner** (`src/ui/chapterTuner.ts`, after the supplied radio-tuner reference): the
-  page's way of saying where you are and of going elsewhere. Flat (SVG and DOM), dark and
-  monochrome, at the right edge, vertically centred: a curved tuning scale (long ticks every 2°,
-  longer every 6°, a dotted track, an inner ring of short ticks, faded out at both ends), the
-  three chapters as its stations (a long tick and 01 / 02 / 03), a rectangular marker on the
-  scale with ▸ and ◂ 0n on its line, and a rounded display with the chapter's title.
-  - States: compact (only the scale's edge, the numbers and the marker show, the rest beyond the
-    edge, nothing scaled down), open (pointer over it, a first tap on a touch screen, or keyboard
-    focus: it slides in, eased, and the page behind it dims and breaks into pixels: the scene
-    through its pixel layer, `scenePixels.ts`, the printed matter through an SVG pixel filter),
-    dragging (the marker follows the pointer along the scale; the nearest station is previewed,
-    its number and the title in red; it stays open however far the pointer goes), and letting go
-    (the marker snaps to the station and, if it is another chapter, `goToChapter` plays the usual
-    transition: pixel reveal, title card; the current chapter is never restarted). A click on a
-    station's number goes there too; the numbers are buttons (Tab, ↑ ↓, Enter).
-  - It never decides the chapter: every frame, from the overlay's own loop, it reads the chapter
-    and the progress from the scroll. The marker eases to the chapter's station when the chapter
-    actually changes (or holds the station let go on until the transition cuts to it); the
-    progress through a chapter runs as red light along the dotted track, only part of the way to
-    the next station. While a transition, a scripted beat, the open letter or the flight into the
-    screen runs, it does not take you anywhere.
-  - The display keeps one size for every title (the longest, THE ARRIVAL, 11 characters of
-    JetBrains Mono, plus padding); the title decodes in when it changes. On small screens the
-    whole tuner is scaled down (to 0.62 at most), its proportions kept.
+- **The chapter selector** (`src/ui/chapterTuner.ts`, Figma "Drunkfurt-progress", the selector
+  frame 491 × 429, its four states): at the right edge, its axis at the design's height (45.6 %),
+  scaled with the page (1920 × 1080 = 1, never below 0.62).
+  - Geometry, from the design and made exact: one centre (276.5, 214.5); the outer circle of long
+    white ticks (r 214.5, 26 px, its dashes made 81 ticks, 4.44° apart), the inner ring of grey
+    dots (r 190.5, every 2°; the design's inner circle sat 5 px off centre), both faded top and
+    bottom by the design's gradient, which stays put. Three chapter markers 120° apart (both tick
+    counts divide 120°, so each is on a tick): longer ticks, red for the chapter you are in.
+    Fixed and horizontal: the selection frame (59 × 58, r 5, 10 % white) on the axis, the two ◂
+    marks and the red dashes on it, the numbers' text, and the white title pill (JetBrains Mono
+    24, padding 20, r 40) beside the frame.
+  - The turn is the scroll's: `position(p)` is 1 at chapter 1's opening shot, 2 at chapter 2's,
+    3 at chapter 3's, linear through a chapter up to where its transition begins (chapter 3
+    stays at 3); the whole scale group turns 120° per unit round the one centre. So a chapter's
+    marker is on the axis exactly when that chapter opens, and going forward the markings move
+    down past the frame (the next chapter comes from above); back, up. A transition is a cut in
+    the progress, so the angle shown closes on the scroll's (exponentially, a fraction of a
+    second) rather than jumping. The numbers ride with their markers, on a circle at a third of
+    their angle (so the neighbours show above and below, as in the design, 50 % white), and the
+    number and title are the chapter's own: they change when the scene does, the title decoding
+    in a pill sized to the finished title (monospace, so the decoding never resizes it).
+  - Open (pointer over it, a first tap on a touch screen, keyboard focus): it slides in to the
+    design's open frame (up to the pill plus 32 px), and the page behind dims and breaks into
+    pixels (the scene's pixel layer, `scenePixels.ts`, and an SVG pixel filter over the printed
+    matter). Dragging up and down on the scale turns it (the scroll's angle is left alone
+    meanwhile, down = forward, as scrolling); the marker passing the frame is previewed (its
+    number and the title in red); let go and it settles on that marker and, if it is another
+    chapter, `goToChapter` plays the usual transition; it holds there until the scene changes.
+    The current chapter is never restarted; nothing turns it during a transition, a scripted
+    beat, the open letter or the flight into the screen. For the keyboard: the chapters as
+    buttons, shown when focused (Tab, Enter).
 - **The sound switch** (top right, `Overlay.tsx`): SOUND ON / SOUND OFF, a white tab in the
   manner of the letter's close control (red when off). The pointer coming onto it decodes its
   text and changes nothing else; a click switches the sound.
@@ -414,8 +421,10 @@ built from.
     line says who speaks, in a yellow label over it (ATTACKER: for him, ME: for you), and a
     dialogue line is never wider than 600 px.
   - **The invitation**: once the letter is closed, you tell him, typed in with the
-    supplied typewriter: "Hey! When you wake up, come to Crasigostraße 24. You don't have to rob
-    people. I'll help you fix your website problem." It cannot come before the letter is read; when it
+    supplied typewriter: "Hey, man. When you wake up, come to Crasigostraße 24." / "You don't have
+    to rob people." / "I'll help you fix your website problem." (one sentence per line, so at 600 px
+    no word is left alone on a line; on any spoken line the last two words are also held together
+    by a no-break space, for narrower pages). It cannot come before the letter is read; when it
     is typed in full and has stood 1.6 s, the gate opens and the scroll goes on to the car. (The
     words are set in capitals; ß is set as ẞ so it survives them.)
   - Sounds are cues fired as the playback crosses them, forwards only. They never feed back
@@ -500,8 +509,11 @@ nothing of yours is left on the pavement. He stays where he fell, behind you.
   before the next, the red trail on the last characters that fades into the text when a line
   is complete, the block caret), each line standing for 0.9 s + 24 ms per character before it
   is deleted; the caret blinks every 1,250 ms instead of 500 ms (2.5 × slower), the typing
-  speed is the component's own. When the last line is in and has stood 1.3 s, the gate opens:
-  the engine starts and the rev prompt follows (about 18 s in all). Scrolling back out of the
+  speed is the component's own. When the last line is in and has stood 1.3 s, it is erased (the
+  typewriter's own deleting), the gate opens and the story carries itself on to the rev point
+  (one 1.1 s scripted move; no scroll needed): the engine catches on the way and ACTION /
+  PRESS D TO REV comes up there with its entrance, waiting. It only shows: the engine revs when
+  you press D. (Once per pass: a reset in between drops a finish already under way.) Scrolling back out of the
   seat, or the chapter starting again, forgets them; they play again next time.
 
 - **The car** is the supplied Mercedes-Benz W206 C220 (`src/assets/mercedes.glb`, 2.2 MB),
@@ -758,7 +770,7 @@ src/
     Stylizer.tsx          classifies meshes, renders the ink buffer, composer
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
   ui/Overlay.tsx          title cards, captions, ink, prompts
-  ui/chapterTuner.ts      the chapter tuner: scale, marker, title display, hover, drag
+  ui/chapterTuner.ts      the chapter selector: scroll-driven circular scale, title pill, hover, drag
   ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
   ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)

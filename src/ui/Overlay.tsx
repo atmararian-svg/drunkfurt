@@ -133,7 +133,8 @@ export function Overlay() {
         if (t && t.on !== on) {
           t.on = on;
           // (balloons are lettered in capitals: ß is set as its capital, ẞ, which the capitals keep as it is)
-          if (on) void t.tw.play((c.dataset.text ?? '').replace(/ß/g, 'ẞ')).then(() => capDefs[i].onTyped?.());
+          // (the last two words of each line are held together, so a narrower page never leaves one word alone on a line)
+          if (on) void t.tw.play((c.dataset.text ?? '').replace(/ß/g, 'ẞ').replace(/ (\S+)$/gm, '\u00a0$1')).then(() => capDefs[i].onTyped?.());
           else t.tw.stop();
         }
       });
@@ -160,7 +161,7 @@ export function Overlay() {
       if (think && !thoughts.started) {
         thoughts.started = true;
         if (thoughts.done) thoughtTw.show(MONOLOGUE);
-        else void thoughtTw.play(MONOLOGUE).then(thoughtsTyped);
+        else void thoughtTw.play(MONOLOGUE).then(() => thoughtsTyped(() => thoughtTw.erase()));
       }
       cue.classList.toggle('is-on', p < 0.004);
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);

@@ -1,5 +1,5 @@
 import { story } from '../../core/store';
-import { Gate, gates, localProgress, readScroll } from '../../core/timeline';
+import { Gate, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 import { CAR_BEAT } from './getaway';
 
 /**
@@ -7,7 +7,10 @@ import { CAR_BEAT } from './getaway';
  * waits (a gate just after CAR_BEAT.doorClosed, before the ignition) while
  * they are typed at the bottom of the page, line by line (the overlay plays
  * them with the supplied typewriter); when the last line is in and has stood
- * a moment, the gate opens: the engine starts and the rev prompt follows.
+ * a moment, it is erased (the typewriter's own deleting), the gate opens and
+ * the story carries itself on to the rev point, no scroll needed: the engine
+ * catches on the way and ACTION / PRESS D TO REV comes up there, waiting for D
+ * (it only shows; the engine revs when you press).
  *
  * Scrolling back out of the seat forgets them (they play again next time),
  * as does the chapter starting again (`resetThoughts`, with the getaway).
@@ -51,19 +54,31 @@ export function updateThoughts() {
   return thoughtsShown(local);
 }
 
-/** The last line is typed: after a moment, the story goes on. */
-export function thoughtsTyped() {
+/** Bumped whenever the thoughts are reset, so a finish already under way is dropped. */
+let round = 0;
+
+/**
+ * The last line is typed: after a moment it is erased (`erase`, the
+ * typewriter's), and then the story goes on by itself to where it waits for
+ * you to rev (the rev prompt comes up there). Once per pass.
+ */
+export function thoughtsTyped(erase: () => Promise<void>) {
   window.clearTimeout(holdTimer);
-  holdTimer = window.setTimeout(() => {
+  const mine = ++round;
+  holdTimer = window.setTimeout(async () => {
+    await erase();
+    if (mine !== round || thoughts.done) return;
     thoughts.done = true;
     gate.open = true;
-    // the page may already be scrolled past the wait: carry on from where it is, without another scroll
-    readScroll();
+    // from wherever the page is, on to the rev point (no further): the gate there holds it for D
+    const to = globalProgress('car', CAR_BEAT.rev);
+    if (timeline.progress < to) playProgress(timeline.progress, to, 1.1);
   }, THOUGHTS.hold);
 }
 
 export function resetThoughts() {
   window.clearTimeout(holdTimer);
+  round++;
   thoughts.started = false;
   thoughts.done = false;
   gate.open = false;

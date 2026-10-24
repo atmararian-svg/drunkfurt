@@ -189,13 +189,15 @@ body { cursor: pointer; }
   to { background-position: 0 34px; }
 }
 
-/* --- the chapter tuner (chapterTuner.ts, after the supplied radio tuner): right edge, centred --- */
+/* --- the chapter selector (chapterTuner.ts, Figma "Drunkfurt-progress"): right edge, on the axis --- */
 .tuner {
+  /* its axis at the design's height (frame top 277 + 214.5 on 1080) */
   position: fixed;
-  top: 50%;
-  right: 0;
+  top: 45.55%;
+  left: 100%;
   z-index: 4;
-  transform: translateY(-50%);
+  width: 0;
+  height: 0;
   pointer-events: none;
   transition: opacity 0.6s var(--ease);
 }
@@ -204,10 +206,10 @@ body { cursor: pointer; }
 .is-preloading .tuner-body { pointer-events: none; }
 .tuner-body {
   position: absolute;
-  top: 0;
   left: 0;
-  width: 480px;
-  height: 360px;
+  top: calc(-214.5px * var(--s, 1));
+  width: 491px;
+  height: 429px;
   transform-origin: 0 0;
   pointer-events: auto;
   touch-action: none;
@@ -216,55 +218,54 @@ body { cursor: pointer; }
 }
 .tuner.is-dragging .tuner-body { cursor: grabbing; }
 .tuner-scale { position: absolute; inset: 0; overflow: visible; }
-.tuner-scale .tk { stroke: rgba(241, 240, 233, 0.22); stroke-width: 1.4; }
-.tuner-scale .tk--major { stroke: rgba(241, 240, 233, 0.4); }
-.tuner-scale .tk--inner { stroke: rgba(241, 240, 233, 0.26); stroke-width: 1.6; }
-.tuner-scale .dt { fill: rgba(241, 240, 233, 0.32); }
-.tuner-scale .dt.is-lit { fill: var(--red); }
-.tuner-scale .st { stroke: rgba(241, 240, 233, 0.75); stroke-width: 1.6; }
-.tuner-scale .st.is-on { stroke: var(--red); stroke-width: 2.2; }
-.tuner-scale .lb { fill: rgba(241, 240, 233, 0.5); font: 500 15px/1 var(--label); letter-spacing: -0.02em; }
-.tuner-scale .lb.is-on { fill: #fff; font-weight: 700; }
-.tuner-scale .lb.is-preview { fill: var(--red); font-weight: 700; }
+.tuner-scale .tk { stroke: #fff; stroke-width: 1; }
+.tuner-scale .dt { stroke: rgba(255, 255, 255, 0.36); stroke-width: 1; }
+.tuner-scale .mkr { stroke: #fff; stroke-width: 1.5; }
+.tuner-scale .mkr.is-on { stroke: var(--red); stroke-width: 2; }
+.tuner-scale .box { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 1; }
 .tuner-scale .tri { fill: #fff; }
-.tuner-scale .dash { stroke: var(--red); stroke-width: 1.6; }
-.tuner-scale .num { fill: #fff; font: 500 11px/1 var(--label); }
-.tuner-scale .mk-box { fill: rgba(12, 12, 12, 0.88); stroke: rgba(241, 240, 233, 0.55); stroke-width: 1.2; }
-.tuner-scale .mk-ln { stroke: rgba(241, 240, 233, 0.6); stroke-width: 2; stroke-linecap: round; }
-.tuner-scale .mk-ln--on { stroke: #fff; stroke-width: 2.4; }
-.tuner.is-dragging .mk-box { stroke: #fff; }
-/* the display: one size for every title (the longest, 11 characters of a monospace, with its padding) */
-.tuner-display {
+.tuner-scale .lb { fill: #fff; font: 400 12px/1 Inter, 'Helvetica Neue', Arial, sans-serif; }
+.tuner-scale .lb.is-preview { fill: var(--red); }
+/* the title, beside the frame on the axis: white, sized to the finished title */
+.tuner-pill {
   position: absolute;
-  top: 144px;
-  left: 222px;
+  top: 186px;
+  left: 132px;
   box-sizing: border-box;
-  width: calc(11 * 0.6 * 26px + 56px);
-  height: 72px;
-  padding: 0 28px;
+  height: 58px;
+  padding: 0 20px;
   display: flex;
   align-items: center;
-  border-radius: 36px;
-  background: #222;
-  color: #fff;
-  font: 500 26px/1 var(--label);
+  border-radius: 40px;
+  background: #fff;
+  color: #101010;
+  font: 400 24px/1 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0;
   white-space: nowrap;
   overflow: hidden;
-  opacity: calc(0.15 + 0.85 * var(--open, 0));
+  opacity: var(--open, 0);
+  transition: width 0.35s var(--ease);
   cursor: default;
 }
-.tuner-display.is-preview { color: var(--red); }
-.tuner-go {
+.tuner-pill.is-preview { color: var(--red); }
+.tuner-keys { position: absolute; top: 0; right: 16px; transform: translateY(-50%); display: grid; gap: 4px; }
+.tuner-keys button {
   position: absolute;
-  width: 68px;
-  height: 36px;
-  padding: 0;
+  right: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  padding: 6px 8px;
   border: 0;
-  background: none;
-  cursor: pointer;
+  border-radius: 3px;
+  background: #fff;
+  color: #111;
+  font: 700 12px/1 var(--label);
+  pointer-events: auto;
 }
-.tuner-go:focus-visible { outline: 2px dashed var(--red); outline-offset: 2px; }
+.tuner-keys button:focus-visible { position: static; width: auto; height: auto; clip-path: none; outline: 2px dashed var(--red); outline-offset: 2px; }
 
 /* --- ink wipe (canvas brush strokes) and outro ------------------------- */
 .wipe,

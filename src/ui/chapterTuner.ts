@@ -1,63 +1,64 @@
 import { CHAPTERS, chapterOf } from '../core/chapters';
 import { story } from '../core/store';
-import { chapterStarts, chapterTurn, locate, scriptOwnsScroll, timeline } from '../core/timeline';
+import { chapterEnds, chapterStarts, chapterTurn, locate, scriptOwnsScroll, timeline } from '../core/timeline';
 import { letter } from '../scenes/city/letter';
 import { monitor } from '../scenes/home/monitor';
 import { goToChapter } from './chapterTransition';
 import { decodeIn } from './decode';
+import { RED } from './palette';
 
 /**
- * The chapter tuner: the page's chapter navigation, after the supplied radio
- * tuner reference. A flat, dark piece of hardware at the right edge,
- * vertically centred: a curved tuning scale (fine ticks, a dotted track, an
- * inner ring of short ticks) with the three chapters as its stations, a
- * rectangular marker on the scale, small direction marks on the marker's
- * line, and a large rounded display with the chapter's title.
+ * The chapter selector (Figma "Drunkfurt-progress", the selector frame,
+ * 491 × 429): a circular scale at the right edge of the page, most of it
+ * beyond the edge.
  *
- * States, one at a time, explicit:
- *  - compact: almost all of it beyond the right edge; the scale's edge, the
- *    chapter numbers and the marker show;
- *  - open (pointer over it, a tap on a touch screen, or keyboard focus): it
- *    slides in, the display with the title shows, and the page behind it dims
- *    and breaks into pixels (the scene's pixel layer, scenePixels.ts, and the
- *    same look laid over the printed matter);
- *  - dragging: the marker follows the pointer along the scale, the nearest
- *    station is previewed (its number and the title in red); it stays open
- *    however far the pointer goes;
- *  - letting go: the marker snaps to that station and, if it is another
- *    chapter, the chapter transition takes you there (goToChapter: pixel
- *    reveal, title card); the current chapter is never restarted.
+ *  - The scale: long white ticks (the outer circle, r 214.5, 26 px long, 81 of
+ *    them, 4.44° apart) and short grey ones (an inner ring of dots, r 190.5,
+ *    every 2°), on one centre, faded towards the top and bottom (the design's
+ *    gradient, which stays put while the scale turns). Three chapter markers
+ *    on it, 120° apart (both tick counts divide 120° exactly, so every marker
+ *    sits on a tick): a longer tick, red for the chapter you are in. The
+ *    chapter numbers ride along with their markers (see `labelAt`).
+ *  - Fixed, horizontal, never turning: the selection frame (59 × 58, r 5) on
+ *    the horizontal axis through the scale's centre, the two ◂ marks and the
+ *    red dashes on that axis, and, opened, the white title pill beside it
+ *    (JetBrains Mono 24, padding 20, sized to the title).
  *
- * It never decides the chapter: every frame (`updateTuner`, from the overlay's
- * loop, so no loop of its own) it reads the chapter and progress from the
- * scroll (`locate(timeline.progress)`). The marker eases to the chapter's
- * station when the chapter actually changes; the progress through the
- * chapter runs as a red light along the dotted track, only part of the way
- * to the next station, so it never seems to be there before the scene is.
- * While a transition, a scripted beat, the open letter or the flight into the
- * screen runs, it does not take you anywhere.
+ * The turn is the scroll's, not a clock's: `position` maps the progress to a
+ * chapter position (1 at chapter 1's opening shot, 2 at chapter 2's, 3 at
+ * chapter 3's; in between, linearly through the chapter up to where its
+ * transition begins), and the scale turns 120° per unit, so a chapter's
+ * marker is on the axis exactly when that chapter opens. Going forward the
+ * markings move down past the frame (the next chapter comes from above);
+ * back, up. A chapter transition is a cut in the progress, so the angle shown
+ * closes on the scroll's over a fraction of a second instead of jumping. The
+ * number and the title are the chapter's own (`locate`): they change when the
+ * scene does, decoding.
+ *
+ * Pointer over it: it slides in to show the title (the page behind dims and
+ * breaks into pixels). Dragging up and down turns the scale (the scroll's
+ * angle is left alone meanwhile); the chapter whose marker passes the frame
+ * is previewed; let go and it snaps to that marker and, if it is another
+ * chapter, goes there through the chapter transition (goToChapter). The
+ * current chapter is never restarted; nothing turns it while a transition,
+ * a scripted beat, the open letter or the flight into the screen runs.
  */
 
-/** The drawing, in its own px (scaled as a whole on small screens). */
-const W = 480;
-const H = 360;
-const R = 300;
-const CX = 70 + R;
-const CY = H / 2;
-/** Each chapter's station on the scale (degrees from nine o'clock, down positive). */
-const STATION = [-18, 0, 18];
-/** How far the scale is drawn, and how far the marker may go. */
-const SPAN = 36;
-const LIMIT = 24;
-/** How much of it shows when compact (its px, from the left edge). */
-const SHOW = 96;
-/** The marker's middle (radius). */
-const MARK_R = R + 6;
+/** The design frame and its geometry (Figma px). */
+const F = { w: 491, h: 429 };
+const C = { x: 276.5, y: 214.5 };
+const OUTER = { r: 214.5, len: 26, count: 81 };
+const INNER = { r: 190.5, len: 4, step: 2 };
+const STEP = 120;
+const BOX = { x: 33, y: 186, w: 59, h: 58, r: 5 };
+const PILL = { x: 132, h: 58, pad: 20, font: 24, adv: 0.6 };
+/** How much shows: compact (the design's first frame), and open (up to the pill and a margin). */
+const SHOW = { compact: 102, margin: 32 };
+/** The numbers: on a circle round the same centre, at a third of their marker's angle (so the neighbours show), tilted with it. */
+const LABEL = { r: 260, squeeze: 37 / STEP, below: 3.7, tilt: 0.62 };
 const TITLES = ['THE ARRIVAL', 'NO WELCOME', 'THE CAVE'];
-const pad = (n: number) => String(n).padStart(2, '0');
 const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const rad = Math.PI / 180;
-const pt = (r: number, deg: number) => [CX - r * Math.cos(deg * rad), CY + r * Math.sin(deg * rad)] as const;
 const SVG = 'http://www.w3.org/2000/svg';
 const el = <K extends keyof SVGElementTagNameMap>(name: K, attrs: Record<string, string | number>, parent?: Element) => {
   const e = document.createElementNS(SVG, name);
@@ -65,40 +66,39 @@ const el = <K extends keyof SVGElementTagNameMap>(name: K, attrs: Record<string,
   parent?.append(e);
   return e;
 };
-const line = (r0: number, r1: number, deg: number, attrs: Record<string, string | number>, parent: Element) => {
-  const [x1, y1] = pt(r0, deg);
-  const [x2, y2] = pt(r1, deg);
-  return el('line', { x1: x1.toFixed(2), y1: y1.toFixed(2), x2: x2.toFixed(2), y2: y2.toFixed(2), ...attrs }, parent);
-};
+/** A point on a circle round the centre: `deg` above the horizontal axis on the left (screen y down). */
+const at = (r: number, deg: number) => [C.x - r * Math.cos(deg * rad), C.y - r * Math.sin(deg * rad)] as const;
 
 const chapterNow = () => chapterOf(locate(timeline.progress).id).number;
-/** May the tuner take you to another chapter now? */
 const safeToTurn = () =>
   story.getState().phase === 'ready' && !chapterTurn.busy && !scriptOwnsScroll() && !letter.open && !monitor.entering;
 
-/** Where the progress light reaches (degrees): through a chapter, part of the way towards the next station. */
-function progressAngle(n: number) {
+/**
+ * The scroll's chapter position: 1 … 3, a chapter's number at its opening
+ * shot, rising linearly through it to the next number where its transition
+ * begins (the last chapter stays at 3).
+ */
+export function position(p = timeline.progress) {
   const starts = chapterStarts();
-  const a = starts[n - 1] ?? 0;
-  const b = starts[n] ?? 1;
-  const f = clamp((timeline.progress - a) / Math.max(1e-6, b - a), 0, 1);
-  const next = n < 3 ? STATION[n] : STATION[2] + 12;
-  return STATION[n - 1] + f * (next - STATION[n - 1]) * (n < 3 ? 0.82 : 1);
+  const ends = chapterEnds();
+  let n = 1;
+  for (let i = 0; i < starts.length; i++) if (p >= starts[i] - 1e-6) n = i + 1;
+  if (n >= CHAPTERS.length) return CHAPTERS.length;
+  return n + clamp((p - starts[n - 1]) / Math.max(1e-6, ends[n - 1] - starts[n - 1]), 0, 1);
 }
 
 interface Tuner {
-  root: HTMLElement;
   update(): void;
   backdrop(): number;
   dispose(): void;
 }
 let tuner: Tuner | null = null;
 
-/** Called every frame by the overlay: the tuner follows the story. */
+/** Called every frame by the overlay (no loop of its own). */
 export function updateTuner() {
   tuner?.update();
 }
-/** How open the tuner is (0 … 1, eased): the page behind it dims and pixelates by this much. */
+/** How open the selector is (0 … 1, eased): the page behind it dims and pixelates by this much. */
 export function tunerBackdrop() {
   return tuner?.backdrop() ?? 0;
 }
@@ -113,20 +113,24 @@ export function mountChapterTuner(): () => void {
   body.className = 'tuner-body';
   root.append(body);
 
-  // --- the scale ---------------------------------------------------------------------
-  const svg = el('svg', { class: 'tuner-scale', viewBox: `0 0 ${W} ${H}`, width: W, height: H, 'aria-hidden': 'true' });
+  // --- the drawing ---------------------------------------------------------------------
+  const svg = el('svg', { class: 'tuner-scale', viewBox: `0 0 ${F.w} ${F.h}`, width: F.w, height: F.h, 'aria-hidden': 'true' });
   const defs = el('defs', {}, svg);
-  const fade = el('linearGradient', { id: 'tuner-fade', x1: 0, y1: 0, x2: 0, y2: 1 }, defs);
+  // the design's fade, top to bottom over the circle (it stays put while the scale turns)
+  const fade = el('linearGradient', { id: 'tuner-fade', gradientUnits: 'userSpaceOnUse', x1: 0, y1: C.y - OUTER.r, x2: 0, y2: C.y + OUTER.r }, defs);
   for (const [o, a] of [
     [0, 0],
-    [0.16, 1],
-    [0.84, 1],
+    [0.303, 0.5],
+    [0.399, 0.7],
+    [0.503, 1],
+    [0.6, 0.7],
+    [0.702, 0.5],
     [1, 0],
   ])
     el('stop', { offset: o, 'stop-color': '#fff', 'stop-opacity': a }, fade);
-  const mask = el('mask', { id: 'tuner-mask', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: W, height: H }, defs);
-  el('rect', { x: 0, y: 0, width: W, height: H, fill: 'url(#tuner-fade)' }, mask);
-  // the page behind it, pixelated (the printed matter: the scene has its own pixel layer)
+  const mask = el('mask', { id: 'tuner-mask', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: F.w, height: F.h }, defs);
+  el('rect', { x: 0, y: 0, width: F.w, height: F.h, fill: 'url(#tuner-fade)' }, mask);
+  // the page behind it, pixelated (its printed matter: the scene has its own pixel layer)
   const pix = el('filter', { id: 'df-pixelate', x: 0, y: 0, width: 1, height: 1 }, defs);
   el('feFlood', { x: 3, y: 3, width: 1, height: 1 }, pix);
   el('feComposite', { width: 7, height: 7 }, pix);
@@ -134,143 +138,111 @@ export function mountChapterTuner(): () => void {
   el('feComposite', { in: 'SourceGraphic', in2: 'grid', operator: 'in' }, pix);
   el('feMorphology', { operator: 'dilate', radius: 3.5 }, pix);
 
-  const scale = el('g', { mask: 'url(#tuner-mask)' }, svg);
-  // long ticks every 2 degrees, a little longer every 6
-  for (let d = -SPAN; d <= SPAN; d += 2) {
-    const major = d % 6 === 0;
-    line(R - 8, R + (major ? 30 : 22), d, { class: major ? 'tk tk--major' : 'tk' }, scale);
+  // the scale: one group, turned as a whole round the centre
+  const faded = el('g', { mask: 'url(#tuner-mask)' }, svg);
+  const scale = el('g', {}, faded);
+  const tick = (r0: number, r1: number, deg: number, cls: string) => {
+    const [x1, y1] = at(r0, deg);
+    const [x2, y2] = at(r1, deg);
+    return el('line', { x1: x1.toFixed(3), y1: y1.toFixed(3), x2: x2.toFixed(3), y2: y2.toFixed(3), class: cls }, scale);
+  };
+  for (let i = 0; i < OUTER.count; i++) {
+    const deg = (360 / OUTER.count) * i;
+    // (the markers' own ticks are drawn below, over these)
+    if (Math.abs(((deg + 60) % STEP) - 60) < 1e-6) continue;
+    tick(OUTER.r - OUTER.len / 2, OUTER.r + OUTER.len / 2, deg, 'tk');
   }
-  // the dotted track (the progress lights along it), and the inner ring of short ticks
-  const dots: SVGCircleElement[] = [];
-  const dotDeg: number[] = [];
-  for (let d = -SPAN; d <= SPAN; d += 1) {
-    const [x, y] = pt(R - 20, d);
-    dots.push(el('circle', { cx: x.toFixed(2), cy: y.toFixed(2), r: 1.1, class: 'dt' }, scale));
-    dotDeg.push(d);
-  }
-  for (let d = -SPAN; d <= SPAN; d += 1.5) line(R - 44, R - 30, d, { class: 'tk tk--inner' }, scale);
-  // the three stations: a long tick and the number
-  const stationTicks = STATION.map((d) => line(R - 12, R + 38, d, { class: 'st' }, scale));
-  const labels = STATION.map((d, i) => {
-    // (just above its tick, as the reference's numbers sit off the line, so the marker's line never runs through it)
-    const [x, y] = pt(R + 50, d - 3.2);
-    const t = el('text', { x: x.toFixed(1), y: (y + 1).toFixed(1), class: 'lb', 'text-anchor': 'middle' }, svg);
-    t.textContent = pad(i + 1);
+  for (let deg = 0; deg < 360; deg += INNER.step) tick(INNER.r - INNER.len / 2, INNER.r + INNER.len / 2, deg, 'dt');
+  // the chapters' markers: chapter n's at (n - 1) · 120° (the next one above the axis at the start; forward, they move down)
+  const markers = CHAPTERS.map((_, i) => tick(INNER.r - INNER.len / 2, OUTER.r + OUTER.len / 2, i * STEP, 'mkr'));
+
+  // fixed: the frame, the ◂ marks and the red dashes on the axis
+  el('rect', { x: BOX.x + 0.5, y: BOX.y + 0.5, width: BOX.w - 1, height: BOX.h - 1, rx: BOX.r, class: 'box' }, svg);
+  el('path', { d: 'M4 214.5 L8 212 L8 217 Z', class: 'tri' }, svg);
+  el('path', { d: 'M95.5 214.5 L99.5 212 L99.5 217 Z', class: 'tri' }, svg);
+  el('rect', { x: 12, y: 214, width: 13, height: 1, fill: RED }, svg);
+  el('rect', { x: 81, y: 214, width: 7, height: 1, fill: RED }, svg);
+  // the numbers (horizontal text, placed by `labelAt`)
+  const labels = CHAPTERS.map((_, i) => {
+    const t = el('text', { class: 'lb', 'text-anchor': 'middle', 'dominant-baseline': 'central' }, svg);
+    t.textContent = String(i + 1);
     return t;
   });
-  // the marker's line: a mark at the left edge, the marker on the scale, then ◂ and the station number
-  const ind = el('g', { class: 'ind' }, svg);
-  el('path', { d: 'M4 -4 L10 0 L4 4 Z', class: 'tri' }, ind);
-  const leftDash = el('line', { x1: 14, y1: 0, x2: 30, y2: 0, class: 'dash' }, ind);
-  const rightDash = el('line', { x1: 0, y1: 0, x2: 0, y2: 0, class: 'dash' }, ind);
-  const tri2 = el('path', { d: '', class: 'tri' }, ind);
-  const num = el('text', { x: 0, y: 4, class: 'num' }, ind);
-  const tailDash = el('line', { x1: 0, y1: 0, x2: 0, y2: 0, class: 'dash' }, ind);
-  const marker = el('g', { class: 'mk' }, svg);
-  el('rect', { x: -26, y: -32, width: 52, height: 64, rx: 7, class: 'mk-box' }, marker);
-  el('line', { x1: -14, y1: -14, x2: 14, y2: -15, class: 'mk-ln' }, marker);
-  el('line', { x1: -16, y1: 0, x2: 16, y2: 0, class: 'mk-ln mk-ln--on' }, marker);
-  el('line', { x1: -14, y1: 14, x2: 14, y2: 15, class: 'mk-ln' }, marker);
   body.append(svg);
 
-  // --- the display -------------------------------------------------------------------
-  const display = document.createElement('div');
-  display.className = 'tuner-display';
+  // the title pill, beside the frame on the axis
+  const pill = document.createElement('div');
+  pill.className = 'tuner-pill';
   const title = document.createElement('span');
   title.className = 'tuner-title';
   title.setAttribute('aria-live', 'polite');
-  display.append(title);
-  body.append(display);
+  pill.append(title);
+  body.append(pill);
 
-  // --- the stations as buttons (pointer, keyboard, screen readers) ---------------------
+  // for the keyboard and screen readers: the chapters as buttons (shown when focused)
+  const keys = document.createElement('div');
+  keys.className = 'tuner-keys';
   const buttons = CHAPTERS.map((c, i) => {
     const b = document.createElement('button');
     b.type = 'button';
-    b.className = 'tuner-go';
-    b.setAttribute('aria-label', `Chapter ${c.number}: ${TITLES[i]}`);
-    const [x, y] = pt(R + 30, STATION[i]);
-    Object.assign(b.style, { left: `${x - 34}px`, top: `${y - 18}px` });
+    b.textContent = `${String(c.number).padStart(2, '0')} — ${TITLES[i]}`;
     b.addEventListener('click', (e) => {
       e.stopPropagation();
-      if (dragged) return;
       commit(i + 1);
     });
-    b.addEventListener('keydown', (e) => {
-      const k = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
-      if (!k) return;
-      e.preventDefault();
-      buttons[clamp(i + k, 0, 2)].focus();
-    });
-    body.append(b);
+    keys.append(b);
     return b;
   });
+  root.append(keys);
   document.body.append(root);
 
-  // --- state ------------------------------------------------------------------------------
+  // --- state -------------------------------------------------------------------------------
   let active = chapterNow();
-  let markDeg = STATION[active - 1];
-  let open = false; // wanted open (hover, tap, focus or drag)
+  /** The position shown (chapter units), and the one the scroll asks for. */
+  let shownPos = position();
   let hover = false;
   let touchOpen = false;
   let focused = false;
-  let openK = 0; // eased
-  let drag: { id: number } | null = null;
-  let dragged = false;
-  let preview = 0;
-  let pendingUntil = 0; // a station let go on, held until the chapter changes (or it is clear it will not)
-  let shown = 0; // the chapter whose title is shown
-  let lit = -1;
+  let open = false;
+  let openK = 0;
+  let drag: { id: number; y0: number; pos0: number; moved: boolean } | null = null;
+  /** After a drag: the position it snapped to, held until the chapter changes (or it is clear it will not). */
+  let held: { pos: number; until: number } | null = null;
+  let titleOf = 0;
   let s = 1;
   let last = performance.now();
 
   const layout = () => {
-    s = clamp(Math.min(window.innerWidth / 1100, window.innerHeight / 760), 0.62, 1);
+    s = clamp(Math.min(window.innerWidth / 1920, window.innerHeight / 1080), 0.62, 1.25);
     root.style.setProperty('--s', String(s));
-    root.style.width = `${W * s}px`;
-    root.style.height = `${H * s}px`;
   };
   const showTitle = (n: number, previewing: boolean) => {
     const key = n * 2 + (previewing ? 1 : 0);
-    if (key === shown) return;
-    shown = key;
-    title.dataset.text = TITLES[n - 1];
-    display.classList.toggle('is-preview', previewing);
+    if (key === titleOf) return;
+    titleOf = key;
+    const text = TITLES[n - 1];
+    title.dataset.text = text;
+    // the pill fits the finished title; the decoding swaps characters of the same (monospace) width, so it never resizes on the way
+    pill.style.width = `${(text.length * PILL.font * PILL.adv + PILL.pad * 2).toFixed(1)}px`;
+    pill.classList.toggle('is-preview', previewing);
     void decodeIn(title, reduced ? 1 : 520, 0, { rise: 0 });
   };
   const setOpen = () => {
-    const want = hover || touchOpen || focused || !!drag;
-    if (want === open) return;
-    open = want;
+    open = hover || touchOpen || focused || !!drag;
     root.classList.toggle('is-open', open);
   };
-
-  /** The station chosen: go there (once settled), unless it is where you are or now is not the time. */
   const commit = (n: number) => {
-    preview = 0;
-    if (n === active || !safeToTurn()) {
-      pendingUntil = 0;
-      showTitle(active, false);
+    if (n === chapterNow() || !safeToTurn()) {
+      held = null;
       return;
     }
-    // the marker stays on it until the transition cuts to that chapter
-    preview = n;
-    pendingUntil = performance.now() + 6000;
+    held = { pos: n, until: performance.now() + 6000 };
     goToChapter(n);
   };
 
   // --- pointer --------------------------------------------------------------------------
-  const degAt = (clientY: number) => {
-    const r = body.getBoundingClientRect();
-    const y = (clientY - r.top) / s - CY;
-    return clamp(Math.asin(clamp(y / MARK_R, -1, 1)) / rad, -LIMIT, LIMIT);
-  };
-  const nearest = (deg: number) => {
-    let best = 1;
-    STATION.forEach((d, i) => {
-      if (Math.abs(deg - d) < Math.abs(deg - STATION[best - 1])) best = i + 1;
-    });
-    return best;
-  };
+  /** Degrees of turn per px dragged along the rim, near the axis. */
+  const perPx = () => 1 / (OUTER.r * s * rad);
   const enter = (e: PointerEvent) => {
     if (e.pointerType === 'touch') return;
     hover = true;
@@ -283,44 +255,44 @@ export function mountChapterTuner(): () => void {
   };
   const down = (e: PointerEvent) => {
     if (story.getState().phase !== 'ready') return;
-    // on a touch screen the first tap opens it; dragging is for when it is open
     if (e.pointerType === 'touch' && !open) {
+      // on a touch screen the first tap opens it
       touchOpen = true;
       setOpen();
       e.preventDefault();
       return;
     }
-    if ((e.target as HTMLElement).closest('.tuner-display') || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    if ((e.target as HTMLElement).closest('.tuner-pill') || (e.pointerType === 'mouse' && e.button !== 0)) return;
     if (!safeToTurn()) return;
     e.preventDefault();
-    drag = { id: e.pointerId };
-    dragged = false;
+    held = null;
+    drag = { id: e.pointerId, y0: e.clientY, pos0: shownPos, moved: false };
     body.setPointerCapture(e.pointerId);
     root.classList.add('is-dragging');
     setOpen();
-    move(e);
   };
   const move = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
-    const d = degAt(e.clientY);
-    if (Math.abs(d - markDeg) > 1) dragged = true;
-    markDeg = d;
-    preview = nearest(d);
-    showTitle(preview, preview !== active);
+    const dy = e.clientY - drag.y0;
+    if (Math.abs(dy) > 3) drag.moved = true;
+    // down moves the markings down: towards the next chapter, as scrolling forward does
+    shownPos = clamp(drag.pos0 + (dy * perPx()) / STEP, 1, CHAPTERS.length);
   };
   const up = (e: PointerEvent) => {
     if (!drag || e.pointerId !== drag.id) return;
+    const moved = drag.moved;
     drag = null;
     root.classList.remove('is-dragging');
     if (body.hasPointerCapture(e.pointerId)) body.releasePointerCapture(e.pointerId);
-    const n = preview || nearest(markDeg);
-    // (the marker eases onto the station by itself; the chapter changes once the transition cuts)
-    if (dragged) commit(n);
-    else if (!pendingUntil) preview = 0;
-    window.setTimeout(() => (dragged = false), 0);
+    if (moved) {
+      const n = Math.round(shownPos);
+      // it settles onto that marker, and stays there until the transition brings that chapter in
+      held = { pos: n, until: performance.now() + 6000 };
+      if (n !== chapterNow()) commit(n);
+      else held = null;
+    }
     setOpen();
   };
-  // a tap elsewhere closes it on a touch screen
   const outside = (e: PointerEvent) => {
     if (touchOpen && !root.contains(e.target as Node)) {
       touchOpen = false;
@@ -338,7 +310,6 @@ export function mountChapterTuner(): () => void {
   };
   // nothing here clicks through to the page (the page's click goes to the next beat)
   const swallow = (e: MouseEvent) => e.stopPropagation();
-
   body.addEventListener('pointerenter', enter);
   body.addEventListener('pointerleave', leave);
   body.addEventListener('pointerdown', down);
@@ -353,7 +324,19 @@ export function mountChapterTuner(): () => void {
   layout();
   showTitle(active, false);
 
-  // --- each frame (from the overlay) -------------------------------------------------------
+  /** Where a chapter's number stands: on its circle at a third of its marker's angle (`rel`, degrees above the axis), tilted with it, fading out beyond the neighbours. */
+  const labelAt = (t: SVGTextElement, rel: number, isActive: boolean, isPreview: boolean) => {
+    const a = Math.abs(rel);
+    const deg = rel * LABEL.squeeze - LABEL.below * Math.max(0, 1 - a / STEP);
+    const [x, y] = at(LABEL.r, deg);
+    t.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${(-deg * LABEL.tilt).toFixed(2)})`);
+    const o = a <= STEP ? 1 - 0.5 * (a / STEP) : 0.5 * Math.max(0, 1 - (a - STEP) / 60);
+    t.style.opacity = o.toFixed(3);
+    t.classList.toggle('is-on', isActive);
+    t.classList.toggle('is-preview', isPreview);
+  };
+
+  // --- each frame -------------------------------------------------------------------------
   const update = () => {
     const now = performance.now();
     const dt = Math.min(0.1, (now - last) / 1000);
@@ -361,65 +344,42 @@ export function mountChapterTuner(): () => void {
     const n = chapterNow();
     if (n !== active) {
       active = n;
-      preview = 0;
-      pendingUntil = 0;
+      held = null;
     }
-    if (!drag && pendingUntil && now > pendingUntil && !chapterTurn.busy) {
-      preview = 0;
-      pendingUntil = 0;
-    }
-    if (!drag && !preview) showTitle(active, false);
-    // the marker: the user's while dragging; otherwise it eases onto the chapter's station (or the one let go on)
+    if (held && now > held.until && !chapterTurn.busy) held = null;
+    // the angle: the scroll's (or the snapped one after a drag), closing over cuts; the user's while dragging
     if (!drag) {
-      const to = STATION[(preview || active) - 1];
-      markDeg += (to - markDeg) * (reduced ? 1 : 1 - Math.exp(-dt * 7));
-      if (Math.abs(to - markDeg) < 0.02) markDeg = to;
+      const want = held ? held.pos : position();
+      shownPos += (want - shownPos) * (reduced ? 1 : 1 - Math.exp(-dt * 9));
+      if (Math.abs(want - shownPos) < 1e-4) shownPos = want;
     }
+    const turn = (shownPos - 1) * STEP;
+    // forward, the scale turns so the markings move down on the left: the next marker (above) comes to the axis
+    scale.setAttribute('transform', `rotate(${(-turn).toFixed(3)} ${C.x} ${C.y})`);
+    // the previewed chapter: the marker nearest the frame while dragging (or held there)
+    const preview = drag ? Math.round(shownPos) : held ? held.pos : 0;
+    for (let i = 0; i < 3; i++) {
+      // (three markers round a circle: the one 240° on is the one 120° back)
+      let rel = (i + 1 - shownPos) * STEP;
+      rel = ((((rel + 180) % 360) + 360) % 360) - 180;
+      markers[i].classList.toggle('is-on', i + 1 === active);
+      labelAt(labels[i], rel, i + 1 === active, !!preview && i + 1 === preview && preview !== active);
+      buttons[i].setAttribute('aria-current', i + 1 === active ? 'true' : 'false');
+    }
+    showTitle(preview && preview !== active ? preview : active, !!preview && preview !== active);
+
     // open and closed, eased on the clock
     const target = open ? 1 : 0;
-    if (openK !== target) {
+    if (openK !== target)
       openK = target > openK ? Math.min(1, openK + (reduced ? 1 : dt / 0.42)) : Math.max(0, openK - (reduced ? 1 : dt / 0.36));
-    }
     const e = openK * openK * (3 - 2 * openK);
-    const hidden = (W - SHOW) * s;
-    body.style.transform = `translateX(${(hidden * (1 - e) - 16 * e).toFixed(1)}px) scale(${s})`;
+    const pillW = parseFloat(pill.style.width) || 0;
+    const show = SHOW.compact + (PILL.x + pillW + SHOW.margin - SHOW.compact) * e;
+    body.style.transform = `translateX(${(-show * s).toFixed(1)}px) scale(${s})`;
     root.style.setProperty('--open', e.toFixed(3));
-
-    // the marker and its line
-    const [mx, my] = pt(MARK_R, markDeg);
-    marker.setAttribute('transform', `translate(${mx.toFixed(2)} ${my.toFixed(2)}) rotate(${(-markDeg * 0.6).toFixed(2)})`);
-    ind.setAttribute('transform', `translate(0 ${my.toFixed(2)})`);
-    leftDash.setAttribute('x2', (mx - 32).toFixed(1));
-    const right = pt(R - 50, markDeg)[0];
-    rightDash.setAttribute('x1', (mx + 30).toFixed(1));
-    rightDash.setAttribute('x2', (right - 10).toFixed(1));
-    tri2.setAttribute('d', `M${(right - 2).toFixed(1)} -4 L${(right - 8).toFixed(1)} 0 L${(right - 2).toFixed(1)} 4 Z`);
-    num.setAttribute('x', (right + 4).toFixed(1));
-    const station = drag || preview ? preview || active : active;
-    num.textContent = pad(station);
-    tailDash.setAttribute('x1', (right + 28).toFixed(1));
-    tailDash.setAttribute('x2', (right + 40).toFixed(1));
-    // the stations: the current one red; the previewed one marked
-    for (let i = 0; i < 3; i++) {
-      const cur = i + 1 === active;
-      const pre = (drag || preview) && i + 1 === (preview || active) && !cur;
-      stationTicks[i].classList.toggle('is-on', cur);
-      labels[i].classList.toggle('is-on', cur);
-      labels[i].classList.toggle('is-preview', !!pre);
-      buttons[i].setAttribute('aria-current', cur ? 'true' : 'false');
-    }
-    // the progress light along the dotted track
-    const p = progressAngle(active);
-    const count = dotDeg.findIndex((d) => d > p);
-    const upto = count < 0 ? dotDeg.length : count;
-    if (upto !== lit) {
-      lit = upto;
-      dots.forEach((c, i) => c.classList.toggle('is-lit', i < upto && dotDeg[i] >= STATION[0] - 4));
-    }
   };
 
   tuner = {
-    root,
     update,
     backdrop: () => openK * openK * (3 - 2 * openK),
     dispose() {

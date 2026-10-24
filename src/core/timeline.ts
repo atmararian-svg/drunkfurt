@@ -165,6 +165,11 @@ export function pageTurnFrom(p: number) {
   return pageTurns().find((z) => z.from >= p - 1e-6) ?? null;
 }
 
+/** Where each chapter ends (global progress): where its transition to the next begins (the last chapter: the page's end). */
+export function chapterEnds() {
+  return [...pageTurns().map((z) => z.from), 1];
+}
+
 /** Where each chapter begins (global progress): its opening shot. */
 export function chapterStarts() {
   return [0, ...pageTurns().map((z) => z.to)];

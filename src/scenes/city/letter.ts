@@ -24,7 +24,8 @@ export const LETTER = {
   hold: 1600,
 };
 
-export const INVITATION = "Hey! When you wake up, come to Crasigostraße 24.\nYou don't have to rob people. I'll help you fix your website problem.";
+// one sentence per line: at 600 px the second and third would otherwise run together and leave "problem." alone on a line
+export const INVITATION = "Hey, man. When you wake up, come to Crasigostraße 24.\nYou don't have to rob people.\nI'll help you fix your website problem.";
 
 export const letter = {
   /** The reveal is open. */
