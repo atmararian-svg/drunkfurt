@@ -224,48 +224,80 @@ body { cursor: pointer; }
 .tuner-scale .mkr.is-on { stroke: var(--red); stroke-width: 2; }
 .tuner-scale .box { fill: none; stroke: rgba(255, 255, 255, 0.1); stroke-width: 1; }
 .tuner-scale .tri { fill: #fff; }
-.tuner-scale .lb { fill: #fff; font: 400 12px/1 Inter, 'Helvetica Neue', Arial, sans-serif; }
+.tuner-scale .lb { fill: #fff; font: 400 12px/1 'JetBrains Mono', ui-monospace, monospace; }
 .tuner-scale .lb.is-preview { fill: var(--red); }
-/* the title, beside the frame on the axis: white, sized to the finished title */
-.tuner-pill {
+/* the current chapter's title, left of the frame on the axis: ◂ CHAPTER ONE, then CH.1 (JetBrains Mono 12) */
+.tuner-head {
   position: absolute;
-  top: 186px;
-  left: 132px;
-  box-sizing: border-box;
-  height: 58px;
-  padding: 0 20px;
+  top: 207px;
+  height: 16px;
   display: flex;
   align-items: center;
-  border-radius: 40px;
-  background: #fff;
-  color: #101010;
-  font: 400 24px/1 'JetBrains Mono', ui-monospace, monospace;
+  gap: 6px;
+  color: #fff;
+  font: 400 12px/16px 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: 0;
   white-space: nowrap;
+  pointer-events: none;
+}
+.tuner-head::before {
+  content: '';
+  width: 0;
+  height: 0;
+  border-top: 2.5px solid transparent;
+  border-bottom: 2.5px solid transparent;
+  border-right: 4px solid #fff;
+  margin-right: 1px;
+}
+/* the chapter tabs (Figma: a frosted panel 157 × 50, r 40, clipping a strip of tabs 42 high) */
+.tuner-tabs {
+  position: absolute;
+  top: 190px;
+  left: 154px;
+  box-sizing: border-box;
+  width: 157px;
+  height: 50px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 40px;
+  background: rgba(255, 255, 255, 0.2);
   overflow: hidden;
   opacity: var(--open, 0);
-  transition: width 0.35s var(--ease);
+  transform: scale(calc(0.94 + 0.06 * var(--open, 0)));
+  transform-origin: 0 50%;
   cursor: default;
 }
-.tuner-pill.is-preview { color: var(--red); }
-.tuner-keys { position: absolute; top: 0; right: 16px; transform: translateY(-50%); display: grid; gap: 4px; }
-.tuner-keys button {
-  position: absolute;
-  right: 0;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  padding: 6px 8px;
-  border: 0;
-  border-radius: 3px;
-  background: #fff;
-  color: #111;
-  font: 700 12px/1 var(--label);
-  pointer-events: auto;
+/* (the frosting only while open: a hidden backdrop blur still costs a full compositing pass) */
+.tuner.is-open .tuner-tabs {
+  -webkit-backdrop-filter: blur(52px);
+  backdrop-filter: blur(52px);
 }
-.tuner-keys button:focus-visible { position: static; width: auto; height: auto; clip-path: none; outline: 2px dashed var(--red); outline-offset: 2px; }
+.tuner-strip {
+  position: absolute;
+  top: 3px;
+  left: -1px;
+  display: flex;
+  gap: 2px;
+  will-change: transform;
+}
+.tuner-tab {
+  height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 1000px;
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.3);
+  font: 400 14px/1 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.03em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s ease, background-color 0.2s ease;
+}
+.tuner-tab:hover,
+.tuner-tab:focus-visible { color: #fff; outline: none; }
+.tuner-tab.is-preview { color: #fff; }
+.tuner-tab.is-on { background: #fff; color: #101010; }
+.tuner-tab:focus-visible { box-shadow: 0 0 0 2px var(--red) inset; }
+.tuner-scale .lb { cursor: pointer; }
 
 /* --- ink wipe (canvas brush strokes) and outro ------------------------- */
 .wipe,
@@ -304,10 +336,17 @@ body { cursor: pointer; }
   letter-spacing: -0.05em;
   pointer-events: auto;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
-/* (hovering only decodes its text: no colour of its own) */
-.sound[aria-pressed='false'] { background: var(--red); color: #fff; }
+/* (hovering only decodes its text, the whole word at once: no colour of its own) */
+/* off: a step back, not an alarm: frosted glass and white text, same size and place */
+.sound[aria-pressed='false'] {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
 .sound:focus-visible { outline: 2px dashed var(--red); outline-offset: 3px; }
 
 @media (max-width: 640px) {

@@ -5,7 +5,7 @@ import { story, useStory } from '../core/store';
 import { CHAPTERS } from '../core/chapters';
 import { chapterTurn, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { builtEpisodes } from '../episodes';
-import { decodeIn, hoverDecode, splitChars } from './decode';
+import { decodeAll, hoverDecode, splitChars } from './decode';
 import { BEAT, BLOCK, KO, defend, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
@@ -305,7 +305,7 @@ export function Overlay() {
     const el = soundText.current!;
     const text = `SOUND ${sound ? 'ON' : 'OFF'}`;
     if (!soundShown.current) splitChars(el);
-    else void decodeIn(el, 380, 0, { rise: 0 });
+    else void decodeAll(el, 380);
     soundShown.current = text;
   }, [sound]);
 
@@ -386,7 +386,11 @@ export function Overlay() {
         className="sound"
         onClick={toggleSound}
         onPointerEnter={(e) => {
-          if (e.pointerType !== 'touch') void decodeIn(soundText.current!, 450, 0, { rise: 0 });
+          // the whole word decodes at once, coming on and going off
+          if (e.pointerType !== 'touch') void decodeAll(soundText.current!, 420);
+        }}
+        onPointerLeave={(e) => {
+          if (e.pointerType !== 'touch') void decodeAll(soundText.current!, 260);
         }}
         aria-pressed={sound}
         aria-label={`Sound ${sound ? 'on' : 'off'}`}

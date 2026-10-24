@@ -146,6 +146,43 @@ export function decodeIn(el: HTMLElement, duration = 900, delay = 0, opts: { ris
 }
 
 /**
+ * Decodes the whole word at once (not left to right): every character turns
+ * to stand-ins together, and each settles back to its letter at its own
+ * scattered moment within `duration` ms. The text's length never changes.
+ * Resolves when all have settled. Calling it again on the same element takes
+ * over from the run before.
+ */
+const allRuns = new WeakMap<HTMLElement, number>();
+export function decodeAll(el: HTMLElement, duration = 420): Promise<void> {
+  const chars = splitChars(el);
+  const run = (allRuns.get(el) ?? 0) + 1;
+  allRuns.set(el, run);
+  if (!chars.length || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    chars.forEach((c) => show(c, null));
+    return Promise.resolve();
+  }
+  const seed = Math.floor(performance.now());
+  const settle = chars.map((_, i) => duration * (0.35 + 0.65 * hash(i + 3, seed)));
+  return new Promise((resolve) => {
+    const t0 = performance.now();
+    const frame = (now: number) => {
+      if (allRuns.get(el) !== run) return resolve();
+      const t = now - t0;
+      const tick = Math.floor(t / 50);
+      let done = true;
+      chars.forEach((c, i) => {
+        const on = t < settle[i];
+        if (on) done = false;
+        show(c, on ? glyph(i, tick + seed) : null);
+      });
+      if (done) return resolve();
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+}
+
+/**
  * Keeps an element's characters decoding indefinitely (a label that is still
  * loading): a few stand-ins at a time, never all at once. Returns a stop
  * function that resolves the text.

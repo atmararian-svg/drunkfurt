@@ -89,40 +89,51 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   on its own tilted orbit, larger and brighter the nearer they are (the supplied Framer
   "DotGridBackground", ported to a plain canvas in `src/ui/dotGrid.ts`; its frame loop only runs
   while something moves).
-- **The chapter selector** (`src/ui/chapterTuner.ts`, Figma "Drunkfurt-progress", the selector
-  frame 491 × 429, its four states): at the right edge, its axis at the design's height (45.6 %),
-  scaled with the page (1920 × 1080 = 1, never below 0.62).
-  - Geometry, from the design and made exact: one centre (276.5, 214.5); the outer circle of long
-    white ticks (r 214.5, 26 px, its dashes made 81 ticks, 4.44° apart), the inner ring of grey
-    dots (r 190.5, every 2°; the design's inner circle sat 5 px off centre), both faded top and
-    bottom by the design's gradient, which stays put. Three chapter markers 120° apart (both tick
-    counts divide 120°, so each is on a tick): longer ticks, red for the chapter you are in.
-    Fixed and horizontal: the selection frame (59 × 58, r 5, 10 % white) on the axis, the two ◂
-    marks and the red dashes on it, the numbers' text, and the white title pill (JetBrains Mono
-    24, padding 20, r 40) beside the frame.
-  - The turn is the scroll's: `position(p)` is 1 at chapter 1's opening shot, 2 at chapter 2's,
-    3 at chapter 3's, linear through a chapter up to where its transition begins (chapter 3
-    stays at 3); the whole scale group turns 120° per unit round the one centre. So a chapter's
-    marker is on the axis exactly when that chapter opens, and going forward the markings move
-    down past the frame (the next chapter comes from above); back, up. A transition is a cut in
-    the progress, so the angle shown closes on the scroll's (exponentially, a fraction of a
-    second) rather than jumping. The numbers ride with their markers, on a circle at a third of
-    their angle (so the neighbours show above and below, as in the design, 50 % white), and the
-    number and title are the chapter's own: they change when the scene does, the title decoding
-    in a pill sized to the finished title (monospace, so the decoding never resizes it).
+- **The chapter selector** (`src/ui/chapterTuner.ts`, Figma "Drunkfurt-selector": Selector-default
+  compact, Selector-1/2/3 open; the selector frame 513 × 429): at the right edge, its axis at the
+  design's height (45.6 %), scaled with the page (1920 × 1080 = 1, never below 0.62).
+  - Geometry, exact, on one centre (298.5, 214.5): the outer circle of long white ticks (r 214.5,
+    26 px, 81 ticks, 4.44° apart), the inner ring of grey dots (r 190.5, every 2°), both faded top
+    and bottom by the design's gradient, which stays put. Three chapter markers 120° apart (both
+    tick counts divide 120°): longer ticks, red for the chapter you are in. The other chapters'
+    names (CH.2, CH.3, JetBrains Mono 12, half strength, tilted 23°) ride with their markers on a
+    circle at 0.3 of their angle, as the design places them; clicking one goes there.
+  - Fixed and horizontal: the selection frame (59 × 58, r 5, 10 % white), its ◂ and red dash, the
+    current chapter's title left of it (◂ and JetBrains Mono 12), and, open, the chapter tabs.
+  - **Chapter titles**: on every entry into a chapter (after the preloader, forwards, back, a
+    jump), CHAPTER ONE / TWO / THREE at once, then after 2 s decoded (decode.ts) to CH.1 / 2 / 3,
+    which stays until the next entry. The entry is the chapter changing, nothing else (a scroll
+    within it, a re-render do not replay it); a new entry before the decode cancels it.
+  - **Chapter tabs** (open only): a frosted panel (157 × 50, r 40, white 20 %, a 10 % white edge,
+    background blur while open) clipping a strip of three tabs (ARRIVAL, NO WELCOME, THE CAVE;
+    42 high, padding 16, JetBrains Mono 14, −3 %). Inactive: white 6 % behind white 30 % text;
+    under the pointer: white text (nothing selected); the current chapter: white with near-black
+    text. The panel grows in slightly as the selector opens, then stands still; only the strip
+    moves, following (eased) the pointer's place across the panel, wherever the pointer is over
+    the selector: right → the strip slides left to show THE CAVE, left → back to ARRIVAL, never
+    further than the strip's own ends. A click on a tab goes to that chapter.
+  - **The turn is the scroll's**: `position(p)` is 1 at chapter 1's opening shot, 2 at chapter 2's,
+    3 at chapter 3's, linear through a chapter up to where its transition begins; the scale group
+    turns 120° per unit round the centre, the markings moving down past the frame going forward
+    (the next chapter comes from above), up going back. A transition is a cut in the progress,
+    so the angle shown closes on it over a fraction of a second.
+  - **Input** (all through `goToChapter`, the chapter transition; one source of truth, the
+    scroll's chapter, read by the scale, the title and the tabs alike): drag up and down on it
+    (0.8° per px: a chapter in about 150 px at full size); the wheel or trackpad over it (the page
+    does not scroll there): a wheel notch is one chapter, a trackpad's stream turns the scale in
+    proportion, never more than one chapter per gesture, and settles on the nearest when it goes
+    quiet (220 ms); a click on a chapter's name or tab; the tabs from the keyboard (Tab, ← →,
+    Enter). The scale settles on the chosen marker and holds there until the scene changes. The
+    current chapter is never restarted; nothing turns it during a transition, a scripted beat,
+    the open letter or the flight into the screen.
   - Open (pointer over it, a first tap on a touch screen, keyboard focus): it slides in to the
-    design's open frame (up to the pill plus 32 px), and the page behind dims and breaks into
-    pixels (the scene's pixel layer, `scenePixels.ts`, and an SVG pixel filter over the printed
-    matter). Dragging up and down on the scale turns it (the scroll's angle is left alone
-    meanwhile, down = forward, as scrolling); the marker passing the frame is previewed (its
-    number and the title in red); let go and it settles on that marker and, if it is another
-    chapter, `goToChapter` plays the usual transition; it holds there until the scene changes.
-    The current chapter is never restarted; nothing turns it during a transition, a scripted
-    beat, the open letter or the flight into the screen. For the keyboard: the chapters as
-    buttons, shown when focused (Tab, Enter).
-- **The sound switch** (top right, `Overlay.tsx`): SOUND ON / SOUND OFF, a white tab in the
-  manner of the letter's close control (red when off). The pointer coming onto it decodes its
-  text and changes nothing else; a click switches the sound.
+    open frame and the page behind dims and breaks into pixels (the scene's pixel layer and an
+    SVG pixel filter over the printed matter). It stays open while a drag or a wheel gesture runs.
+- **The sound switch** (top right, `Overlay.tsx`): SOUND ON is a white tab with near-black text;
+  SOUND OFF steps back: frosted glass (white 14 %, a 12 % white edge, background blur) and white
+  text, the same size and place, no red. The pointer coming on (and going off) decodes the whole
+  word at once (`decodeAll`, decode.ts: every character scrambles together and settles at its
+  own scattered moment), and changes nothing else; a click switches the sound.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
   station no longer waits for the street's models) and a marker after it that reports when
   everything in it has loaded and drawn twice; a world that fails is caught by its own error
@@ -770,7 +781,7 @@ src/
     Stylizer.tsx          classifies meshes, renders the ink buffer, composer
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
   ui/Overlay.tsx          title cards, captions, ink, prompts
-  ui/chapterTuner.ts      the chapter selector: scroll-driven circular scale, title pill, hover, drag
+  ui/chapterTuner.ts      the chapter selector: scroll-driven scale, chapter titles, tabs, drag, wheel
   ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
   ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
