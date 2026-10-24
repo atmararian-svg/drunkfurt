@@ -89,37 +89,30 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   on its own tilted orbit, larger and brighter the nearer they are (the supplied Framer
   "DotGridBackground", ported to a plain canvas in `src/ui/dotGrid.ts`; its frame loop only runs
   while something moves).
-- **The chapter ring** (`src/ui/chapterRing.ts`, asset `src/assets/ring.glb` from the supplied
-  "Stargate" model by tools/ring2glb.mjs): the page's way of saying where you are and of going
-  elsewhere. A metal ring at its own scale at the right edge, vertically centred, almost all of
-  it beyond the edge: idle, about a tenth of its diameter shows, with the current chapter's
-  marker at nine o'clock.
-  - Three markers 120° apart (the model's chevrons 0, 3 and 6; the other six and the model's
-    inner ring, whose symbols are modelled into it, are left out). The inner ring is a plain
-    band built here and engraved by a texture laid around it by angle: fine divisions every 3°
-    (longer every 15°), a track line, sector codes (DF-12 / 120…) with alignment marks, and at
-    each marker the chapter's glyph, its number and its serial DF-0n — 01 arrival: an axis
-    entered by three strokes; 02 conflict: the axis broken and shifted, crossed by a diagonal;
-    03 creation: an open frame with an axis standing in it.
-  - Light is the page's red only (`RED`, as emissive, never the whole ring): the current
-    chapter's marker and glyph lit, chapters behind you dim, those ahead dark.
-  - It follows the scroll, never leads it (the chapter of `locate(timeline.progress)`). Over the
-    last 1.6 viewport heights of a chapter its engravings light one after another towards the
-    next marker; when the chapter turns, the ring makes one eased rotation (1.5 s) to the next
-    marker while the light runs on into it, a hair past it and back (the alignment), and the new
-    marker flares once. Backwards the same, the other way; a change during a turn retargets
-    from where it is, so it never spins twice or falls out of step.
-  - Hover: it comes further in (a quarter of its diameter) and 6 % larger, with the chapter's
-    name and DRAG TO NAVIGATE beside it (decoded in). Drag (mouse, or touch: the drag does not
-    scroll the page) turns it like a dial: up and down along the rim, geared 1.6 : 1; the marker
-    nearest nine o'clock is previewed (its name in red, its marker pulsing, apart from the
-    current one); let go and it snaps to a marker and, settled, goes there through the chapter
-    transition (`goToChapter`: pixel reveal, title card). The current chapter is not restarted;
-    while a transition, a scripted beat, the open letter or the flight into the screen runs, it
-    does not turn. For the keyboard and screen readers the chapters are also buttons (shown when
-    focused).
-  - Its own small WebGL canvas (pointer-events none, so the page stays clickable around it; the
-    pointer is followed on the window), drawn only when something changes.
+- **The chapter tuner** (`src/ui/chapterTuner.ts`, after the supplied radio-tuner reference): the
+  page's way of saying where you are and of going elsewhere. Flat (SVG and DOM), dark and
+  monochrome, at the right edge, vertically centred: a curved tuning scale (long ticks every 2°,
+  longer every 6°, a dotted track, an inner ring of short ticks, faded out at both ends), the
+  three chapters as its stations (a long tick and 01 / 02 / 03), a rectangular marker on the
+  scale with ▸ and ◂ 0n on its line, and a rounded display with the chapter's title.
+  - States: compact (only the scale's edge, the numbers and the marker show, the rest beyond the
+    edge, nothing scaled down), open (pointer over it, a first tap on a touch screen, or keyboard
+    focus: it slides in, eased, and the page behind it dims and breaks into pixels: the scene
+    through its pixel layer, `scenePixels.ts`, the printed matter through an SVG pixel filter),
+    dragging (the marker follows the pointer along the scale; the nearest station is previewed,
+    its number and the title in red; it stays open however far the pointer goes), and letting go
+    (the marker snaps to the station and, if it is another chapter, `goToChapter` plays the usual
+    transition: pixel reveal, title card; the current chapter is never restarted). A click on a
+    station's number goes there too; the numbers are buttons (Tab, ↑ ↓, Enter).
+  - It never decides the chapter: every frame, from the overlay's own loop, it reads the chapter
+    and the progress from the scroll. The marker eases to the chapter's station when the chapter
+    actually changes (or holds the station let go on until the transition cuts to it); the
+    progress through a chapter runs as red light along the dotted track, only part of the way to
+    the next station. While a transition, a scripted beat, the open letter or the flight into the
+    screen runs, it does not take you anywhere.
+  - The display keeps one size for every title (the longest, THE ARRIVAL, 11 characters of
+    JetBrains Mono, plus padding); the title decodes in when it changes. On small screens the
+    whole tuner is scaled down (to 0.62 at most), its proportions kept.
 - **The sound switch** (top right, `Overlay.tsx`): SOUND ON / SOUND OFF, a white tab in the
   manner of the letter's close control (red when off). The pointer coming onto it decodes its
   text and changes nothing else; a click switches the sound.
@@ -764,8 +757,8 @@ src/
     ink.ts                ink buffer material + ink line effect
     Stylizer.tsx          classifies meshes, renders the ink buffer, composer
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
-  ui/Overlay.tsx          title cards, captions, the chapter ring's place, ink, prompts
-  ui/chapterRing.ts       the chapter ring: engravings, scroll-linked turn and light, hover, drag
+  ui/Overlay.tsx          title cards, captions, ink, prompts
+  ui/chapterTuner.ts      the chapter tuner: scale, marker, title display, hover, drag
   ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
   ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
@@ -826,12 +819,6 @@ wipe opens.
   layouts), the car's prompt placement and the close cursor. The letter
   (`src/assets/letter.webp`, 1592 × 2000) is the high-resolution image supplied with that brief,
   used as it is.
-- **The chapter ring**: "Stargate" by stale_mud (https://sketchfab.com/3d-models/stargate-1af03ae28595490aa11ce3ba07b1e23f),
-  under the Sketchfab Standard licence according to its metadata, supplied by the project owner.
-  `tools/ring2glb.mjs` keeps the outer ring and three chevrons (textures as grey JPEGs, 512 px,
-  made from the model's: base colours in grey, the lens glow map in grey so its light is the
-  page's red), then `gltf-transform weld`, `simplify --ratio 0.5 --error 0.002` and `quantize`:
-  0.58 MB. The inner ring and its engravings are this project's own (`chapterRing.ts`).
 - **Episode 04**: the room is "Surveillance room" by wa_rouk
   (https://sketchfab.com/3d-models/surveillance-room-7fd56cd3917443a99966352beefd8304), under
   the Sketchfab Standard licence according to the file's own metadata; it was supplied by the

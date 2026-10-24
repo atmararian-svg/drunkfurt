@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { audio } from '../audio/AudioDirector';
 import { clamp, smoothstep } from '../core/math';
 import { story, useStory } from '../core/store';
-import { CHAPTERS, chapterOf } from '../core/chapters';
+import { CHAPTERS } from '../core/chapters';
 import { chapterTurn, episodeRange, gateLimit, locate, scrollToProgress, timeline } from '../core/timeline';
 import { builtEpisodes } from '../episodes';
 import { decodeIn, hoverDecode, splitChars } from './decode';
@@ -16,8 +16,7 @@ import { setScenePixels } from './scenePixels';
 import { createTypewriter, Typewriter } from './typewriter';
 import { letter, letterSpot, pickLetter } from '../scenes/city/letter';
 import { closeLetterNow, openLetter } from './letterReveal';
-import { goToChapter } from './chapterTransition';
-import { mountChapterRing, ringOwnsPointer } from './chapterRing';
+import { mountChapterTuner, tunerBackdrop, updateTuner } from './chapterTuner';
 import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
 import { PressPrompt } from './PressPrompt';
 
@@ -62,8 +61,6 @@ function inkAt(p: number): { w: number; mode: 'close' | 'open' } {
   return locate(p).id === 'outro' ? { w: 1, mode: 'close' } : { w: 0, mode: 'open' };
 }
 
-const pad = (n: number) => String(n).padStart(2, '0');
-
 /**
  * Everything on top of the canvas is printed matter: a title panel, caption
  * boxes, brush-stroke wipes between shots, the one prompt the story asks you to
@@ -74,9 +71,8 @@ export function Overlay() {
   const prompt = useStory((s) => s.prompt);
   const sound = useStory((s) => s.sound);
   const root = useRef<HTMLDivElement>(null);
-  const ringHost = useRef<HTMLDivElement>(null);
   const soundText = useRef<HTMLSpanElement>(null);
-  useEffect(() => mountChapterRing(ringHost.current!), []);
+  useEffect(() => mountChapterTuner(), []);
   // one list for the page's life: the effects below must not re-run (and restart what they drive) on every re-render
   const episodes = useMemo(builtEpisodes, []);
 
@@ -146,7 +142,11 @@ export function Overlay() {
       const ask = story.getState().prompt;
       updateCombatPrompts(actionShown(id, local) || ask === 'rev', ask === 'defend' ? 'defend' : ask === 'rev' ? 'rev' : null);
       const look = combatLook(id, local);
-      setScenePixels(look.block, look.blur, look.dark);
+      // the chapter tuner open: the page behind it dims and breaks into pixels (the scene, and the printed matter over it)
+      updateTuner();
+      const tk = tunerBackdrop();
+      setScenePixels(Math.max(look.block, 1 + 7 * tk), Math.max(look.blur, 0.35 * tk), Math.max(look.dark, 0.45 * tk));
+      el.style.filter = tk > 0.02 ? `url(#df-pixelate) brightness(${(1 - 0.55 * tk).toFixed(3)})` : '';
       // the thoughts in the car, once the door has shut (car/thoughts.ts holds the story until they are done)
       const think = id === 'car' && updateThoughts();
       if (think !== thoughtsOn) {
@@ -203,6 +203,7 @@ export function Overlay() {
       if (!thoughts.done) thoughts.started = false;
       unmountPrompts();
       setScenePixels(1);
+      el.style.filter = '';
       closeLetterNow();
     };
   }, [episodes]);
@@ -263,6 +264,8 @@ export function Overlay() {
         return;
       }
       if (letter.open) return;
+      // Enter on the chapter tuner's stations is theirs
+      if ((e.target as HTMLElement | null)?.closest?.('.tuner')) return;
       if (e.code === 'Enter' || (e.code === 'Space' && story.getState().prompt)) {
         e.preventDefault();
         next();
@@ -271,8 +274,6 @@ export function Overlay() {
     const onClick = (e: MouseEvent) => {
       unlock();
       if ((e.target as HTMLElement).closest('a,button,.fx-press,.whiteout,.preloader,.letter-layer')) return;
-      // a press on the chapter ring (or the end of a turn of it) is the ring's
-      if (ringOwnsPointer()) return;
       next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -376,24 +377,7 @@ export function Overlay() {
         <i />
       </div>
 
-      {/* the chapter ring (chapterRing.ts) is drawn into .ring-host; for the keyboard and screen readers, the chapters as buttons */}
-      <div className="ring-host" ref={ringHost} />
-      <nav className="ring-nav" aria-label="DRUNKFURT chapters">
-        {CHAPTERS.map((c) => (
-          <button
-            key={c.number}
-            type="button"
-            aria-label={`Chapter ${c.number}: ${c.title}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              // the chapter you are in is not restarted
-              if (chapterOf(locate(timeline.progress).id).number !== c.number) goToChapter(c.number);
-            }}
-          >
-            {pad(c.number)} {c.title.toUpperCase()}
-          </button>
-        ))}
-      </nav>
+      {/* the chapter tuner (chapterTuner.ts) is its own element on the page, so the dimming of the page behind it leaves it alone */}
 
       {/* the pointer coming onto it decodes its text (decode.ts), nothing else; a click switches the sound */}
       <button

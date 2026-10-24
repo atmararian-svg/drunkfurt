@@ -189,69 +189,82 @@ body { cursor: pointer; }
   to { background-position: 0 34px; }
 }
 
-/* --- the chapter ring (chapterRing.ts): a sliver at the right edge, vertically centred --- */
-.ring {
-  position: absolute;
+/* --- the chapter tuner (chapterTuner.ts, after the supplied radio tuner): right edge, centred --- */
+.tuner {
+  position: fixed;
   top: 50%;
   right: 0;
+  z-index: 4;
   transform: translateY(-50%);
   pointer-events: none;
+  transition: opacity 0.6s var(--ease);
 }
-.is-over-ring body { cursor: grab; }
-.is-turning-ring body,
-.is-turning-ring * { cursor: grabbing !important; user-select: none; }
-.ring-label {
+.is-preloading .tuner,
+.site-handoff .tuner { opacity: 0; }
+.is-preloading .tuner-body { pointer-events: none; }
+.tuner-body {
   position: absolute;
-  top: 50%;
-  display: grid;
-  justify-items: end;
-  gap: 6px;
-  transform: translateY(-50%);
-  font: 700 14px/1 'JetBrains Mono', ui-monospace, monospace;
-  letter-spacing: -0.02em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  color: #fff;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.25s var(--ease);
-}
-.ring-label.is-on { opacity: 1; }
-.ring-name { color: #fff; }
-.ring-label.is-preview .ring-name { color: var(--red); }
-.ring-hint { font-size: 11px; color: rgba(241, 240, 233, 0.6); }
-/* the chapters as plain buttons, for the keyboard and screen readers: shown only when focused */
-.ring-nav {
-  position: absolute;
-  top: 50%;
-  right: 24px;
-  display: grid;
-  gap: 4px;
-  transform: translateY(-50%);
-}
-.ring-nav button {
-  position: absolute;
-  right: 0;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
-  padding: 6px 8px;
-  border: 0;
-  background: #fff;
-  color: #111;
-  font: 700 12px/1 'JetBrains Mono', ui-monospace, monospace;
+  top: 0;
+  left: 0;
+  width: 480px;
+  height: 360px;
+  transform-origin: 0 0;
   pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  cursor: grab;
 }
-.ring-nav button:focus-visible {
-  position: static;
-  width: auto;
-  height: auto;
-  clip-path: none;
-  outline: 2px dashed var(--red);
-  outline-offset: 2px;
+.tuner.is-dragging .tuner-body { cursor: grabbing; }
+.tuner-scale { position: absolute; inset: 0; overflow: visible; }
+.tuner-scale .tk { stroke: rgba(241, 240, 233, 0.22); stroke-width: 1.4; }
+.tuner-scale .tk--major { stroke: rgba(241, 240, 233, 0.4); }
+.tuner-scale .tk--inner { stroke: rgba(241, 240, 233, 0.26); stroke-width: 1.6; }
+.tuner-scale .dt { fill: rgba(241, 240, 233, 0.32); }
+.tuner-scale .dt.is-lit { fill: var(--red); }
+.tuner-scale .st { stroke: rgba(241, 240, 233, 0.75); stroke-width: 1.6; }
+.tuner-scale .st.is-on { stroke: var(--red); stroke-width: 2.2; }
+.tuner-scale .lb { fill: rgba(241, 240, 233, 0.5); font: 500 15px/1 var(--label); letter-spacing: -0.02em; }
+.tuner-scale .lb.is-on { fill: #fff; font-weight: 700; }
+.tuner-scale .lb.is-preview { fill: var(--red); font-weight: 700; }
+.tuner-scale .tri { fill: #fff; }
+.tuner-scale .dash { stroke: var(--red); stroke-width: 1.6; }
+.tuner-scale .num { fill: #fff; font: 500 11px/1 var(--label); }
+.tuner-scale .mk-box { fill: rgba(12, 12, 12, 0.88); stroke: rgba(241, 240, 233, 0.55); stroke-width: 1.2; }
+.tuner-scale .mk-ln { stroke: rgba(241, 240, 233, 0.6); stroke-width: 2; stroke-linecap: round; }
+.tuner-scale .mk-ln--on { stroke: #fff; stroke-width: 2.4; }
+.tuner.is-dragging .mk-box { stroke: #fff; }
+/* the display: one size for every title (the longest, 11 characters of a monospace, with its padding) */
+.tuner-display {
+  position: absolute;
+  top: 144px;
+  left: 222px;
+  box-sizing: border-box;
+  width: calc(11 * 0.6 * 26px + 56px);
+  height: 72px;
+  padding: 0 28px;
+  display: flex;
+  align-items: center;
+  border-radius: 36px;
+  background: #222;
+  color: #fff;
+  font: 500 26px/1 var(--label);
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: calc(0.15 + 0.85 * var(--open, 0));
+  cursor: default;
 }
+.tuner-display.is-preview { color: var(--red); }
+.tuner-go {
+  position: absolute;
+  width: 68px;
+  height: 36px;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+.tuner-go:focus-visible { outline: 2px dashed var(--red); outline-offset: 2px; }
 
 /* --- ink wipe (canvas brush strokes) and outro ------------------------- */
 .wipe,
