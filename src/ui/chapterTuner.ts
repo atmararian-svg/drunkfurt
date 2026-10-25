@@ -255,11 +255,14 @@ export function mountChapterTuner(): () => void {
   let stripTo = PANEL.inset;
   let stripAt = PANEL.inset;
   let s = 1;
+  /** A phone (a touch screen under 600 px on its short side). */
+  let narrow = false;
   let last = performance.now();
 
   const layout = () => {
     // (on a touch screen never below 0.8: its tabs and names stay big enough for a finger)
     s = clamp(Math.min(window.innerWidth / 1920, window.innerHeight / 1080), TOUCH ? 0.8 : 0.62, 1.25);
+    narrow = TOUCH && Math.min(window.innerWidth, window.innerHeight) < 600;
     root.style.setProperty('--s', String(s));
   };
   /** The chapter the title shows (0: none yet). */
@@ -513,7 +516,8 @@ export function mountChapterTuner(): () => void {
       const [x, y] = at(LABEL.r, deg);
       names[i].setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${(deg * LABEL.tilt).toFixed(2)})`);
       const o = i + 1 === active ? 0 : a <= STEP ? 0.5 * clamp((a - 30) / 50, 0, 1) : 0.5 * clamp(1 - (a - STEP) / 60, 0, 1);
-      names[i].style.opacity = o.toFixed(3);
+      // (on a narrow touch screen the neighbours' names only show once it is open: closed, the sliver stays quiet over the scene)
+      names[i].style.opacity = (narrow ? o * openK * openK * (3 - 2 * openK) : o).toFixed(3);
       names[i].classList.toggle('is-preview', !!preview && preview === i + 1 && preview !== active);
       tabs[i].classList.toggle('is-on', i + 1 === active);
       tabs[i].classList.toggle('is-preview', !!preview && preview === i + 1 && preview !== active);
