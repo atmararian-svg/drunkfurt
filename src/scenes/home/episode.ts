@@ -6,6 +6,7 @@ import type { EpisodeDef } from '../../episodes/types';
 import { DISPLAY, DISPLAY_NORMAL, HOME_BEAT, SEAT_EYE } from './layout';
 import { flyAt, monitor, resetMonitor } from './monitor';
 import { RoomScene } from './RoomScene';
+import { TOUCH } from '../../ui/touch';
 
 /**
  * Episode 4 camera. The page opens on the way in, in the dark behind the
@@ -100,7 +101,7 @@ export const homeEpisode: EpisodeDef = {
   },
   captions: [
     { from: 0.16, to: 0.38, place: 'tl', text: 'CRASIGOSTRAẞE 24. EVERYTHING I HAVE BUILT IS ON THESE SCREENS. TIME TO SHOW IT.' },
-    { from: 0.74, to: 1, place: 'bl', tone: 'yellow', text: 'CLICK THE SCREEN.', when: () => monitor.armed && !monitor.entering },
+    { from: 0.74, to: 1, place: 'bl', tone: 'yellow', text: TOUCH ? 'TAP THE SCREEN.' : 'CLICK THE SCREEN.', when: () => monitor.armed && !monitor.entering },
   ],
   beats: [0, HOME_BEAT.opened, 0.32, HOME_BEAT.atChair, HOME_BEAT.gate],
 };

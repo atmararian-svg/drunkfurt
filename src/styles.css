@@ -711,6 +711,8 @@ body { cursor: pointer; }
   line-height: 1;
 }
 .fx-key-d { display: block; letter-spacing: 0; text-box: trim-both cap alphabetic; }
+/* (touch: the key holds the word TAP, so it widens to it) */
+.fx-key--tap { width: auto; padding: 0 calc(12 * var(--u)); }
 @supports not (text-box: trim-both cap alphabetic) {
   /* without trimming, the capitals sit high in the line box by about the descender's depth */
   .fx-key-d { transform: translateY(0.06em); }

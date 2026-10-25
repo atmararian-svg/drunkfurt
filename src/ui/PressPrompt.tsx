@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { ARROW } from './fightArt';
+import { TOUCH } from './touch';
 
 /**
  * One action prompt panel (combatPrompt.ts drives it): PRESS [D] on the first
@@ -29,10 +30,11 @@ export function PressPrompt({
         <svg className="fx-arrow" viewBox={`0 0 ${ARROW.w} ${ARROW.h}`} aria-hidden>
           <path d={ARROW.d} fill="currentColor" />
         </svg>
+        {/* on a touch screen there is no D: the red key says TAP (the panel is the button) */}
         <span className="fx-press-d">
-          <span className="fx-word" data-text="PRESS" />
-          <span className="fx-key">
-            <span className="fx-key-d" data-text="D" />
+          {!TOUCH && <span className="fx-word" data-text="PRESS" />}
+          <span className={TOUCH ? 'fx-key fx-key--tap' : 'fx-key'}>
+            <span className="fx-key-d" data-text={TOUCH ? 'TAP' : 'D'} />
           </span>
         </span>
       </span>

@@ -8,6 +8,7 @@ import { BEAT, BLOCK, KO, encounter, encounterAt, resetEncounter } from './encou
 import { INVITATION, LETTER, invitationTyped, letter, resetLetter } from './letter';
 import { strangerGroundAt } from './strangerRoute';
 import { cityTrack } from './track';
+import { TOUCH } from '../../ui/touch';
 
 /**
  * Episode 2 camera, by beat (local progress):
@@ -112,7 +113,8 @@ export const cityEpisode: EpisodeDef = {
     { from: 0.79, to: 0.9, place: 'tr', tone: 'speech', kicker: 'ATTACKER:', text: 'Your bag. Give it to me. Now.', when: () => !encounter.outcome },
     { from: 0.92, to: 0.955, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', when: () => encounter.outcome === 'blocked' },
     // the letter he dropped: the story waits until it has been read (letter.ts), then you tell him where to find you
-    { from: LETTER.gate - 0.006, to: 1, place: 'bl', tone: 'yellow', text: 'Something fell out of his coat. A letter. Click it.', when: () => encounter.outcome === 'blocked' && !letter.read },
+    // (from where the fight's own playback ends: the letter can be picked up from there, see letter.ts)
+    { from: LETTER.from + 0.04, to: 1, place: 'bl', tone: 'yellow', text: `Something fell out of his coat. A letter. ${TOUCH ? 'Tap' : 'Click'} it.`, when: () => encounter.outcome === 'blocked' && !letter.read },
     { from: LETTER.gate - 0.006, to: 1, place: 'tr', tone: 'speech', kicker: 'ME:', text: INVITATION, when: () => letter.read, onTyped: invitationTyped },
     { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'When I came to, he was gone. He did not even take the bag.', when: () => encounter.outcome === 'knockedOut' },
   ],

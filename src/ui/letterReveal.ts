@@ -13,6 +13,7 @@ import {
 import letterUrl from '../assets/letter.webp';
 import { letter } from '../scenes/city/letter';
 import { pinScroll } from '../core/timeline';
+import { TOUCH } from './touch';
 
 /**
  * Reading the letter, after Framer's "CrumpledPaper Reveal": the image starts
@@ -140,12 +141,12 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   stageEl.className = 'letter-stage';
   const label = document.createElement('div');
   label.className = 'letter-cursor';
-  label.textContent = 'CLICK TO CLOSE';
+  label.textContent = TOUCH ? 'TAP TO CLOSE' : 'CLICK TO CLOSE';
   label.setAttribute('aria-hidden', 'true');
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'letter-close';
-  button.textContent = 'CLICK TO CLOSE';
+  button.textContent = TOUCH ? 'TAP TO CLOSE' : 'CLICK TO CLOSE';
   // for assistive technology: the letter's own words are in the image; it is described as what it is
   const alt = document.createElement('p');
   alt.className = 'dc-sr';

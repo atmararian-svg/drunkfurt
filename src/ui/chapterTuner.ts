@@ -6,6 +6,7 @@ import { monitor } from '../scenes/home/monitor';
 import { goToChapter } from './chapterTransition';
 import { decodeIn, splitChars } from './decode';
 import { RED } from './palette';
+import { TOUCH } from './touch';
 
 /**
  * The chapter selector (Figma "Drunkfurt-selector": Selector-default, the
@@ -257,7 +258,8 @@ export function mountChapterTuner(): () => void {
   let last = performance.now();
 
   const layout = () => {
-    s = clamp(Math.min(window.innerWidth / 1920, window.innerHeight / 1080), 0.62, 1.25);
+    // (on a touch screen never below 0.8: its tabs and names stay big enough for a finger)
+    s = clamp(Math.min(window.innerWidth / 1920, window.innerHeight / 1080), TOUCH ? 0.8 : 0.62, 1.25);
     root.style.setProperty('--s', String(s));
   };
   /** The chapter the title shows (0: none yet). */
@@ -316,6 +318,12 @@ export function mountChapterTuner(): () => void {
       void decodeIn(title, reduced ? 1 : 520, 0, { rise: 0 });
     }, FULL_MS);
   };
+  /** With no pointer to follow (touch), the strip brings the current chapter's tab into the middle of the panel. */
+  const showActiveTab = () => {
+    const t = tabs[active - 1];
+    const room = Math.min(0, PANEL.w - PANEL.inset - strip.offsetWidth);
+    stripTo = clamp(PANEL.w / 2 - (t.offsetLeft + t.offsetWidth / 2), room, PANEL.inset);
+  };
   const setOpen = () => {
     open = hover || touchOpen || focused || !!drag || !!wheel;
     root.classList.toggle('is-open', open);
@@ -345,6 +353,7 @@ export function mountChapterTuner(): () => void {
     if (e.pointerType === 'touch' && !open) {
       // on a touch screen the first tap opens it
       touchOpen = true;
+      showActiveTab();
       setOpen();
       e.preventDefault();
       return;
@@ -468,6 +477,7 @@ export function mountChapterTuner(): () => void {
     const n = chapterNow();
     if (n !== active) {
       active = n;
+      if (TOUCH) showActiveTab();
       held = null;
     }
     // a chapter entered (after the preloader, forwards, back or by a jump): its full title, then CH.n; once per entry
