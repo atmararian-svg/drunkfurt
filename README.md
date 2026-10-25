@@ -40,6 +40,32 @@ the camera is travelling. Scroll also drives events: in Episode 1 a traveller cr
 front of you and the train door slides shut behind you, both scrubbing backwards when you
 scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) runs on time.
 
+### Phones and tablets
+
+The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked at 390 × 844 and
+844 × 390 (a phone) and 820 × 1180 (a tablet):
+
+- **Taps work everywhere.** While the page is held (the preloader, a chapter transition, the
+  open letter) only a touch's move is swallowed, never its start: swallowing that also swallowed
+  every tap, and the sound choice and the letter's close could not be tapped.
+- **Words for touch**: the prompts read [TAP] TO DEFEND and [TAP] TO REV (the red key says TAP;
+  the panel is the button, and the rev is a press-and-hold on it, as the D was), the letter's
+  close TAP TO CLOSE, the hints "Tap it." and TAP THE SCREEN.
+- **Sound choice, upright**: on a page taller than wide the pieces are stacked on a 1080 × 1920
+  frame (ENABLE above, SOUND in the middle, DISABLE below) and the page splits into a top and a
+  bottom half; a tap on a half chooses it.
+- **Wider shots upright**: the camera's vertical field of view opens up on a portrait page
+  (its tangent × aspect^-0.6, at most 1.7 ×: about 1.25 × on a tablet, 1.6 × on a phone), so the
+  wide shots keep more of their width (`portraitFov`, `ScrollCameraRig.tsx`).
+- **The letter**: too small to read whole on a phone, so a tap on the sheet zooms in (2.4 ×) on
+  the point tapped, a drag moves over it, another tap zooms out; TAP TO CLOSE closes it (a line
+  above it says TAP THE LETTER TO ZOOM). With a mouse nothing changes.
+- **The chapter selector**: a first tap opens it, then drag or tap; never below 0.8 of its size
+  (finger-sized tabs and names); the tab strip brings the current chapter's tab into view (no
+  pointer to follow); on a phone the neighbours' names only show once it is open.
+- **Lighter**: the 3D page's pixel density is capped at 1.25 on touch devices (1.75 elsewhere).
+- `viewport-fit=cover` (the safe areas are already kept clear), no double-tap zoom, no tap flash.
+
 ## Chapters, preloader and transitions
 
 Chapters (`src/core/chapters.ts`) are what the visitor sees: what the preloader loads, what the
