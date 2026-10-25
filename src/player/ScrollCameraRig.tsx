@@ -12,6 +12,18 @@ import { playerState } from './playerState';
 /** Time-driven shots can still take the camera for scripted beats (e.g. slow motion). */
 export const cameraDirector = new ShotPlayer();
 /** Live camera pose, for dev inspection and for starting shots from the current view. */
+/**
+ * On a page taller than wide (a phone upright, a tablet in portrait) the shots, composed for a
+ * wide frame, would lose most of their width. The vertical field of view is opened up there, by
+ * up to 1.7 × in its tangent (aspect^-0.6: about 1.25 × on a tablet, 1.6 × on a phone), so more
+ * of each shot's width stays in view without the fish-eye of keeping all of it.
+ */
+export function portraitFov(fov: number, aspect: number) {
+  if (aspect >= 1) return fov;
+  const k = Math.min(1.7, Math.pow(aspect, -0.6));
+  return (2 * Math.atan(Math.tan((fov * Math.PI) / 360) * k) * 180) / Math.PI;
+}
+
 export const rigPose: CameraPose = { position: new Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 54 };
 
 const LOOK_YAW = deg(7);
@@ -103,7 +115,7 @@ export function ScrollCameraRig() {
       pose.position.z + st.off.z - sin * bobX,
     );
     camera.rotation.set(pose.pitch + st.lookPitch * loose, pose.yaw + st.lookYaw * loose, pose.roll + Math.sin(st.phase) * 0.003 * k * loose);
-    const fov = pose.fov ?? 54;
+    const fov = portraitFov(pose.fov ?? 54, (camera as { aspect?: number }).aspect ?? 1.6);
     if (Math.abs(camera.fov - fov) > 0.01) {
       camera.fov = fov;
       camera.updateProjectionMatrix();

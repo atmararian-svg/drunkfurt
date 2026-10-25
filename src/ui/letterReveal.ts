@@ -53,6 +53,8 @@ export const LETTER_REVEAL = {
 };
 /** The sheet's aspect (width / height): the supplied image's, 1592 × 2000. */
 const ASPECT = 1592 / 2000;
+/** The reading zoom on a touch screen (a tap on the sheet). */
+const ZOOM = 2.4;
 
 const vertex = /* glsl */ `
 uniform float uUnfold;
@@ -147,6 +149,12 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   button.type = 'button';
   button.className = 'letter-close';
   button.textContent = TOUCH ? 'TAP TO CLOSE' : 'CLICK TO CLOSE';
+  // (touch: a tap on the sheet zooms in to read it; said once, under the button)
+  const hint = document.createElement('p');
+  hint.className = 'letter-hint';
+  hint.textContent = 'TAP THE LETTER TO ZOOM';
+  hint.setAttribute('aria-hidden', 'true');
+  if (TOUCH) root.append(hint);
   // for assistive technology: the letter's own words are in the image; it is described as what it is
   const alt = document.createElement('p');
   alt.className = 'dc-sr';
@@ -173,6 +181,9 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   let to = 1;
   let ms = LETTER_REVEAL.open;
   const light = new Vector2(0.3, 0.4);
+  let zoom = 1;
+  let zoomTo = 1;
+  const pan = new Vector2();
   const target = new Vector2(0.3, 0.4);
 
   // --- WebGL, or the CSS fallback
@@ -269,6 +280,14 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
       // lying on the ground (tipped away), turning to face you as it opens; a slight drift in the hand once open
       sheet.rotation.set(-1.15 * k * k + Math.sin(now / 2100) * 0.012 * unfold, 0.35 * k + Math.sin(now / 2700) * 0.015 * unfold, 0.6 * k);
       sheet.scale.setScalar(ground.scale + (1 - ground.scale) * unfold);
+      // (touch) the reading zoom: the camera closes in on the point tapped, and pans with a drag
+      zoom += (zoomTo - zoom) * (reduced ? 1 : 0.18);
+      if (Math.abs(zoomTo - zoom) < 0.002) zoom = zoomTo;
+      const f = (zoom - 1) / (ZOOM - 1);
+      cam.zoom = zoom;
+      cam.position.x = pan.x * f;
+      cam.position.y = pan.y * f;
+      cam.updateProjectionMatrix();
       renderer.render(scene, cam);
     } else if (fallback) {
       const k = 1 - unfold;
@@ -290,13 +309,62 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     target.set((e.clientX / window.innerWidth) * 2 - 1, -((e.clientY / window.innerHeight) * 2 - 1));
   };
   const opened = performance.now();
+  /**
+   * On a touch screen the sheet is too small to read whole: a tap on it zooms
+   * in (ZOOM ×) on the point tapped, a drag then moves over it, another tap
+   * zooms back out; the visible TAP TO CLOSE button closes it. With a mouse a
+   * click anywhere closes it, as before.
+   */
+  let touch: { x: number; y: number; px: number; py: number; moved: boolean } | null = null;
+  let lastTouch = 0;
+  const limitPan = () => {
+    pan.x = Math.max(-ASPECT / 2, Math.min(ASPECT / 2, pan.x));
+    pan.y = Math.max(-0.5, Math.min(0.5, pan.y));
+  };
+  const touchDown = (e: PointerEvent) => {
+    if (e.pointerType !== 'touch' || (e.target as HTMLElement).closest('.letter-close')) return;
+    touch = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y, moved: false };
+  };
+  const touchMove = (e: PointerEvent) => {
+    if (!touch || e.pointerType !== 'touch') return;
+    const dx = e.clientX - touch.x;
+    const dy = e.clientY - touch.y;
+    if (Math.hypot(dx, dy) > 8) touch.moved = true;
+    if (zoomTo > 1 && touch.moved) {
+      const h = fit().h * zoom;
+      pan.x = touch.px - dx / h;
+      pan.y = touch.py + dy / h;
+      limitPan();
+    }
+  };
+  const touchUp = (e: PointerEvent) => {
+    if (!touch || e.pointerType !== 'touch') return;
+    lastTouch = performance.now();
+    if (!touch.moved && performance.now() - opened > 350 && renderer) {
+      if (zoomTo > 1) zoomTo = 1;
+      else {
+        // in on the point tapped (in sheet units: the sheet is 1 high)
+        const h = fit().h;
+        pan.x = (e.clientX - window.innerWidth / 2) / h;
+        pan.y = -(e.clientY - window.innerHeight / 2) / h;
+        limitPan();
+        zoomTo = ZOOM;
+      }
+    }
+    touch = null;
+  };
   const click = (e: MouseEvent) => {
     e.stopPropagation();
     e.preventDefault();
     // the click that opened it does not close it
     if (performance.now() - opened < 350) return;
+    // a tap is the zoom's (above); only the button closes on a touch screen
+    if (performance.now() - lastTouch < 700 && !(e.target as HTMLElement).closest('.letter-close')) return;
     close();
   };
+  root.addEventListener('pointerdown', touchDown);
+  root.addEventListener('pointermove', touchMove);
+  root.addEventListener('pointerup', touchUp);
   const key = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       e.preventDefault();
@@ -314,6 +382,7 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   function close() {
     if (closing) return;
     closing = true;
+    zoomTo = 1;
     from = unfold;
     to = 0;
     ms = LETTER_REVEAL.close * Math.max(0.5, unfold);
