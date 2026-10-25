@@ -31,6 +31,20 @@ import { DISABLE_PATH, ENABLE_PATH } from './soundWords';
  * resolves or when `cancel` is called.
  */
 const FRAME = { w: 1920, h: 1080 };
+/**
+ * On a page taller than wide (a phone held upright, a tablet in portrait) the
+ * same pieces are stacked instead, on a 1080 × 1920 frame: ENABLE above,
+ * SOUND in the middle, DISABLE below, and the page splits into a top and a
+ * bottom half. The words keep their own size and shape; only their places change.
+ */
+const TALL = {
+  frame: { w: 1080, h: 1920 },
+  enable: { x: (1080 - 846) / 2, y: 300, w: 846, h: 412 },
+  disable: { x: (1080 - 975) / 2, y: 1210, w: 975, h: 412 },
+  /** SOUND's shift from its place on the wide frame (its middle to the page's middle, between the words). */
+  sound: { x: 540 - 960, y: 930 - 958 },
+  split: 960,
+};
 const ENABLE = { x: 24, y: 24, w: 846, h: 412 };
 const DISABLE = { x: 921, y: 24, w: 975, h: 412 };
 /** The line between the two words (design px). */
@@ -134,6 +148,8 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   let u = 1;
   let left = 0;
   let top = 0;
+  let tall = false;
+  let boxes = { enable: ENABLE, disable: DISABLE };
   let state: State = 'none';
   let done = false;
   let raf = 0;
@@ -159,14 +175,18 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   const layout = () => {
     const W = window.innerWidth;
     const H = window.innerHeight;
-    u = Math.min(W / FRAME.w, H / FRAME.h);
-    left = (W - FRAME.w * u) / 2;
-    top = (H - FRAME.h * u) / 2;
-    Object.assign(frame.style, { left: `${left}px`, top: `${top}px`, width: `${FRAME.w * u}px`, height: `${FRAME.h * u}px` });
+    tall = W / H < 0.8;
+    const fr = tall ? TALL.frame : FRAME;
+    boxes = tall ? { enable: TALL.enable, disable: TALL.disable } : { enable: ENABLE, disable: DISABLE };
+    u = Math.min(W / fr.w, H / fr.h);
+    left = (W - fr.w * u) / 2;
+    top = (H - fr.h * u) / 2;
+    host.classList.toggle('is-tall', tall);
+    Object.assign(frame.style, { left: `${left}px`, top: `${top}px`, width: `${fr.w * u}px`, height: `${fr.h * u}px` });
     const dpr = Math.min(2, window.devicePixelRatio || 1);
     for (const [c, r, key] of [
-      [enable, ENABLE, 'enable'],
-      [disable, DISABLE, 'disable'],
+      [enable, boxes.enable, 'enable'],
+      [disable, boxes.disable, 'disable'],
     ] as const) {
       Object.assign(c.style, { left: `${r.x * u}px`, top: `${r.y * u}px`, width: `${r.w * u}px`, height: `${r.h * u}px` });
       c.width = sharp[key].width = Math.max(1, Math.round(r.w * u * dpr));
@@ -175,16 +195,25 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     }
     word.style.fontSize = `${SOUND_SIZE * u}px`;
     placeLetters(false);
-    // the halves meet at the line between the words
-    const split = left + SPLIT * u;
-    onBtn.style.width = `${split}px`;
-    offBtn.style.left = `${split}px`;
+    // the halves meet at the line between the words: left and right, or (tall) top and bottom
+    if (tall) {
+      const split = top + TALL.split * u;
+      Object.assign(onBtn.style, { left: '0px', right: '0px', width: 'auto', top: '0px', bottom: 'auto', height: `${split}px` });
+      Object.assign(offBtn.style, { left: '0px', right: '0px', width: 'auto', top: `${split}px`, bottom: '0px', height: 'auto' });
+    } else {
+      const split = left + SPLIT * u;
+      Object.assign(onBtn.style, { left: '0px', right: 'auto', width: `${split}px`, top: '0px', bottom: '0px', height: 'auto' });
+      Object.assign(offBtn.style, { left: `${split}px`, right: '0px', width: 'auto', top: '0px', bottom: '0px', height: 'auto' });
+    }
     paint(performance.now());
   };
 
   const placeLetters = (animate: boolean) => {
     letters.forEach((s, i) => {
-      const { x, y, deg } = LAYOUT[state][i];
+      const p = LAYOUT[state][i];
+      const x = p.x + (tall ? TALL.sound.x : 0);
+      const y = p.y + (tall ? TALL.sound.y : 0);
+      const deg = p.deg;
       s.style.transition = animate ? '' : 'none';
       // the same functions in every state (translate, rotate), so the browser glides between them
       s.style.transform = `translate(${(x * u).toFixed(2)}px, ${(y * u).toFixed(2)}px) rotate(${deg.toFixed(2)}deg)`;
@@ -217,7 +246,7 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     }
     for (const key of ['enable', 'disable'] as const) {
       const c = key === 'enable' ? enable : disable;
-      const r = key === 'enable' ? ENABLE : DISABLE;
+      const r = boxes[key];
       const chosenOther = (key === 'enable' && state === 'off') || (key === 'disable' && state === 'on');
       const target = chosenOther ? INACTIVE_BLOCK : 1;
       // coming in: from INTRO_BLOCK down on the intro's own curve; afterwards: eased towards the state's target
@@ -296,12 +325,14 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   const GIVE = 14;
   const move = (e: PointerEvent) => {
     if (e.pointerType === 'touch') return;
-    slideTo(e.clientX - (left + SOUND_MID * u));
+    // (stacked, the halves are top and bottom, and SOUND stays in the middle)
+    const at = tall ? e.clientY : e.clientX;
+    if (!tall) slideTo(e.clientX - (left + SOUND_MID * u));
     wake();
-    const split = left + SPLIT * u;
-    if (e.clientX < split - GIVE) set('on');
-    else if (e.clientX > split + GIVE) set('off');
-    else if (state === 'none') set(e.clientX < split ? 'on' : 'off');
+    const split = tall ? top + TALL.split * u : left + SPLIT * u;
+    if (at < split - GIVE) set('on');
+    else if (at > split + GIVE) set('off');
+    else if (state === 'none') set(at < split ? 'on' : 'off');
   };
   const leave = () => {
     slideTo(0);
@@ -326,18 +357,18 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
   const offClick = click(false);
   const focusOn = () => {
     set('on');
-    slideTo((UNDER.on - SOUND_MID) * u);
+    if (!tall) slideTo((UNDER.on - SOUND_MID) * u);
   };
   const focusOff = () => {
     set('off');
-    slideTo((UNDER.off - SOUND_MID) * u);
+    if (!tall) slideTo((UNDER.off - SOUND_MID) * u);
   };
   const key = (e: KeyboardEvent) => {
     if (done) return;
-    if (e.key === 'ArrowLeft') {
+    if (e.key === 'ArrowLeft' || (tall && e.key === 'ArrowUp')) {
       set('on');
       onBtn.focus({ preventScroll: true });
-    } else if (e.key === 'ArrowRight') {
+    } else if (e.key === 'ArrowRight' || (tall && e.key === 'ArrowDown')) {
       set('off');
       offBtn.focus({ preventScroll: true });
     }

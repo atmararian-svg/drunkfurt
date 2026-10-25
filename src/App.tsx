@@ -80,6 +80,13 @@ function EpisodeWorlds() {
   );
 }
 
+/**
+ * The 3D page's pixel density: up to 1.75 on a desktop; on touch devices (phones, tablets, with
+ * dense screens and small GPUs) up to 1.25, where the comic look's ink and halftone hold up and
+ * the frame rate does too.
+ */
+const TOUCH_DPR: [number, number] = window.matchMedia?.('(pointer: coarse)').matches ? [1, 1.25] : [1, 1.75];
+
 export function App() {
   const episode = useStory((s) => s.episode);
 
@@ -118,7 +125,10 @@ export function App() {
     const interrupt = (e: Event) => {
       if (e instanceof KeyboardEvent && !scrollKeys.includes(e.code)) return;
       if (scriptOwnsScroll()) {
-        if (e.cancelable) e.preventDefault();
+        // (a touch's start is never swallowed: that would also swallow the tap, and with it every
+        // button while the page is held, the sound choice and the letter's close among them; its
+        // move is what scrolls, and that is swallowed)
+        if (e.cancelable && e.type !== 'touchstart') e.preventDefault();
         return;
       }
       stopAutoplay();
@@ -166,7 +176,7 @@ export function App() {
       <div className="stage" role="img" aria-label="DRUNKFURT, Episode 1: arriving at Frankfurt (Main) Hbf at night">
         <Canvas
           shadows={{ type: PCFShadowMap }}
-          dpr={[1, 1.75]}
+          dpr={TOUCH_DPR}
           gl={{ antialias: false, stencil: false, powerPreference: 'high-performance' }}
           camera={{ fov: 54, near: 0.05, far: 1300 }}
           onCreated={({ gl }) => {
