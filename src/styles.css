@@ -32,6 +32,11 @@ html, body {
   -webkit-tap-highlight-color: transparent;
   -webkit-text-size-adjust: 100%;
 }
+/* the page scrolls (that is the story's timeline), but the browser's own scrollbar is never shown:
+   the chapter selector is the page's progress */
+html { scrollbar-width: none; }
+html::-webkit-scrollbar,
+body::-webkit-scrollbar { display: none; width: 0; height: 0; }
 #root { min-height: 100%; }
 
 .stage {

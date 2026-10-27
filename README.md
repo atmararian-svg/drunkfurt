@@ -77,6 +77,15 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
 - **Lighter**: the 3D page's pixel density is capped at 1.25 on touch devices (1.75 elsewhere).
 - `viewport-fit=cover` (the safe areas are already kept clear), no double-tap zoom, no tap flash.
 
+
+### Deploying (Netlify)
+
+`netlify.toml` builds with `npm run build` and serves `dist/`. Or build locally and drag the
+contents of `dist/` (zipped, `index.html` at the top) onto Netlify's deploy page.
+`public/_headers` caches the hashed files in `assets/` for good and keeps `index.html` fresh.
+The browser's own scrollbar is hidden (`styles.css`): the page still scrolls, and the chapter
+selector shows the progress.
+
 ## Chapters, preloader and transitions
 
 Chapters (`src/core/chapters.ts`) are what the visitor sees: what the preloader loads, what the

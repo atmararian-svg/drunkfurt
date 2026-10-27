@@ -1,0 +1,7 @@
+# Netlify: built with Vite, served from dist/ (a drag-and-drop deploy of the zipped dist/ works the same)
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
