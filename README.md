@@ -64,16 +64,15 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   of its size (finger-sized tabs and names); the tab strip brings the current chapter's tab into
   view (no pointer to follow).
 - **On a phone** (touch, under 600 px on the short side; `is-phone` on `<html>`, either way up):
-  - the selector lies along the **bottom centre**: the same circle turned a quarter, its frame on
-    top and the markings running left and right (forward, they move left), cropped to its upper
-    edge; the title above the frame, the tabs under it, always out (no dimming, no names on the
-    scale). The tabs are a native scroller: a swipe scrolls them (snapping to a tab), a tap on a
-    tab goes to its chapter; a sideways drag on the scale turns it, a vertical swipe still scrolls
-    the page;
-  - while the story asks you to act (ACTION, TAP TO DEFEND / REV, the letter, the cave's screen)
-    it **slides away down** (0.55 s, cubic ease in and out) and comes back once that is over;
-    the subtitles, thoughts, captions, title card and SCROLL cue stand above it while it is out
-    and come down with it (`--tuner-room`);
+  - the selector is **only its tabs**, at the bottom centre (no scale, no title): a native
+    scroller, a swipe scrolls them (snapping to a tab), a tap on a tab goes to its chapter;
+  - they **move in from below when you scroll back** and out again when you scroll on (0.5 s,
+    cubic ease in and out); they stay away while something takes the bottom of the page (a
+    chapter's title card), while the story asks you to act (ACTION, TAP TO DEFEND / REV, the
+    letter, the cave's screen); a chapter turn played by the page neither brings them in nor
+    sends them away;
+  - while they are out, the subtitles, thoughts, captions and SCROLL cue stand above them and
+    come down with them (`--tuner-room`);
   - the sound switch sits **top centre**.
 - **Lighter**: the 3D page's pixel density is capped at 1.25 on touch devices (1.75 elsewhere).
 - `viewport-fit=cover` (the safe areas are already kept clear), no double-tap zoom, no tap flash.

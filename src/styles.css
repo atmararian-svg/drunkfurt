@@ -740,40 +740,31 @@ body { cursor: pointer; }
 }
 
 
-/* --- a phone (ui/touch.ts `is-phone`): the chapter selector along the bottom centre, turned a quarter (the
-   frame on top of the circle, the markings running left and right), the title above the frame and the tabs
-   under it, a strip that scrolls with a swipe; it slides away down while the story asks you to act */
+/* --- a phone (ui/touch.ts `is-phone`): only the chapter tabs, at the bottom centre, a strip that scrolls
+   with a swipe; they move in from below when you scroll back and out again (chapterTuner.ts) */
 .tuner.tuner--phone {
   top: auto;
   left: 50%;
-  bottom: max(6px, env(safe-area-inset-bottom, 0px));
-  width: calc(513px * var(--s, 1));
-  height: calc(160px * var(--s, 1));
+  bottom: max(12px, env(safe-area-inset-bottom, 0px));
+  width: calc(312px * var(--s, 1));
+  height: calc(50px * var(--s, 1));
   transform: translateX(-50%);
   will-change: transform;
 }
 .tuner--phone .tuner-body {
   top: 0;
-  width: 513px;
-  height: 160px;
-  overflow: hidden;
-  touch-action: pan-y;
+  width: 312px;
+  height: 50px;
+  touch-action: pan-x;
   cursor: default;
 }
-.tuner--phone .lb { display: none; }
-.tuner--phone .tuner-head {
-  top: 6px;
-  left: 0;
-  right: 0;
-  justify-content: center;
-  gap: 0;
-}
-.tuner--phone .tuner-head::before { display: none; }
-.tuner--phone .tuner-slot .tuner-title { left: 50%; right: auto; transform: translateX(-50%); }
+.tuner--phone.is-away .tuner-body { pointer-events: none; }
+.tuner--phone .tuner-scale,
+.tuner--phone .tuner-head { display: none; }
 .tuner--phone .tuner-tabs {
-  top: 98px;
-  left: 126.5px;
-  width: 260px;
+  top: 0;
+  left: 0;
+  width: 100%;
   opacity: 1;
   transform: none;
   overflow-x: auto;
@@ -800,9 +791,9 @@ body { cursor: pointer; }
   right: auto;
   transform: translateX(-50%);
 }
-/* what sits at the bottom of the page stands above the selector while it is out (the room it takes),
-   and comes down with it when it goes */
-.is-phone { --tuner-room: calc(160px * var(--tuner-s, 0.7) + max(6px, env(safe-area-inset-bottom, 0px))); }
+/* what sits at the bottom of the page stands above the tabs while they are out (the room they take),
+   and comes down with them when they go */
+.is-phone { --tuner-room: calc(50px * var(--tuner-s, 1) + max(12px, env(safe-area-inset-bottom, 0px))); }
 .is-phone.is-tuner-away { --tuner-room: 0px; }
 .is-phone .caption.caption--speech,
 .is-phone .thoughts { bottom: calc(var(--tuner-room) + 24px); }

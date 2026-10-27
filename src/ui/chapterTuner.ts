@@ -83,14 +83,15 @@ const el = <K extends keyof SVGElementTagNameMap>(name: K, attrs: Record<string,
   return e;
 };
 /**
- * On a phone the same selector lies along the bottom of the page: the circle
- * turned a quarter so the frame sits on its top (12 o'clock) and the markings
- * run left and right, cropped to its upper edge (a 513 × 160 frame), with the
- * title above the frame and the tabs under it, as a strip that scrolls with a
- * swipe. It never opens or closes (it is always there, small), and it slides
- * away down while the story asks you to act (`tunerAway`).
+ * On a phone only the tabs are left, at the bottom centre (no scale, no title):
+ * a strip that scrolls with a swipe, a tap on a tab picks its chapter. It moves
+ * in from below when you scroll back, and out again when you scroll on, when
+ * something takes the bottom of the page (a chapter's title card), or while
+ * the story asks you to act (`tunerAway`).
  */
-const PHONE = { w: 513, h: 160, c: { x: 256.5, y: 274.5 }, panel: { w: 260, top: 98 } };
+const PHONE = { w: 312, h: 50 };
+/** A point on a circle round the centre: `deg` above the horizontal axis on the left (screen y down). */
+const at = (r: number, deg: number) => [C.x - r * Math.cos(deg * rad), C.y - r * Math.sin(deg * rad)] as const;
 const wrap180 = (d: number) => ((((d + 180) % 360) + 360) % 360) - 180;
 
 const chapterNow = () => chapterOf(locate(timeline.progress).id).number;
@@ -137,14 +138,6 @@ export function mountChapterTuner(): () => void {
   const reduced = !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
   // the layout is chosen when it is built (a phone turning past the line builds it again, see `layout`)
   const phone = isPhone();
-  const FR = phone ? { w: PHONE.w, h: PHONE.h } : F;
-  const cx = phone ? PHONE.c.x : C.x;
-  const cy = phone ? PHONE.c.y : C.y;
-  /** A point on a circle round the centre, `deg` clockwise from the axis: on the left (wide), or on top (a phone). */
-  const at = (r: number, deg: number) =>
-    phone
-      ? ([cx + r * Math.sin(deg * rad), cy - r * Math.cos(deg * rad)] as const)
-      : ([cx - r * Math.cos(deg * rad), cy - r * Math.sin(deg * rad)] as const);
   const root = document.createElement('nav');
   root.className = phone ? 'tuner tuner--phone' : 'tuner';
   root.setAttribute('aria-label', 'DRUNKFURT chapters');
@@ -153,16 +146,9 @@ export function mountChapterTuner(): () => void {
   root.append(body);
 
   // --- the drawing ---------------------------------------------------------------------
-  const svg = el('svg', { class: 'tuner-scale', viewBox: `0 0 ${FR.w} ${FR.h}`, width: FR.w, height: FR.h, 'aria-hidden': 'true' });
+  const svg = el('svg', { class: 'tuner-scale', viewBox: `0 0 ${F.w} ${F.h}`, width: F.w, height: F.h, 'aria-hidden': 'true' });
   const defs = el('defs', {}, svg);
-  // (the design's fade runs across the circle along the frame's line: top to bottom, or on a phone left to right)
-  const fade = el(
-    'linearGradient',
-    phone
-      ? { id: 'tuner-fade', gradientUnits: 'userSpaceOnUse', x1: cx - OUTER.r, y1: 0, x2: cx + OUTER.r, y2: 0 }
-      : { id: 'tuner-fade', gradientUnits: 'userSpaceOnUse', x1: 0, y1: cy - OUTER.r, x2: 0, y2: cy + OUTER.r },
-    defs,
-  );
+  const fade = el('linearGradient', { id: 'tuner-fade', gradientUnits: 'userSpaceOnUse', x1: 0, y1: C.y - OUTER.r, x2: 0, y2: C.y + OUTER.r }, defs);
   for (const [o, a] of [
     [0, 0],
     [0.303, 0.5],
@@ -173,8 +159,8 @@ export function mountChapterTuner(): () => void {
     [1, 0],
   ])
     el('stop', { offset: o, 'stop-color': '#fff', 'stop-opacity': a }, fade);
-  const mask = el('mask', { id: 'tuner-mask', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: FR.w, height: FR.h }, defs);
-  el('rect', { x: 0, y: 0, width: FR.w, height: FR.h, fill: 'url(#tuner-fade)' }, mask);
+  const mask = el('mask', { id: 'tuner-mask', maskUnits: 'userSpaceOnUse', x: 0, y: 0, width: F.w, height: F.h }, defs);
+  el('rect', { x: 0, y: 0, width: F.w, height: F.h, fill: 'url(#tuner-fade)' }, mask);
   // the page behind it, pixelated (its printed matter: the scene has its own pixel layer)
   const pix = el('filter', { id: 'df-pixelate', x: 0, y: 0, width: 1, height: 1 }, defs);
   // (its block size grows with the backdrop, so the pixels come on gradually: see `update`)
@@ -204,17 +190,9 @@ export function mountChapterTuner(): () => void {
   const markers = CHAPTERS.map((_, i) => tick(INNER.r - INNER.len / 2, OUTER.r + OUTER.len / 2, i * STEP, 'mkr'));
 
   // fixed: the frame, its ◂ and the red dash in it
-  // (the same pieces at the same distances from the centre, turned to the top on a phone)
-  if (phone) {
-    const top = cy - OUTER.r;
-    el('rect', { x: cx - BOX.w / 2 + 0.5, y: top - BOX.h / 2 + 0.5, width: BOX.w - 1, height: BOX.h - 1, rx: BOX.r, class: 'box' }, svg);
-    el('path', { d: `M${cx} ${cy - 181} L${cx - 2.5} ${cy - 177} L${cx + 2.5} ${cy - 177} Z`, class: 'tri' }, svg);
-    el('rect', { x: cx - 0.5, y: cy - 195.5, width: 1, height: 7, fill: RED }, svg);
-  } else {
-    el('rect', { x: BOX.x + 0.5, y: BOX.y + 0.5, width: BOX.w - 1, height: BOX.h - 1, rx: BOX.r, class: 'box' }, svg);
-    el('path', { d: 'M117.5 214.5 L121.5 212 L121.5 217 Z', class: 'tri' }, svg);
-    el('rect', { x: 103, y: 214, width: 7, height: 1, fill: RED }, svg);
-  }
+  el('rect', { x: BOX.x + 0.5, y: BOX.y + 0.5, width: BOX.w - 1, height: BOX.h - 1, rx: BOX.r, class: 'box' }, svg);
+  el('path', { d: 'M117.5 214.5 L121.5 212 L121.5 217 Z', class: 'tri' }, svg);
+  el('rect', { x: 103, y: 214, width: 7, height: 1, fill: RED }, svg);
   // the neighbours' names on the scale (clickable: a direct choice)
   const names = CHAPTERS.map((_, i) => {
     const t = el('text', { class: 'lb', 'text-anchor': 'middle', 'dominant-baseline': 'central' }, svg);
@@ -230,7 +208,7 @@ export function mountChapterTuner(): () => void {
   // the current chapter's title, left of the frame (HTML, for the decoding)
   const head = document.createElement('div');
   head.className = 'tuner-head';
-  if (!phone) head.style.right = `${F.w - TITLE.right}px`;
+  head.style.right = `${F.w - TITLE.right}px`;
   // a slot the title rolls through (old out, new in, letter by letter: the reference's stagger)
   const slot = document.createElement('span');
   slot.className = 'tuner-slot';
@@ -285,17 +263,18 @@ export function mountChapterTuner(): () => void {
   /** After a drag or a wheel gesture: the chapter change waits this long, so the scene never turns while the hand is still on it. */
   let commitTimer = 0;
   /** Direct input (a drag, or a wheel / trackpad gesture): the position it asks for, in chapter units. */
-  let drag: { id: number; x0: number; y0: number; pos0: number; moved: boolean } | null = null;
+  let drag: { id: number; y0: number; pos0: number; moved: boolean } | null = null;
   let wheel: { base: number; acc: number; timer: number } | null = null;
   /** After a choice: the chapter it settled on, held until the scene changes (or it is clear it will not). */
   let held: { pos: number; until: number } | null = null;
   let stripTo = PANEL.inset;
   let stripAt = PANEL.inset;
   let s = 1;
-  /** A phone (a touch screen under 600 px on its short side). */
   let last = performance.now();
-  /** A phone: how far the selector has gone away (0 there … 1 gone), eased. */
-  let awayK = 0;
+  /** A phone: how far the tabs have gone (0 there … 1 gone), eased; and whether the last scroll went back (they are out). */
+  let awayK = 1;
+  let backward = false;
+  let lastProgress = timeline.progress;
 
   const layout = () => {
     // (on a touch screen never below 0.8: its tabs and names stay big enough for a finger)
@@ -305,8 +284,8 @@ export function mountChapterTuner(): () => void {
       return;
     }
     s = phone
-      ? // a phone: as wide as fits with a margin, and never taller than about a quarter of the page
-        clamp(Math.min((window.innerWidth - 16) / PHONE.w, (window.innerHeight * 0.3) / PHONE.h), 0.55, 0.85)
+      ? // a phone: full size (finger-sized tabs) where it fits, a little smaller where it does not
+        clamp((window.innerWidth - 32) / PHONE.w, 0.8, 1)
       : clamp(Math.min(window.innerWidth / 1920, window.innerHeight / 1080), TOUCH ? 0.8 : 0.62, 1.25);
     root.style.setProperty('--s', String(s));
     if (phone) document.documentElement.style.setProperty('--tuner-s', String(s));
@@ -420,7 +399,7 @@ export function mountChapterTuner(): () => void {
     e.preventDefault();
     window.clearTimeout(commitTimer);
     held = null;
-    drag = { id: e.pointerId, x0: e.clientX, y0: e.clientY, pos0: shownPos, moved: false };
+    drag = { id: e.pointerId, y0: e.clientY, pos0: shownPos, moved: false };
     body.setPointerCapture(e.pointerId);
     root.classList.add('is-dragging');
     setOpen();
@@ -435,9 +414,8 @@ export function mountChapterTuner(): () => void {
       stripTo = PANEL.inset + (room - PANEL.inset) * f;
     }
     if (!drag || e.pointerId !== drag.id) return;
-    // down moves the markings down: towards the next chapter, as scrolling forward does; on a phone,
-    // a swipe to the left moves them left, the same way
-    const d = phone ? -(e.clientX - drag.x0) : e.clientY - drag.y0;
+    // down moves the markings down: towards the next chapter, as scrolling forward does
+    const d = e.clientY - drag.y0;
     if (Math.abs(d) > 3) drag.moved = true;
     shownPos = clamp(drag.pos0 + (d / s) * (DRAG_DEG_PER_PX / STEP), 1, CHAPTERS.length);
   };
@@ -553,7 +531,7 @@ export function mountChapterTuner(): () => void {
       if (Math.abs(want - shownPos) < 1e-4) shownPos = want;
     }
     // forward, the markings move down on the left: the next marker (above) comes to the axis
-    scale.setAttribute('transform', `rotate(${(-(shownPos - 1) * STEP).toFixed(3)} ${cx} ${cy})`);
+    scale.setAttribute('transform', `rotate(${(-(shownPos - 1) * STEP).toFixed(3)} ${C.x} ${C.y})`);
     const preview = drag || wheel ? Math.round(shownPos) : held ? held.pos : 0;
     // turning it by hand: the marker that reaches the frame takes the title, rolling in; let go on the same chapter, it rolls back
     const atFrame = drag || wheel ? preview : held ? held.pos : active;
@@ -599,12 +577,25 @@ export function mountChapterTuner(): () => void {
     }
     root.style.setProperty('--open', e.toFixed(3));
     if (phone) {
-      // along the bottom; away (down, out of the page) while the story asks you to act, back after: eased in and out
-      const want = away ? 1 : 0;
-      if (awayK !== want) awayK = want > awayK ? Math.min(1, awayK + (reduced ? 1 : dt / 0.55)) : Math.max(0, awayK - (reduced ? 1 : dt / 0.55));
+      // the tabs come in when you scroll back and go when you scroll on (a turn of a chapter, played
+      // by the page, counts as neither); never while the story asks you to act, while something
+      // takes the bottom of the page (a title card) or before the story has begun
+      const p = timeline.progress;
+      if (!chapterTurn.busy && Math.abs(p - lastProgress) > 1e-5) backward = p < lastProgress;
+      lastProgress = p;
+      const hidden =
+        !backward ||
+        away ||
+        story.getState().phase !== 'ready' ||
+        document.documentElement.classList.contains('is-preloading') ||
+        !!document.querySelector('.tcard.is-on');
+      // moved in and out from below, eased in and out (cubic)
+      const want = hidden ? 1 : 0;
+      if (awayK !== want) awayK = want > awayK ? Math.min(1, awayK + (reduced ? 1 : dt / 0.5)) : Math.max(0, awayK - (reduced ? 1 : dt / 0.5));
       const k = awayK < 0.5 ? 4 * awayK ** 3 : 1 - (-2 * awayK + 2) ** 3 / 2;
-      root.style.transform = `translateX(-50%) translateY(${(k * 120).toFixed(2)}%)`;
-      document.documentElement.classList.toggle('is-tuner-away', away);
+      root.style.transform = `translateX(-50%) translateY(calc(${(k * 100).toFixed(2)}% + ${(k * 48).toFixed(1)}px))`;
+      root.classList.toggle('is-away', hidden);
+      document.documentElement.classList.toggle('is-tuner-away', hidden);
       body.style.transform = `scale(${s})`;
       return;
     }
