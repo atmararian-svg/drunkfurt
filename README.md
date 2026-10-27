@@ -60,9 +60,21 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
 - **The letter**: too small to read whole on a phone, so a tap on the sheet zooms in (2.4 ×) on
   the point tapped, a drag moves over it, another tap zooms out; TAP TO CLOSE closes it (a line
   above it says TAP THE LETTER TO ZOOM). With a mouse nothing changes.
-- **The chapter selector**: a first tap opens it, then drag or tap; never below 0.8 of its size
-  (finger-sized tabs and names); the tab strip brings the current chapter's tab into view (no
-  pointer to follow); on a phone the neighbours' names only show once it is open.
+- **The chapter selector on a tablet**: a first tap opens it, then drag or tap; never below 0.8
+  of its size (finger-sized tabs and names); the tab strip brings the current chapter's tab into
+  view (no pointer to follow).
+- **On a phone** (touch, under 600 px on the short side; `is-phone` on `<html>`, either way up):
+  - the selector lies along the **bottom centre**: the same circle turned a quarter, its frame on
+    top and the markings running left and right (forward, they move left), cropped to its upper
+    edge; the title above the frame, the tabs under it, always out (no dimming, no names on the
+    scale). The tabs are a native scroller: a swipe scrolls them (snapping to a tab), a tap on a
+    tab goes to its chapter; a sideways drag on the scale turns it, a vertical swipe still scrolls
+    the page;
+  - while the story asks you to act (ACTION, TAP TO DEFEND / REV, the letter, the cave's screen)
+    it **slides away down** (0.55 s, cubic ease in and out) and comes back once that is over;
+    the subtitles, thoughts, captions, title card and SCROLL cue stand above it while it is out
+    and come down with it (`--tuner-room`);
+  - the sound switch sits **top centre**.
 - **Lighter**: the 3D page's pixel density is capped at 1.25 on touch devices (1.75 elsewhere).
 - `viewport-fit=cover` (the safe areas are already kept clear), no double-tap zoom, no tap flash.
 

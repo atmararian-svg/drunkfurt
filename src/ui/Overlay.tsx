@@ -16,7 +16,7 @@ import { setScenePixels } from './scenePixels';
 import { createTypewriter, Typewriter } from './typewriter';
 import { letter, letterSpot, pickLetter } from '../scenes/city/letter';
 import { closeLetterNow, openLetter } from './letterReveal';
-import { mountChapterTuner, tunerBackdrop, updateTuner } from './chapterTuner';
+import { mountChapterTuner, tunerAway, tunerBackdrop, updateTuner } from './chapterTuner';
 import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
 import { PressPrompt } from './PressPrompt';
 
@@ -145,6 +145,8 @@ export function Overlay() {
       updateCombatPrompts(actionShown(id, local) || ask === 'rev', ask === 'defend' ? 'defend' : ask === 'rev' ? 'rev' : null);
       const look = combatLook(id, local);
       // the chapter tuner open: the page behind it dims and breaks into pixels (the scene, and the printed matter over it)
+      // (on a phone the selector slides away down while the story asks you to act: ACTION, a tap, the letter, the screen)
+      tunerAway(actionShown(id, local) || ask === 'defend' || ask === 'rev' || ask === 'letter' || ask === 'monitor' || letter.open);
       updateTuner();
       const tk = tunerBackdrop();
       setScenePixels(Math.max(look.block, 1 + 7 * tk), Math.max(look.blur, 0.35 * tk), Math.max(look.dark, 0.45 * tk));

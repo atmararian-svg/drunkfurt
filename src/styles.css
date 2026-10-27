@@ -739,6 +739,82 @@ body { cursor: pointer; }
   .fx-press { right: 16px; bottom: 116px; }
 }
 
+
+/* --- a phone (ui/touch.ts `is-phone`): the chapter selector along the bottom centre, turned a quarter (the
+   frame on top of the circle, the markings running left and right), the title above the frame and the tabs
+   under it, a strip that scrolls with a swipe; it slides away down while the story asks you to act */
+.tuner.tuner--phone {
+  top: auto;
+  left: 50%;
+  bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  width: calc(513px * var(--s, 1));
+  height: calc(160px * var(--s, 1));
+  transform: translateX(-50%);
+  will-change: transform;
+}
+.tuner--phone .tuner-body {
+  top: 0;
+  width: 513px;
+  height: 160px;
+  overflow: hidden;
+  touch-action: pan-y;
+  cursor: default;
+}
+.tuner--phone .lb { display: none; }
+.tuner--phone .tuner-head {
+  top: 6px;
+  left: 0;
+  right: 0;
+  justify-content: center;
+  gap: 0;
+}
+.tuner--phone .tuner-head::before { display: none; }
+.tuner--phone .tuner-slot .tuner-title { left: 50%; right: auto; transform: translateX(-50%); }
+.tuner--phone .tuner-tabs {
+  top: 98px;
+  left: 126.5px;
+  width: 260px;
+  opacity: 1;
+  transform: none;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
+}
+.tuner--phone .tuner-tabs::-webkit-scrollbar { display: none; }
+.tuner--phone .tuner-strip {
+  position: relative;
+  top: 3px;
+  left: 0;
+  width: max-content;
+  padding: 0 3px;
+  will-change: auto;
+}
+.tuner--phone .tuner-tab { scroll-snap-align: center; }
+/* the sound switch: top centre */
+.is-phone .sound {
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+}
+/* what sits at the bottom of the page stands above the selector while it is out (the room it takes),
+   and comes down with it when it goes */
+.is-phone { --tuner-room: calc(160px * var(--tuner-s, 0.7) + max(6px, env(safe-area-inset-bottom, 0px))); }
+.is-phone.is-tuner-away { --tuner-room: 0px; }
+.is-phone .caption.caption--speech,
+.is-phone .thoughts { bottom: calc(var(--tuner-room) + 24px); }
+.is-phone .caption--bl,
+.is-phone .caption--br { bottom: calc(var(--tuner-room) + 24px); }
+.is-phone .cue { bottom: calc(var(--tuner-room) + 20px); }
+.is-phone .tcard-slide { top: calc(100% - 614 * var(--u) - var(--tuner-room)); }
+.is-phone .tcard-panel { min-height: calc(836 * var(--u) + var(--tuner-room)); }
+.is-phone .caption.caption--speech,
+.is-phone .thoughts { transition: bottom 0.55s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.4s ease, transform 0.35s var(--ease); }
+.is-phone .cue { transition: bottom 0.55s cubic-bezier(0.65, 0, 0.35, 1), opacity 0.6s var(--ease); }
+
 /* --- the thoughts in the car (scenes/car/thoughts.ts): bottom centre, 32 px up, JetBrains Mono 16 px, capitals */
 .thoughts {
   position: fixed;
