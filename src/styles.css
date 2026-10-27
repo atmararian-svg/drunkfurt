@@ -786,6 +786,9 @@ body { cursor: pointer; }
 }
 .tuner--phone .tuner-tab { scroll-snap-align: center; }
 /* the sound switch: top centre */
+/* (the captions at the top start under it) */
+.is-phone .caption--tl,
+.is-phone .caption--tr { top: calc(max(20px, env(safe-area-inset-top, 0px)) + 30px + 16px); }
 .is-phone .sound {
   left: 50%;
   right: auto;
