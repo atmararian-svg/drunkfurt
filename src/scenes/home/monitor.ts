@@ -86,9 +86,27 @@ export const monitor = {
   /** Set by the scene: the screen's picture, and the camera to pick with. */
   mesh: null as Mesh | null,
   camera: null as Camera | null,
-  /** The wall screen with the text about the author: the pointer on it draws you in to read it. */
-  about: { mesh: null as Mesh | null, centre: new Vector3(), over: false, hover: 0, anchor: null as { x: number; y: number } | null },
+  /**
+   * The wall screen with the text about the author. A click on it draws you in
+   * to read it (`reading`); the next click anywhere, or Escape, lets you lean
+   * back. `over`: the pointer is on it; `hover`: the lean in, eased 0 … 1.
+   */
+  about: { mesh: null as Mesh | null, centre: new Vector3(), over: false, reading: false, hover: 0 },
 };
+
+/** A click (or Enter, without a point) while seated: to read the screen about the author, or to stop. Whether it was taken. */
+export function aboutClick(clientX?: number, clientY?: number) {
+  const a = monitor.about;
+  if (a.reading) {
+    a.reading = false;
+    return true;
+  }
+  if (clientX !== undefined && clientY !== undefined && overAbout(clientX, clientY)) {
+    a.reading = true;
+    return true;
+  }
+  return false;
+}
 
 /** Whether a point on the page (CSS px) is over the screen with the text about the author. */
 export function overAbout(clientX: number, clientY: number) {
@@ -194,7 +212,7 @@ export function resetMonitor() {
   monitor.hover = 0;
   monitor.link = -1;
   monitor.about.over = false;
+  monitor.about.reading = false;
   monitor.about.hover = 0;
-  monitor.about.anchor = null;
   pinScroll(false);
 }

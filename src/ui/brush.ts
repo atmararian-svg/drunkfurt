@@ -1,5 +1,6 @@
 import { mulberry32 } from '../core/math';
 import { Art, FIGHT_ART, FRAME } from './fightArt';
+import { drawPixelated } from './pixelReveal';
 
 /**
  * Ink-brush wipes, drawn on a canvas: a handful of broad, ragged black strokes
@@ -137,22 +138,65 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
   const word = (art: Art, at: number, anchor: 'tl' | 'br') => {
     const age = t - at;
     if (age < 0) return;
-    // comes in a touch large and settles, fading up (no hard snap)
-    const u = Math.min(1, age / 0.18);
-    const pop = 1.12 - 0.12 * (1 - Math.pow(1 - u, 3));
-    const x = anchor === 'tl' ? art.x * k : W - (FRAME.w - art.x) * k;
-    const y = anchor === 'tl' ? art.y * k : H - (FRAME.h - art.y) * k;
+    // thrown in with the blow, the way ACTION comes in: in from its own side (BAM from the left, POW
+    // from the right), a touch large and tilted, out of coarse pixels that resolve as it lands; it
+    // overshoots, settles, and shakes off the impact
+    const u = Math.min(1, age / HIT_IN);
+    const travel = easeOutBack(u);
+    const sharpen = 1 - Math.pow(1 - u, 2);
+    const side = anchor === 'tl' ? -1 : 1;
+    const reach = Math.min(W, H) * 0.42 * (1 - travel);
+    const after = age - HIT_IN;
+    const shake = after > 0 ? Math.exp(-after * 16) * 6 * k * Math.sin(after * 90) : 0;
+    const { w, h, sharp, out, tiny } = wordCanvas(art, k);
+    const x = (anchor === 'tl' ? art.x * k : W - (FRAME.w - art.x) * k) + w / 2 + side * reach + shake;
+    const y = (anchor === 'tl' ? art.y * k : H - (FRAME.h - art.y) * k) + h / 2 + side * reach * 0.3 - shake * 0.5;
+    const block = 1 + 27 * (1 - sharpen);
+    let img: HTMLCanvasElement = sharp;
+    if (block > 1.05) {
+      drawPixelated(out.getContext('2d')!, tiny, sharp, block, w, h);
+      img = out;
+    }
     ctx.save();
-    ctx.translate(x + (art.w * k) / 2, y + (art.h * k) / 2);
-    ctx.scale(k * pop, k * pop);
-    ctx.translate(-art.w / 2, -art.h / 2);
-    ctx.fillStyle = '#fefefe';
-    ctx.globalAlpha = Math.min(1, age / 0.09);
-    ctx.fill(artPath(art));
+    ctx.translate(x, y);
+    ctx.rotate(((side * -9 * (1 - travel)) * Math.PI) / 180);
+    const sc = 1.22 - 0.22 * sharpen;
+    ctx.scale(sc, sc);
+    ctx.globalAlpha = Math.min(1, u / 0.3);
+    ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   };
   word(FIGHT_ART.BAM, beats.hit1, 'tl');
   word(FIGHT_ART.POW, beats.hit2, 'br');
+}
+
+/** How long a hit word takes to come in (seconds of the fight's clock). */
+const HIT_IN = 0.3;
+const easeOutBack = (u: number) => {
+  const c = 1.9;
+  return 1 + (c + 1) * Math.pow(u - 1, 3) + c * Math.pow(u - 1, 2);
+};
+/** Each word drawn sharp once at the frame's scale, with a canvas to pixelate it into. */
+const words = new Map<Art, { k: number; w: number; h: number; sharp: HTMLCanvasElement; out: HTMLCanvasElement; tiny: HTMLCanvasElement }>();
+function wordCanvas(art: Art, k: number) {
+  let c = words.get(art);
+  if (!c || Math.abs(c.k - k) > 1e-4) {
+    const w = Math.max(1, Math.ceil(art.w * k));
+    const h = Math.max(1, Math.ceil(art.h * k));
+    const sharp = document.createElement('canvas');
+    sharp.width = w;
+    sharp.height = h;
+    const sc = sharp.getContext('2d')!;
+    sc.scale(w / art.w, h / art.h);
+    sc.fillStyle = '#fefefe';
+    sc.fill(artPath(art));
+    const out = document.createElement('canvas');
+    out.width = w;
+    out.height = h;
+    c = { k, w, h, sharp, out, tiny: document.createElement('canvas') };
+    words.set(art, c);
+  }
+  return c;
 }
 
 const paths = new Map<Art, Path2D>();

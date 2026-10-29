@@ -31,9 +31,32 @@ import { postFx } from '../../render/Stylizer';
 import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
 import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, overAbout, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
+import { TOUCH } from '../../ui/touch';
 
-/** How far (px) the pointer moves from where it drew you in to the screen about the author before you lean back. */
-const READ_LET_GO = 160;
+/**
+ * The label at the pointer over the screen about the author (the letter's close cursor, the same
+ * white tab): CLICK TO READ on it, CLICK TO CLOSE while you read. Empty text hides it. None on touch.
+ */
+let readLabel: HTMLDivElement | null = null;
+function readCursor(text: string, x: number, y: number) {
+  if (TOUCH) return;
+  if (!text) {
+    if (readLabel) readLabel.style.opacity = '0';
+    document.documentElement.classList.remove('is-over-about');
+    return;
+  }
+  if (!readLabel) {
+    readLabel = document.createElement('div');
+    readLabel.className = 'read-cursor';
+    readLabel.setAttribute('aria-hidden', 'true');
+    document.body.append(readLabel);
+  }
+  if (readLabel.textContent !== text) readLabel.textContent = text;
+  readLabel.style.opacity = '1';
+  readLabel.style.transform = `translate(${Math.round(x + 14)}px, ${Math.round(y + 14)}px)`;
+  document.documentElement.classList.add('is-over-about');
+}
+
 /** The wall screen that shows the text about the author. */
 const ABOUT_SCREEN = 'screen_13';
 
@@ -301,8 +324,19 @@ function Room({ active }: { active: boolean }) {
       monitor.armed = false;
       if (story.getState().prompt === 'monitor') story.setState({ prompt: null });
     }
-    if (monitor.entering || monitor.hover > 0) resetMonitor();
+    if (monitor.entering || monitor.hover > 0 || monitor.about.hover > 0) resetMonitor();
+    readCursor('', 0, 0);
   }, [active]);
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && monitor.about.reading) monitor.about.reading = false;
+    };
+    window.addEventListener('keydown', esc);
+    return () => {
+      window.removeEventListener('keydown', esc);
+      readCursor('', 0, 0);
+    };
+  }, []);
   useEffect(
     () => () => {
       monitor.armed = false;
@@ -328,21 +362,21 @@ function Room({ active }: { active: boolean }) {
     // link under it; once the click is taken, the lean is held where it was, so the move in owns the camera
     if (!monitor.entering) {
       const p = input.pointer;
-      const at = monitor.armed && p.active ? pick(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight) : null;
+      // (while you read the screen about the author, the big display does not answer the pointer)
+      const at = monitor.armed && p.active && !monitor.about.reading ? pick(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight) : null;
       monitor.over = !!at;
       monitor.link = at ? at.link : -1;
       monitor.hover = damp(monitor.hover, monitor.over ? 1 : 0, 2.6, dt);
       // the screen about the author, the same way: the pointer on it draws you in, close enough to read
-      // (as you turn to it, it moves out from under the pointer: once drawn in, you stay until the pointer
-      // moves well away from where it was, or leaves the story's gate)
+      // the screen about the author: a click on it draws you in to read it (Overlay → aboutClick), the next
+      // click lets you lean back, so the pointer is free to move while you read; a label at the pointer says so
       const ab = monitor.about;
       const px = ((p.x + 1) / 2) * window.innerWidth;
       const py = ((p.y + 1) / 2) * window.innerHeight;
-      if (!monitor.armed || !p.active || at) ab.anchor = null;
-      else if (!ab.anchor && overAbout(px, py)) ab.anchor = { x: px, y: py };
-      else if (ab.anchor && Math.hypot(px - ab.anchor.x, py - ab.anchor.y) > READ_LET_GO && !overAbout(px, py)) ab.anchor = null;
-      ab.over = !!ab.anchor;
-      ab.hover = damp(ab.hover, ab.over ? 1 : 0, 2.2, dt);
+      if (!monitor.armed) ab.reading = false;
+      ab.over = !at && monitor.armed && p.active && !ab.reading && overAbout(px, py);
+      ab.hover = damp(ab.hover, ab.reading ? 1 : 0, 2.2, dt);
+      readCursor(ab.over || ab.reading ? (ab.reading ? 'CLICK TO CLOSE' : 'CLICK TO READ') : '', px, py);
     }
     const l = !monitor.entering ? SCREEN_LINKS[monitor.link] : undefined;
     display.mark.visible = !!l;

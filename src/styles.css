@@ -1071,3 +1071,23 @@ body { cursor: pointer; }
   background: var(--red);
   letter-spacing: 0;
 }
+
+/* the label at the pointer over the screen about the author in the cave (RoomScene.tsx readCursor):
+   the letter's close cursor, the same white tab */
+.read-cursor {
+  position: fixed;
+  left: 0;
+  top: 0;
+  z-index: 6;
+  padding: 10px;
+  border-radius: 3px;
+  background: #fff;
+  color: #111;
+  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: -0.05em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+.site-handoff .read-cursor { opacity: 0 !important; }

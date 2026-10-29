@@ -41,8 +41,12 @@ export interface ManRig {
   /** The knife in his right hand, and a second one for the pavement. */
   knife: Object3D;
   groundKnife: Object3D;
-  /** Pose: the captured walk at `phase` blended over his stance by `walk` (0..1). */
-  stand(phase: number, walk: number): void;
+  /**
+   * Pose: the captured walk at `phase` blended over his stance by `walk` (0..1);
+   * `upright` (0..1) brings the stance's legs together, straight, as he stands
+   * before he has taken a step.
+   */
+  stand(phase: number, walk: number, upright?: number): void;
   /** Leans his upper body forward from the hips by `a` radians (into a thrust). */
   lean(a: number): void;
   /** Turns head and neck towards a world point (0 not at all … 1 the face square on it). */
@@ -174,10 +178,8 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   sampleClip(STANCE_T);
   const stance = snap();
   // feet a little closer than in mid-stride: the legs part-way back towards standing straight
-  ['LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot'].forEach((n) => {
-    const i = list.indexOf(bone(n));
-    stance.q[i].slerp(rest[i], 0.4);
-  });
+  const legs = ['LeftUpLeg', 'LeftLeg', 'LeftFoot', 'RightUpLeg', 'RightLeg', 'RightFoot'].map((n) => list.indexOf(bone(n)));
+  legs.forEach((i) => stance.q[i].slerp(rest[i], 0.4));
 
   // --- what the rest pose tells us: head forward axis, knife placement
   root.updateMatrixWorld(true);
@@ -325,7 +327,7 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
     groundKnife,
     stride: 0,
     startPhase: 0,
-    stand(phase, walk) {
+    stand(phase, walk, upright = 0) {
       model.position.set(0, 0, 0);
       model.rotation.set(0, 0, 0);
       // from the rest pose every time (the clip does not drive every bone, e.g. fingers), then the walk
@@ -339,6 +341,9 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
           b.quaternion.copy(stance.q[i]).slerp(QA, w);
         });
         bone('Hips').position.lerpVectors(stance.hips, bone('Hips').position.clone(), w);
+        // standing still, not caught mid-stride: both legs straight under him
+        const u = Math.min(1, Math.max(0, upright)) * (1 - w);
+        if (u > 0) for (const i of legs) list[i].quaternion.slerp(rest[i], u);
         // standing, his legs are straighter than mid-stride: back up onto his feet
         root.updateMatrixWorld(true);
         const low = Math.min(...ankles.map((b) => b.getWorldPosition(D).y));

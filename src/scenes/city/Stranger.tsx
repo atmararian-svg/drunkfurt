@@ -123,7 +123,8 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     // --- body: his walk (phase locked to the distance walked), easing into his stance as he stops
     const pace = walkPace(walkU);
     const phase = START_PHASE + (s / rig.stride) * Math.PI * 2;
-    rig.stand(phase, pace);
+    // until he sets off he stands upright, feet together; his first steps take him out of it
+    rig.stand(phase, pace, 1 - smoothstep(ramp(walkU, 0, 0.04)));
     rig.lean(0.06 * raise);
     root.updateMatrixWorld(true);
     const body = (bx: number, by: number, bz: number, out: Vector3) => out.set(bx, by, bz).applyMatrix4(root.matrixWorld);

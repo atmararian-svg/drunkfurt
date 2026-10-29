@@ -9,7 +9,7 @@ import { decodeAll, hoverDecode, splitChars } from './decode';
 import { BEAT, BLOCK, KO, defend, encounterAt } from '../scenes/city/encounter';
 import { drawBrushWipe, drawHits, drawKnockout, drawSpeedLines } from './brush';
 import { launchAt } from '../scenes/car/getaway';
-import { enterSite, monitor, pick } from '../scenes/home/monitor';
+import { aboutClick, enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 import { mountCombatPrompts, updateCombatPrompts } from './combatPrompt';
 import { setScenePixels } from './scenePixels';
@@ -268,6 +268,8 @@ export function Overlay() {
       // the last scene: only a click on the big screen does anything (Enter takes you in as well)
       if (monitor.entering) return;
       if (story.getState().prompt === 'monitor') {
+        // the screen about the author: read it, or stop reading
+        if (aboutClick(e?.clientX, e?.clientY)) return;
         // the page under the click: a project, About, All works, or the home page; Enter: the one under the pointer
         if (!e) enterSite(monitor.link);
         else {
