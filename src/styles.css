@@ -1091,3 +1091,14 @@ body { cursor: pointer; }
   transition: opacity 0.2s ease;
 }
 .site-handoff .read-cursor { opacity: 0 !important; }
+
+/* the dither trail under the pointer (ui/ditherCursor.ts): grey glyphs as a negative of the page under them */
+.dither-cursor {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  mix-blend-mode: difference;
+}
