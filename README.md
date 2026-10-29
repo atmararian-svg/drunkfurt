@@ -102,6 +102,23 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   Open Graph and Twitter tags in `index.html` use `VITE_SITE_URL` (set in `.env`; change it to
   the real address, or set it in Netlify's build environment). `robots.txt` allows everything.
 
+### Launch polish in the story
+
+- **The fight**: he goes down instead of cutting to him lying: the first hit knocks the knife
+  away and him back a step, the second takes him off his feet backwards onto the pavement over
+  0.75 s, gathering speed (`manRig.fall`, `Stranger.tsx`), under the pixels.
+- **SKIP DIALOGUE** (bottom right, the key S; TAP TO SKIP on touch) while the invitation is said
+  after the letter and while the thoughts in the car are typed: the invitation is taken as said;
+  the thoughts end and the car goes on to the rev point.
+- **The Mercedes**: its star and lettering (and the steering wheel's star) are dark trim, not
+  chrome. The centre screen right of the wheel, which only glowed grey, is a console that types
+  itself in with the ignition (`car/carScreen.ts`): the route to Crasigostraße 24 from the
+  letter, ETA 00:32, and who is driving.
+- **The cave**: the pointer on the screen about the author turns you to it and draws you in
+  (60 % of the way, the view 10° narrower) to read it; it holds until the pointer moves well
+  away (160 px) from where it drew you in.
+- **SCROLL** and the captions' labels are JetBrains Mono Bold, set tight, like the rest.
+
 ### Deploying (Netlify)
 
 `netlify.toml` builds with `npm run build` and serves `dist/`. Or build locally and drag the
