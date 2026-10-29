@@ -12,6 +12,7 @@ import { chapterOf, chapterReadiness } from './core/chapters';
 import { preloadRoom } from './scenes/home/RoomScene';
 import { installChapterTransitions } from './ui/chapterTransition';
 import { Overlay } from './ui/Overlay';
+import { watchContextLoss } from './ui/stub';
 import { Preloader } from './ui/Preloader';
 
 /**
@@ -182,6 +183,7 @@ export function App() {
           onCreated={({ gl }) => {
             gl.toneMapping = NoToneMapping;
             gl.outputColorSpace = SRGBColorSpace;
+            watchContextLoss(gl.domElement);
           }}
         >
           <Suspense fallback={null}>

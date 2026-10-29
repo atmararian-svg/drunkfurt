@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- the chapter selector's frame: ink, the white ◂ and the red dash in it -->
+  <rect width="64" height="64" rx="12" fill="#101010"/>
+  <rect x="8.5" y="8.5" width="47" height="47" rx="6" fill="none" stroke="#fff" stroke-opacity="0.22" stroke-width="2"/>
+  <path d="M30 32 L42 24.5 V39.5 Z" fill="#fff"/>
+  <rect x="15" y="30" width="11" height="4" fill="#cd1919"/>
+</svg>

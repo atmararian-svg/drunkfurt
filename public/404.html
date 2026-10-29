@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#101010" />
+    <meta name="robots" content="noindex" />
+    <title>DRUNKFURT / 404</title>
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <style>
+      /* DRUNKFURT's own type and colours (src/styles.css), on a page of its own */
+      @font-face { font-family: 'JetBrains Mono'; font-weight: 100 800; font-display: swap; src: url('/fonts/jetbrains-mono-latin-wght-normal.woff2') format('woff2'); }
+      @font-face { font-family: 'Archivo'; font-weight: 100 900; font-stretch: 62% 125%; font-display: swap; src: url('/fonts/archivo-latin-wdth-normal.woff2') format('woff2'); }
+      :root { color-scheme: dark; --ink: #101010; --red: #cd1919; }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; height: 100%; }
+      body {
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background-color: var(--ink);
+        background-image: radial-gradient(circle, rgba(241, 240, 233, 0.07) 0.8px, transparent 1.25px);
+        background-size: 5px 5px;
+        color: #fff;
+        font: 700 14px/1.5 'JetBrains Mono', ui-monospace, monospace;
+        letter-spacing: -0.02em;
+        text-transform: uppercase;
+      }
+      main { width: min(720px, 100%); }
+      .meta { display: flex; justify-content: space-between; gap: 24px; font-size: 12px; opacity: 0.8; }
+      h1 {
+        margin: 20px 0 28px;
+        font-family: 'Archivo', 'Arial Black', sans-serif;
+        font-weight: 800;
+        font-stretch: 125%;
+        font-size: clamp(44px, 11vw, 112px);
+        line-height: 0.82;
+        letter-spacing: -0.05em;
+      }
+      p { margin: 0 0 6px; color: #dedede; }
+      p::before { content: '> '; color: var(--red); }
+      .caret { display: inline-block; width: 0.6em; height: 1.1em; vertical-align: -0.2em; background: var(--red); animation: blink 1s steps(1) infinite; }
+      @keyframes blink { 50% { opacity: 0; } }
+      a {
+        display: inline-block;
+        margin-top: 32px;
+        padding: 10px;
+        border-radius: 3px;
+        background: #fff;
+        color: #111;
+        font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+        letter-spacing: -0.05em;
+        text-decoration: none;
+      }
+      a:hover, a:focus-visible { background: var(--red); color: #fff; outline: none; }
+      @media (prefers-reduced-motion: reduce) { .caret { animation: none; } }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="meta"><span>DRUNKFURT / ERROR 404</span><span>FRANKFURT AM MAIN / 03:12</span></div>
+      <h1>WRONG<br />STOP</h1>
+      <p>This page does not exist.</p>
+      <p>Neither does the last train home.</p>
+      <p>Get off here and walk back. <span class="caret" aria-hidden="true"></span></p>
+      <a href="/">BACK TO THE STATION</a>
+    </main>
+  </body>
+</html>
