@@ -42,6 +42,10 @@ scroll up. Ambient life (pigeon, dust, tickers, the clock, one flickering tube) 
 
 ### Phones and tablets
 
+**A touch screen gets the desktop-only page first** (`ui/stub.ts`, see Launch below): the story
+runs on phones and tablets, but not smoothly. TRY ANYWAY (remembered for the visit, or `?anyway`
+in the address) goes in, to all of the following.
+
 The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked at 390 × 844 and
 844 × 390 (a phone) and 820 × 1180 (a tablet):
 
@@ -77,6 +81,26 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
 - **Lighter**: the 3D page's pixel density is capped at 1.25 on touch devices (1.75 elsewhere).
 - `viewport-fit=cover` (the safe areas are already kept clear), no double-tap zoom, no tap flash.
 
+
+### Launch: pages around the story
+
+- **In place of the story** (`ui/stub.ts`, styled as the page: ink, halftone, a console in
+  JetBrains Mono capitals, an Archivo headline, white tabs). `main.tsx` decides before any of
+  the 3D is loaded:
+  - no WebGL (none, or the context refused): LIGHTS OUT, how to turn it on, ARIANATMAR.COM;
+  - a touch device (phone or tablet): BIGGER SCREEN, COPY LINK (the share sheet where there is
+    one), TRY ANYWAY, ARIANATMAR.COM;
+  - the story's WebGL lost mid-way and not given back within 2.5 s: BLACKOUT, RELOAD.
+- **404** (`public/404.html`, Netlify serves it for unknown paths): WRONG STOP, BACK TO THE
+  STATION, in the same manner (its two fonts are copied to `public/fonts/`).
+- **Fonts are served with the page** (`src/fonts/`, `src/fonts.css`): JetBrains Mono (variable
+  weight; every monospace on the page, set tight as in the design), Archivo (variable weight
+  and width; the headlines), Anton (the posters). Latin and Latin Extended subsets, SIL OFL
+  (licences alongside). No request goes to Google.
+- **Icons and sharing**: `public/favicon.svg` (the selector's frame: the white ◂ and the red
+  dash), `apple-touch-icon.png` (180 px), `site.webmanifest`, `og.jpg` (1200 × 630, the station);
+  Open Graph and Twitter tags in `index.html` use `VITE_SITE_URL` (set in `.env`; change it to
+  the real address, or set it in Netlify's build environment). `robots.txt` allows everything.
 
 ### Deploying (Netlify)
 
