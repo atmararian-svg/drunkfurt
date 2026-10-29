@@ -114,9 +114,21 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   chrome. The centre screen right of the wheel, which only glowed grey, is a console that types
   itself in with the ignition (`car/carScreen.ts`): the route to Crasigostraße 24 from the
   letter, ETA 00:32, and who is driving.
-- **The cave**: the pointer on the screen about the author turns you to it and draws you in
-  (60 % of the way, the view 10° narrower) to read it; it holds until the pointer moves well
-  away (160 px) from where it drew you in.
+- **The cave**: the screen about the author is read with a click, as the letter is: CLICK TO
+  READ at the pointer over it; a click turns you to it and draws you in (60 % of the way, the
+  view 10° narrower), the pointer free to move; CLICK TO CLOSE, any click or Escape, and you lean
+  back. (A hover zoom moved the screen out from under the pointer and let go at once.)
+- **The attacker stands upright** until he sets off (legs straight, feet together:
+  `manRig.stand(…, upright)`); his first steps take him out of it.
+- **BAM and POW** are thrown in with each blow (`brush.ts drawHits`): in from their own side
+  (BAM from the left, POW from the right), large and tilted, out of 28 px pixels that resolve as
+  they land (as ACTION comes in), overshooting, settling, shaking off the impact (0.3 s).
+- **The dither trail under the pointer** (`ui/ditherCursor.ts`), after the supplied "ASCII Flow
+  Trail" (Floyd–Steinberg glyphs, Bayer thresholds, a screen-blended trail), made denser and
+  smoother: the head eases after the pointer at a time-based rate, the trail is laid every 5 px
+  along the whole way it moved each frame (a fast flick leaves an unbroken stroke), it ages over
+  0.85 s and narrows into a tail; radius 78 px; grey glyphs in `difference` blend, a negative of
+  the page. Not on touch, not with reduced motion.
 - **SCROLL** and the captions' labels are JetBrains Mono Bold, set tight, like the rest.
 
 ### Deploying (Netlify)
