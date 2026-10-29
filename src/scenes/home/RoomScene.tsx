@@ -32,6 +32,8 @@ import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
 import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, overAbout, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 
+/** How far (px) the pointer moves from where it drew you in to the screen about the author before you lean back. */
+const READ_LET_GO = 160;
 /** The wall screen that shows the text about the author. */
 const ABOUT_SCREEN = 'screen_13';
 
@@ -331,8 +333,15 @@ function Room({ active }: { active: boolean }) {
       monitor.link = at ? at.link : -1;
       monitor.hover = damp(monitor.hover, monitor.over ? 1 : 0, 2.6, dt);
       // the screen about the author, the same way: the pointer on it draws you in, close enough to read
+      // (as you turn to it, it moves out from under the pointer: once drawn in, you stay until the pointer
+      // moves well away from where it was, or leaves the story's gate)
       const ab = monitor.about;
-      ab.over = !at && monitor.armed && p.active && overAbout(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight);
+      const px = ((p.x + 1) / 2) * window.innerWidth;
+      const py = ((p.y + 1) / 2) * window.innerHeight;
+      if (!monitor.armed || !p.active || at) ab.anchor = null;
+      else if (!ab.anchor && overAbout(px, py)) ab.anchor = { x: px, y: py };
+      else if (ab.anchor && Math.hypot(px - ab.anchor.x, py - ab.anchor.y) > READ_LET_GO && !overAbout(px, py)) ab.anchor = null;
+      ab.over = !!ab.anchor;
       ab.hover = damp(ab.hover, ab.over ? 1 : 0, 2.2, dt);
     }
     const l = !monitor.entering ? SCREEN_LINKS[monitor.link] : undefined;
