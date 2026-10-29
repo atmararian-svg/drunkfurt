@@ -98,7 +98,10 @@ export function buildCarScreen(screen: Mesh, frame: Matrix4, towards: Vector3): 
     const H = canvas.height;
     ctx.fillStyle = '#0b0b0c';
     ctx.fillRect(0, 0, W, H);
-    const size = Math.round(H / 13);
+    // as large as the longest line allows across the screen
+    ctx.font = `800 100px 'JetBrains Mono', ui-monospace, monospace`;
+    const longest = Math.max(...SCREEN_LINES.map((l) => ctx.measureText(`> ${l}`).width));
+    const size = Math.round(Math.min(H / 13, (100 * W * 0.86) / longest));
     const lead = Math.round(size * 1.45);
     const left = Math.round(W * 0.06);
     let y = Math.round(H * 0.1) + size;

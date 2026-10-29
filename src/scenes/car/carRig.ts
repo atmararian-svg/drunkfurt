@@ -90,7 +90,8 @@ function pick(name: string, mesh: string, m: Mats): Material {
   if (/^(lights_13|lights_global|vehiclelights|leftflash|rightflash|shader_brake|reverese|red$)/.test(n)) return m.tail;
   if (/^tyr/.test(n)) return m.tyre;
   // the maker's star and lettering, dark: there, but not read as a brand
-  if (/^(lettering|badge)/.test(n) || /logo/.test(mesh)) return m.trim;
+  // (the star in the steering wheel's hub is the wheel's chrome)
+  if (/^(lettering|badge)/.test(n) || /logo/.test(mesh) || (/steer/.test(mesh) && /^(chrome|simbs)/.test(n))) return m.trim;
   if (/^(chrome|metallic$|gray_glossy|59)/.test(n)) return /wheel/.test(mesh) ? m.rim : m.chrome;
   if (/^(gauges|gauges_screen)$/.test(n)) return m.clusterGlass;
   if (n === 'screen') return m.screen;

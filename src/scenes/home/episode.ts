@@ -46,7 +46,7 @@ const FLY_FOV = 40;
 const LEAN = { distance: 0.3, fov: 3 };
 
 /** The lean to read the screen about the author: the share of the way there, and how much the view narrows (deg). */
-const READ = { share: 0.45, fov: 8 };
+const READ = { share: 0.6, fov: 10 };
 const toAbout = new Vector3();
 const wrapPi = (x: number) => Math.atan2(Math.sin(x), Math.cos(x));
 const toScreen = new Vector3();
