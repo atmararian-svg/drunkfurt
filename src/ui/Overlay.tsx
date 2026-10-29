@@ -91,6 +91,9 @@ export function Overlay() {
       const p = c.querySelector<HTMLElement>('[data-type]');
       if (p) typed.set(c, { tw: createTypewriter(p, { startDelay: 250 }), on: false });
     });
+    // (balloons are lettered in capitals: ß is set as its capital, ẞ, which the capitals keep as it is)
+    // (the last two words of each line are held together, so a narrower page never leaves one word alone on a line)
+    const spoken = (text: string) => text.replace(/ß/g, 'ẞ').replace(/ (\S+)$/gm, '\u00a0$1');
     const thoughtEl = el.querySelector<HTMLElement>('.thoughts-text')!;
     const thoughtTw = createTypewriter(thoughtEl, { content: 'lines', stableHeight: false, startDelay: 500, pauseAfterType: (t) => 900 + 24 * t.length });
     const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;
@@ -106,7 +109,14 @@ export function Overlay() {
       if (story.getState().prompt === 'thought') {
         thoughtTw.stop();
         skipThoughts();
-      } else skipInvitation();
+      } else {
+        // the words still being typed are shown whole at once (the address in them is worth keeping)
+        captions.forEach((c) => {
+          const t = typed.get(c);
+          if (t?.on && t.tw.typing) t.tw.show(spoken(c.dataset.text ?? ''));
+        });
+        skipInvitation();
+      }
     };
     const skipKey = (e: KeyboardEvent) => {
       if (e.code !== 'KeyS' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
@@ -154,9 +164,7 @@ export function Overlay() {
         const t = typed.get(c);
         if (t && t.on !== on) {
           t.on = on;
-          // (balloons are lettered in capitals: ß is set as its capital, ẞ, which the capitals keep as it is)
-          // (the last two words of each line are held together, so a narrower page never leaves one word alone on a line)
-          if (on) void t.tw.play((c.dataset.text ?? '').replace(/ß/g, 'ẞ').replace(/ (\S+)$/gm, '\u00a0$1')).then(() => capDefs[i].onTyped?.());
+          if (on) void t.tw.play(spoken(c.dataset.text ?? '')).then(() => capDefs[i].onTyped?.());
           else t.tw.stop();
         }
       });

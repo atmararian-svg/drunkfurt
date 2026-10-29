@@ -115,7 +115,7 @@ export const cityEpisode: EpisodeDef = {
     // the letter he dropped: the story waits until it has been read (letter.ts), then you tell him where to find you
     // (from where the fight's own playback ends: the letter can be picked up from there, see letter.ts)
     { from: LETTER.from + 0.04, to: 1, place: 'bl', tone: 'yellow', text: `Something fell out of his coat. A letter. ${TOUCH ? 'Tap' : 'Click'} it.`, when: () => encounter.outcome === 'blocked' && !letter.read },
-    { from: LETTER.gate - 0.006, to: 1, place: 'tr', tone: 'speech', kicker: 'ME:', text: INVITATION, when: () => letter.read && !letter.skipped, onTyped: invitationTyped },
+    { from: LETTER.gate - 0.006, to: 1, place: 'tr', tone: 'speech', kicker: 'ME:', text: INVITATION, when: () => letter.read, onTyped: invitationTyped },
     { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'When I came to, he was gone. He did not even take the bag.', when: () => encounter.outcome === 'knockedOut' },
   ],
 };
