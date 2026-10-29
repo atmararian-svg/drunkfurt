@@ -16,6 +16,8 @@ import { ramp, routeAt, routeS, walkPace } from './strangerRoute';
 
 /** Where he ends up afterwards: on his back on the pavement (his feet here, his head towards the shops). */
 const DOWN = { x: 7.0, z: -36.3, yaw: 0.9 };
+/** How long he takes to go down after the second hit (seconds of the fight's clock). */
+const FALL_S = 0.75;
 /** Your eyes when he comes at you (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
 const UP = new Vector3(0, 1, 0);
@@ -58,7 +60,9 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
 
     // after the fight: on the pavement (you defended), or gone (you went down). Only from the moment the
     // page is black, so scrolling back brings him back on his feet.
-    if (view.outcome === 'blocked' && (t >= BLOCK.dark || local >= BEAT.aftermath)) {
+    // (he goes down in the dark, under the pixels, but not in a cut: the first hit knocks the knife
+    // away and him back a step, the second takes him off his feet onto his back)
+    if (view.outcome === 'blocked' && (t >= BLOCK.hit1 || local >= BEAT.aftermath)) {
       root.visible = true;
       root.position.set(DOWN.x, 0, DOWN.z);
       root.rotation.y = DOWN.yaw;
@@ -73,6 +77,24 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       if (key.current) key.current.visible = false;
       encounter.stranger.x = DOWN.x;
       encounter.stranger.z = DOWN.z;
+      const fall = local >= BEAT.aftermath ? 1 : ramp(t, BLOCK.hit2, BLOCK.hit2 + FALL_S);
+      if (fall < 1) {
+        // from where he stood (squared up to you) to where he lies; the fall itself gathers speed
+        // (gravity) and settles with a small give as he lands
+        const stood = routeAt(routeS(1));
+        const stoodYaw = Math.atan2(CAM.x - stood.x, CAM.z - stood.z);
+        const stagger = smoothstep(ramp(t, BLOCK.hit1, BLOCK.hit1 + 0.25));
+        const g = fall * fall;
+        const land = g + Math.sin(Math.PI * smoothstep(ramp(fall, 0.85, 1))) * 0.03;
+        const away = tmp.c.set(-Math.sin(stoodYaw), 0, -Math.cos(stoodYaw)).multiplyScalar(0.18 * stagger);
+        root.position.set(lerp(stood.x + away.x, DOWN.x, smoothstep(fall)), 0, lerp(stood.z + away.z, DOWN.z, smoothstep(fall)));
+        root.rotation.y = lerpAngle(stoodYaw, DOWN.yaw, smoothstep(fall));
+        rig.fall(land);
+        // knocked back: the upper body thrown back by the first hit, the head with it
+        if (fall < 0.6) rig.lean(-0.22 * stagger * (1 - fall / 0.6));
+        encounter.stranger.x = root.position.x;
+        encounter.stranger.z = root.position.z;
+      }
       return;
     }
     rig.groundKnife.visible = false;

@@ -57,6 +57,11 @@ export interface ManRig {
   grip(w: number): void;
   /** On his back on the pavement, arms flung out. */
   lie(): void;
+  /**
+   * Going down: from his stance (`k` 0) backwards about his feet onto his back
+   * (`k` 1, the pose `lie` sets), the arms flung out on the way.
+   */
+  fall(k: number): void;
   /** Where the blade's tip is (world). */
   tip(out: Vector3): Vector3;
   /** Frees what this build made (its materials, the knit textures, the beanie, scarf and knife copies). */
@@ -380,6 +385,16 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       model.rotation.set(-Math.PI / 2, 0, 0);
       // feet at the root, head away from it; lifted by half his depth so he lies on the pavement
       model.position.set(0, 0.11, 0);
+      root.updateMatrixWorld(true);
+    },
+    fall(k) {
+      rig.stand(0, 0);
+      const e = Math.min(1, Math.max(0, k));
+      const y0 = model.position.y;
+      list.forEach((b, i) => b.quaternion.slerp(rest[i], e));
+      bone('Hips').position.lerp(restHips, e);
+      model.rotation.set((-Math.PI / 2) * e, 0, 0);
+      model.position.set(0, y0 + (0.11 - y0) * e, 0);
       root.updateMatrixWorld(true);
     },
     tip(out) {
