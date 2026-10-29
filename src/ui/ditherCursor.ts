@@ -137,7 +137,7 @@ export function mountDitherCursor() {
       c1 = Math.max(c1, b);
       r0 = Math.min(r0, c);
       r1 = Math.max(r1, e);
-      const w = life * life * STRENGTH * 0.35;
+      const w = life * life * STRENGTH * 0.5;
       for (let row = c; row <= e; row++) {
         const cy = row * CELL + CELL / 2 - p.y;
         for (let col = a; col <= b; col++) {
