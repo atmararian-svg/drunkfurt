@@ -45,6 +45,10 @@ const FLY_FOV = 40;
 /** How far the pointer over the screen draws you towards it (m), and how much the view narrows (deg). */
 const LEAN = { distance: 0.3, fov: 3 };
 
+/** The lean to read the screen about the author: the share of the way there, and how much the view narrows (deg). */
+const READ = { share: 0.45, fov: 8 };
+const toAbout = new Vector3();
+const wrapPi = (x: number) => Math.atan2(Math.sin(x), Math.cos(x));
 const toScreen = new Vector3();
 const target = new Vector3();
 
@@ -70,6 +74,18 @@ function lookAtScreen(local: number, pose: CameraPose) {
     toScreen.copy(DISPLAY.centre).sub(pose.position).normalize();
     pose.position.addScaledVector(toScreen, LEAN.distance * h);
     pose.fov = (pose.fov ?? 46) - LEAN.fov * h;
+  }
+  // the screen about the author: the pointer on it turns you to it and draws you in, near enough to read
+  const a = smoothstep(clamp(monitor.about.hover, 0, 1));
+  if (a > 0) {
+    const d = toAbout.copy(monitor.about.centre).sub(pose.position);
+    const yaw = Math.atan2(-d.x, -d.z);
+    const pitch = Math.atan2(d.y, Math.hypot(d.x, d.z));
+    pose.position.addScaledVector(d, READ.share * a);
+    pose.yaw += wrapPi(yaw - pose.yaw) * a;
+    pose.pitch += (pitch - pose.pitch) * a;
+    pose.fov = (pose.fov ?? 46) - READ.fov * a;
+    pose.still = Math.max(pose.still ?? 0, a);
   }
   const f = flyAt();
   if (f <= 0) return;

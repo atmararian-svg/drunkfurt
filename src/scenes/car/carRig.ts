@@ -1,6 +1,7 @@
-import { Color, DoubleSide, Group, Material, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
+import { Color, DoubleSide, Group, Material, Matrix4, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { buildCluster } from './carCluster';
+import { buildCarScreen } from './carScreen';
 
 /**
  * The supplied Mercedes-Benz W206 C220 (tools/mercedes2glb.mjs), set up to be
@@ -88,7 +89,9 @@ function pick(name: string, mesh: string, m: Mats): Material {
   if (/^(headlight|lights_29|drl_[LR]|blue2)$/.test(n)) return m.lamp;
   if (/^(lights_13|lights_global|vehiclelights|leftflash|rightflash|shader_brake|reverese|red$)/.test(n)) return m.tail;
   if (/^tyr/.test(n)) return m.tyre;
-  if (/^(chrome|lettering|badge|metallic$|gray_glossy|59)/.test(n)) return /wheel/.test(mesh) ? m.rim : m.chrome;
+  // the maker's star and lettering, dark: there, but not read as a brand
+  if (/^(lettering|badge)/.test(n) || /logo/.test(mesh)) return m.trim;
+  if (/^(chrome|metallic$|gray_glossy|59)/.test(n)) return /wheel/.test(mesh) ? m.rim : m.chrome;
   if (/^(gauges|gauges_screen)$/.test(n)) return m.clusterGlass;
   if (n === 'screen') return m.screen;
   if (/mirror/.test(n)) return m.mirror;
@@ -151,6 +154,15 @@ export function buildCar(gltf: GLTF): CarRig {
   node('w206_needle_tacho').visible = false;
   const dials = buildCluster();
   root.add(dials.mesh);
+  // the centre screen: a console (the route, the driver) on a plane fitted to the model's screen, which has no UVs
+  let screenMesh: Mesh | null = null;
+  model.traverse((o) => {
+    const mesh = o as Mesh;
+    if (mesh.isMesh && (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).includes(m.screen)) screenMesh = mesh;
+  });
+  root.updateMatrixWorld(true);
+  const centre = screenMesh ? buildCarScreen(screenMesh, new Matrix4(), new Vector3(0, 0.26, -0.966)) : null;
+  if (centre) root.add(centre.mesh);
 
   // the throttle pedal: it pivots on its node's origin (hung from the top, as in the car), 14° at full throttle
   const gas = model.getObjectByName('w206_gaspedal');
@@ -171,8 +183,8 @@ export function buildCar(gltf: GLTF): CarRig {
       m.tail.emissiveIntensity = 0.9 * on;
     },
     cluster(rpm, kmh, on, gear, shift) {
-      // the centre screen glows softly, so the eye goes to the cluster
-      m.screen.emissiveIntensity = 0.22 * on;
+      // the centre screen wakes with the cluster (its glass stays dark under the console)
+      centre?.set(on, performance.now());
       dials.set(rpm, kmh, on, gear, shift);
     },
     pedal(down) {

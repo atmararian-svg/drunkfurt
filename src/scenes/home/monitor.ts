@@ -1,4 +1,4 @@
-import { Camera, Mesh, Raycaster, Vector2 } from 'three';
+import { Camera, Mesh, Raycaster, Vector2, Vector3 } from 'three';
 import { clamp } from '../../core/math';
 import { story } from '../../core/store';
 import { pinScroll } from '../../core/timeline';
@@ -86,7 +86,19 @@ export const monitor = {
   /** Set by the scene: the screen's picture, and the camera to pick with. */
   mesh: null as Mesh | null,
   camera: null as Camera | null,
+  /** The wall screen with the text about the author: the pointer on it draws you in to read it. */
+  about: { mesh: null as Mesh | null, centre: new Vector3(), over: false, hover: 0 },
 };
+
+/** Whether a point on the page (CSS px) is over the screen with the text about the author. */
+export function overAbout(clientX: number, clientY: number) {
+  const { camera } = monitor;
+  const { mesh } = monitor.about;
+  if (!mesh || !camera) return false;
+  ndc.set((clientX / window.innerWidth) * 2 - 1, -(clientY / window.innerHeight) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  return ray.intersectObject(mesh, false).length > 0;
+}
 
 /** Where the move into the screen is now (0 … 1). */
 export function flyAt(now = performance.now()) {
@@ -181,5 +193,7 @@ export function resetMonitor() {
   monitor.over = false;
   monitor.hover = 0;
   monitor.link = -1;
+  monitor.about.over = false;
+  monitor.about.hover = 0;
   pinScroll(false);
 }

@@ -13,11 +13,12 @@ import { enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 import { mountCombatPrompts, updateCombatPrompts } from './combatPrompt';
 import { setScenePixels } from './scenePixels';
+import { TOUCH } from './touch';
 import { createTypewriter, Typewriter } from './typewriter';
-import { letter, letterSpot, pickLetter } from '../scenes/city/letter';
+import { letter, letterSpot, pickLetter, skipInvitation } from '../scenes/city/letter';
 import { closeLetterNow, openLetter } from './letterReveal';
 import { mountChapterTuner, tunerAway, tunerBackdrop, updateTuner } from './chapterTuner';
-import { MONOLOGUE, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
+import { MONOLOGUE, skipThoughts, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
 import { PressPrompt } from './PressPrompt';
 
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
@@ -94,6 +95,26 @@ export function Overlay() {
     const thoughtTw = createTypewriter(thoughtEl, { content: 'lines', stableHeight: false, startDelay: 500, pauseAfterType: (t) => 900 + 24 * t.length });
     const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;
     let thoughtsOn = false;
+    // SKIP DIALOGUE (bottom right, or S): while the invitation is said, or the thoughts in the car are typed
+    const skipBtn = el.querySelector<HTMLButtonElement>('.skip')!;
+    const skippable = () => {
+      const ask = story.getState().prompt;
+      return (ask === 'invite' && letter.read && !letter.invited) || (ask === 'thought' && !thoughts.done);
+    };
+    const skip = () => {
+      if (!skippable()) return;
+      if (story.getState().prompt === 'thought') {
+        thoughtTw.stop();
+        skipThoughts();
+      } else skipInvitation();
+    };
+    const skipKey = (e: KeyboardEvent) => {
+      if (e.code !== 'KeyS' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
+      e.preventDefault();
+      skip();
+    };
+    skipBtn.addEventListener('click', skip);
+    window.addEventListener('keydown', skipKey);
     const unmountPrompts = mountCombatPrompts(el.querySelector<HTMLCanvasElement>('.fx-action')!, {
       defend: el.querySelector<HTMLElement>('.fx-press--defend')!,
       rev: el.querySelector<HTMLElement>('.fx-press--rev')!,
@@ -168,6 +189,11 @@ export function Overlay() {
         else void thoughtTw.play(MONOLOGUE).then(() => thoughtsTyped(() => thoughtTw.erase()));
       }
       cue.classList.toggle('is-on', p < 0.004);
+      const canSkip = skippable();
+      if (skipBtn.classList.contains('is-on') !== canSkip) {
+        skipBtn.classList.toggle('is-on', canSkip);
+        skipBtn.tabIndex = canSkip ? 0 : -1;
+      }
       outro.classList.toggle('is-on', id === 'outro' && local > 0.15);
 
       const ink = inkAt(p);
@@ -206,6 +232,8 @@ export function Overlay() {
       typed.forEach((t) => t.tw.stop());
       thoughtTw.stop();
       if (!thoughts.done) thoughts.started = false;
+      skipBtn.removeEventListener('click', skip);
+      window.removeEventListener('keydown', skipKey);
       unmountPrompts();
       setScenePixels(1);
       el.style.filter = '';
@@ -377,6 +405,16 @@ export function Overlay() {
       <canvas className="impact" aria-hidden />
 
       <RevPrompt prompt={prompt} />
+
+      <button type="button" className="skip" tabIndex={-1} aria-label="Skip dialogue">
+        {TOUCH ? (
+          'TAP TO SKIP'
+        ) : (
+          <>
+            <span className="skip-key">S</span> SKIP DIALOGUE
+          </>
+        )}
+      </button>
 
       <div className="cue">
         <span>Scroll</span>

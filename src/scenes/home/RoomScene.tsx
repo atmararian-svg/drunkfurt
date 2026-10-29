@@ -29,7 +29,7 @@ import { Gate, gates, localProgress } from '../../core/timeline';
 import { input } from '../../player/input';
 import { postFx } from '../../render/Stylizer';
 import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
-import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, pick, resetMonitor, solidAt } from './monitor';
+import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, overAbout, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 
 /** The wall screen that shows the text about the author. */
@@ -178,7 +178,8 @@ function buildRoom(gltf: GLTF) {
     steel.dispose();
     led.dispose();
   };
-  return { root, wall, dispose };
+  const about = screens.find((s) => s.name === ABOUT_SCREEN) ?? null;
+  return { root, wall, dispose, about };
 }
 
 /**
@@ -263,10 +264,19 @@ function Room({ active }: { active: boolean }) {
   useEffect(() => {
     monitor.mesh = display.screen;
     monitor.camera = camera;
+    // the screen about the author: its middle, for the camera to lean towards
+    const about = room.about;
+    monitor.about.mesh = about;
+    if (about) {
+      about.updateWorldMatrix(true, false);
+      about.geometry.computeBoundingBox();
+      about.geometry.boundingBox!.getCenter(monitor.about.centre).applyMatrix4(about.matrixWorld);
+    }
     return () => {
       if (monitor.mesh === display.screen) monitor.mesh = null;
+      if (monitor.about.mesh === about) monitor.about.mesh = null;
     };
-  }, [display, camera]);
+  }, [display, camera, room]);
 
   useEffect(() => {
     if (!active) return;
@@ -320,6 +330,10 @@ function Room({ active }: { active: boolean }) {
       monitor.over = !!at;
       monitor.link = at ? at.link : -1;
       monitor.hover = damp(monitor.hover, monitor.over ? 1 : 0, 2.6, dt);
+      // the screen about the author, the same way: the pointer on it draws you in, close enough to read
+      const ab = monitor.about;
+      ab.over = !at && monitor.armed && p.active && overAbout(((p.x + 1) / 2) * window.innerWidth, ((p.y + 1) / 2) * window.innerHeight);
+      ab.hover = damp(ab.hover, ab.over ? 1 : 0, 2.2, dt);
     }
     const l = !monitor.entering ? SCREEN_LINKS[monitor.link] : undefined;
     display.mark.visible = !!l;

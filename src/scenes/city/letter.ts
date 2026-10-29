@@ -34,6 +34,8 @@ export const letter = {
   read: false,
   /** The invitation has been said (typed and held): the story may go on. */
   invited: false,
+  /** The invitation was skipped (SKIP DIALOGUE): it is not shown again this pass. */
+  skipped: false,
   /** The pointer is over the sheet on the pavement. */
   over: false,
   /** Set by the prop: the sheet's mesh, and the camera to pick with. */
@@ -73,8 +75,19 @@ export function invitationTyped() {
   }, LETTER.hold);
 }
 
+/** SKIP DIALOGUE: the invitation is taken as said, at once, and goes; the story may go on. */
+export function skipInvitation() {
+  if (!letter.read || letter.invited) return;
+  window.clearTimeout(holdTimer);
+  letter.skipped = true;
+  letter.invited = true;
+  updateLetter();
+  readScroll();
+}
+
 export function resetLetter() {
   window.clearTimeout(holdTimer);
+  letter.skipped = false;
   letter.open = false;
   letter.read = false;
   letter.invited = false;

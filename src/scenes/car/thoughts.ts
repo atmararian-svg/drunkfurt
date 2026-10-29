@@ -76,6 +76,17 @@ export function thoughtsTyped(erase: () => Promise<void>) {
   }, THOUGHTS.hold);
 }
 
+/** SKIP DIALOGUE: the thoughts are over at once (the overlay clears them), and the story goes on to the rev point. */
+export function skipThoughts() {
+  if (thoughts.done) return;
+  window.clearTimeout(holdTimer);
+  round++;
+  thoughts.done = true;
+  gate.open = true;
+  const to = globalProgress('car', CAR_BEAT.rev);
+  if (timeline.progress < to) playProgress(timeline.progress, to, 1.1);
+}
+
 export function resetThoughts() {
   window.clearTimeout(holdTimer);
   round++;
