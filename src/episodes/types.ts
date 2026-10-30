@@ -12,8 +12,13 @@ export interface Caption {
   kicker?: string;
   /** Screen corner, like a caption box placed on a comic panel. */
   place: 'tl' | 'tr' | 'bl' | 'br';
-  /** Yellow box for narration that matters, white for everything else, a balloon for someone speaking. */
-  tone?: 'yellow' | 'paper' | 'speech';
+  /**
+   * 'speech': someone speaking (typed in at the bottom of the page); 'tip': the
+   * system telling you what to do (the ACTION box, bottom left, ui/textBoxes.ts);
+   * anything else: his thoughts (the box by his face, bottom right). `place`
+   * only places a speech caption.
+   */
+  tone?: 'yellow' | 'paper' | 'speech' | 'tip';
   /** Only shown when this holds (e.g. one caption per outcome of an interaction). */
   when?: () => boolean;
   /** A balloon's text is typed in (ui/typewriter.ts); called each time it has been typed in full. */

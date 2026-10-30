@@ -13,6 +13,7 @@ import { aboutClick, enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 import { mountCombatPrompts, updateCombatPrompts } from './combatPrompt';
 import { setScenePixels } from './scenePixels';
+import { mountTextBoxes } from './textBoxes';
 import { TOUCH } from './touch';
 import { createTypewriter, Typewriter } from './typewriter';
 import { letter, letterSpot, pickLetter, skipInvitation } from '../scenes/city/letter';
@@ -82,7 +83,12 @@ export function Overlay() {
     let raf = 0;
     const el = root.current!;
     const captions = Array.from(el.querySelectorAll<HTMLElement>('[data-caption]'));
-    const capDefs = episodes.flatMap((ep) => ep.captions);
+    // speech is typed in at the bottom of the page (the captions here); his thoughts and the system's tips
+    // go to the two text boxes (textBoxes.ts)
+    const allDefs = episodes.flatMap((ep) => ep.captions.map((c, i) => ({ c, ep: ep.id, key: `${ep.id}-${i}` })));
+    const capDefs = allDefs.filter((d) => d.c.tone === 'speech').map((d) => d.c);
+    const boxDefs = allDefs.filter((d) => d.c.tone !== 'speech');
+    const boxes = mountTextBoxes(el);
     const cue = el.querySelector<HTMLElement>('.cue')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
     // balloons are typed in (the supplied typewriter); the thoughts in the car as well, line by line
@@ -171,6 +177,19 @@ export function Overlay() {
       // the fight: ACTION and PRESS D TO DEFEND, and the street breaking into coarse pixels (blurred and dark once you defend)
       // (the same ACTION and panel system asks for D in the car, to rev)
       const ask = story.getState().prompt;
+      // his thoughts and the system's tips: the first that holds here of each; both keep out of the way while the
+      // page asks you to act, the letter is open, a chapter turns, or the page is handed over to the site
+      const holds = (d: (typeof boxDefs)[number]) => d.ep === id && local >= d.c.from && local <= d.c.to && (!d.c.when || d.c.when());
+      const thought = boxDefs.find((d) => d.c.tone !== 'tip' && holds(d));
+      const tipDef = boxDefs.find((d) => d.c.tone === 'tip' && holds(d));
+      const html = document.documentElement.classList;
+      const busy =
+        actionShown(id, local) || ask === 'defend' || ask === 'rev' || letter.open || chapterTurn.busy || monitor.entering || html.contains('is-preloading') || html.contains('site-handoff');
+      boxes.update(
+        thought ? { key: thought.key, text: thought.c.text, kicker: thought.c.kicker } : null,
+        tipDef ? { key: tipDef.key, text: tipDef.c.text } : null,
+        busy,
+      );
       updateCombatPrompts(actionShown(id, local) || ask === 'rev', ask === 'defend' ? 'defend' : ask === 'rev' ? 'rev' : null);
       const look = combatLook(id, local);
       // the chapter tuner open: the page behind it dims and breaks into pixels (the scene, and the printed matter over it)
@@ -241,6 +260,7 @@ export function Overlay() {
       thoughtTw.stop();
       if (!thoughts.done) thoughts.started = false;
       skipBtn.removeEventListener('click', skip);
+      boxes.dispose();
       window.removeEventListener('keydown', skipKey);
       unmountPrompts();
       setScenePixels(1);
@@ -378,7 +398,7 @@ export function Overlay() {
       ))}
 
       {episodes.flatMap((ep) =>
-        ep.captions.map((c, i) => (
+        ep.captions.filter((c) => c.tone === 'speech').map((c, i) => (
           <aside
             key={`${ep.id}-${i}`}
             className={`caption caption--${c.place} caption--${c.tone ?? 'paper'}`}

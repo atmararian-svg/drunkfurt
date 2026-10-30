@@ -906,7 +906,9 @@ body { cursor: pointer; }
   cursor: none;
   opacity: 0;
 }
-.letter-close:focus-visible { opacity: 1; outline: 2px dashed #fff; outline-offset: 3px; }
+/* (with a pointer, the one close control is the label at the pointer: the button stays unseen even when it
+   holds the focus, there for assistive technology and Enter; Escape closes too) */
+.letter-close:focus-visible { outline: none; }
 @media (hover: none), (pointer: coarse) {
   .letter-layer { cursor: auto; }
   .letter-close { opacity: 1; cursor: pointer; }
@@ -1102,3 +1104,71 @@ body { cursor: pointer; }
   pointer-events: none;
   mix-blend-mode: difference;
 }
+
+/* --- the text boxes (ui/textBoxes.ts, Figma "text-boxes+person" on 1920 × 1080, at the design's own size) --- */
+/* his face, in the bottom right corner (249 × 310), and his thoughts beside it */
+.hero-face {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 249px;
+  height: 310px;
+  object-fit: cover;
+  pointer-events: none;
+  user-select: none;
+  visibility: hidden;
+  opacity: 0;
+}
+.hero-box {
+  /* the white box, its print out of register: blue 2 px up and left, red 2 px down and right, black between */
+  position: fixed;
+  right: calc(227px + 2px);
+  bottom: calc(55px + 2px);
+  z-index: 3;
+  box-sizing: border-box;
+  width: 202px;
+  margin: 0;
+  padding: 10px;
+  background: #fff;
+  color: #000;
+  box-shadow: -2px -2px 0 #3931e2, 2px 2px 0 #df0c20, 0 0 0 2px #000;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+.hero-kicker {
+  display: block;
+  margin-bottom: 4px;
+  font: 500 12px/16px var(--label);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.hero-text,
+.tip-text {
+  margin: 0;
+  font: 400 12px/16px var(--label);
+  letter-spacing: 0;
+  text-transform: uppercase;
+  overflow-wrap: break-word;
+}
+/* the system's tip, bottom left: ACTION and what to do, a black bar filling under them */
+.tip {
+  position: fixed;
+  left: max(20px, env(safe-area-inset-left, 0px));
+  bottom: max(20px, env(safe-area-inset-bottom, 0px));
+  z-index: 3;
+  box-sizing: border-box;
+  width: 288px;
+  padding: 10px 4px 4px;
+  background: #fff;
+  color: #000;
+  pointer-events: none;
+  visibility: hidden;
+  opacity: 0;
+}
+.tip-row { display: flex; gap: 20px; padding: 0 10px; }
+.tip-label { flex: none; font: 500 12px/16px var(--label); letter-spacing: 0; }
+.tip-text { flex: 1; }
+.tip-bar { height: 18px; margin-top: 17px; }
+.tip-bar i { display: block; height: 100%; background: #000; transform-origin: 0 50%; transform: scaleX(0); }

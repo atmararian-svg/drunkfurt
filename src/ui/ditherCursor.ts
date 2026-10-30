@@ -1,3 +1,4 @@
+import { monitor } from '../scenes/home/monitor';
 import { TOUCH } from './touch';
 
 /**
@@ -19,6 +20,11 @@ import { TOUCH } from './touch';
  * Grey glyphs drawn with `mix-blend-mode: difference`: a negative of the page
  * under them (light over the dark night, dark over the white screens).
  * Not on touch screens, not with reduced motion.
+ *
+ * It keeps out of the way of what can be used: over the chapter selector, a
+ * button or a link, the portfolio screen in the cave, it lays no trail (what
+ * is there fades), and a pointer at rest (REST_S) leaves none either, so
+ * nothing sits on what you are looking at.
  */
 const CELL = 11;
 /** Radius of the stroke at the pointer (CSS px); it narrows to TAPER of that at the end of the tail. */
@@ -32,6 +38,10 @@ const STEP = 5;
 const FOLLOW = 22;
 const STRENGTH = 0.85;
 const MAX_POINTS = 600;
+/** A pointer still for this long (s) stops laying the trail; what is there melts away. */
+const REST_S = 0.25;
+/** What the trail keeps off (the selector, the page's controls). */
+const OFF = '.tuner, a, button, [role="button"], .sound, .skip, .fx-press, .letter-layer, .stub';
 const GREY = '150, 150, 150';
 /** Glyphs from empty to full (the brief's Floyd–Steinberg set, inverted). */
 const GLYPHS = [' ', '▩', '▨', '▧', '▦', '▥', '▤', '▣'];
@@ -65,7 +75,7 @@ export function mountDitherCursor() {
   };
   size();
 
-  const target = { x: 0, y: 0, on: false };
+  const target = { x: 0, y: 0, on: false, off: false, moved: 0 };
   const head = { x: 0, y: 0 };
   let laid = { x: 0, y: 0 };
   const pts: { x: number; y: number; t: number }[] = [];
@@ -83,6 +93,8 @@ export function mountDitherCursor() {
     target.x = e.clientX;
     target.y = e.clientY;
     target.on = true;
+    target.moved = performance.now();
+    target.off = !!(e.target as Element | null)?.closest?.(OFF);
     if (idle) {
       idle = false;
       last = performance.now();
@@ -96,6 +108,8 @@ export function mountDitherCursor() {
     last = now;
     const t = now / 1000;
     // the head eases after the pointer; the trail is laid along the way it went, every STEP px
+    // (over a control or the portfolio screen, or at rest: no new trail, the head follows quietly)
+    const quiet = target.off || monitor.over || now - target.moved > REST_S * 1000;
     if (target.on) {
       const k = 1 - Math.exp(-FOLLOW * dt);
       head.x += (target.x - head.x) * k;
@@ -104,16 +118,14 @@ export function mountDitherCursor() {
       const dy = head.y - laid.y;
       const d = Math.hypot(dx, dy);
       const n = Math.floor(d / STEP);
-      for (let i = 1; i <= n; i++) pts.push({ x: laid.x + (dx * i) / n, y: laid.y + (dy * i) / n, t: t - dt * (1 - i / n) });
+      if (!quiet) for (let i = 1; i <= n; i++) pts.push({ x: laid.x + (dx * i) / n, y: laid.y + (dy * i) / n, t: t - dt * (1 - i / n) });
       if (n > 0) laid = { x: head.x, y: head.y };
-      // resting: the head keeps its glow
-      if (n === 0 && (pts.length === 0 || t - pts[pts.length - 1].t > 0.05)) pts.push({ x: head.x, y: head.y, t });
     }
     while (pts.length && (t - pts[0].t > TAIL_S || pts.length > MAX_POINTS)) pts.shift();
 
     ctx.clearRect(0, 0, W, H);
     if (!pts.length) {
-      if (!target.on) {
+      if (!target.on || quiet) {
         idle = true;
         return;
       }
