@@ -129,7 +129,33 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   along the whole way it moved each frame (a fast flick leaves an unbroken stroke), it ages over
   0.85 s and narrows into a tail; radius 78 px; grey glyphs in `difference` blend, a negative of
   the page. Not on touch, not with reduced motion.
+  It keeps off what can be used (the chapter selector, buttons and links, the sound switch, the
+  portfolio screen) and stops laying a trail when the pointer rests (0.25 s): what is there melts.
+- **The letter** has one close control with a pointer: CLICK TO CLOSE at the pointer. The button
+  under the sheet is shown only on touch screens; with a pointer it stays unseen (for assistive
+  technology and Enter; Escape closes too).
 - **SCROLL** and the captions' labels are JetBrains Mono Bold, set tight, like the rest.
+
+### Text boxes: his thoughts and the system's tips
+
+`ui/textBoxes.ts`, from Figma "Drunkfurt-text-boxes" (frame "text-boxes+person", 1920 × 1080),
+drawn at the design's own size. Captions say which box they belong to (`tone`, `episodes/types.ts`):
+
+- **His thoughts** (every caption that is not speech or a tip): his face in the bottom right corner
+  (249 × 310, `assets/hero.webp`, the design's background-removed portrait) and beside it a white
+  box (JetBrains Mono 12 px capitals, 182 px wide, 10 px padding), its print out of register: blue
+  2 px up and left, red 2 px down and right, black in the two corners between. One box for all of
+  them: while one follows another (or within 0.9 s) the box stays and its words change by
+  decoding; with none for longer, face and box go.
+- **The system's tips** (`tone: 'tip'`: pick up the letter, click the screen): bottom left, 20 px
+  in, ACTION (Medium) and the tip, and under them a black bar 18 px high filling from nothing in
+  5 s; then the tip goes, until it holds again.
+- Both come in through pixels (an SVG filter per box, 22 px blocks resolving in 0.55 s) and go out
+  the same way (0.4 s); the words start decoding when the box is 80 % of the way sharp and settle
+  0.55 s after it is. Both keep out of the way while the page asks you to act (ACTION, defend,
+  rev), the letter is open, a chapter turns, during the preloader and the hand-over to the site.
+- Speech (ATTACKER:, ME:) is still typed in at the bottom of the page, and the thoughts in the car
+  (the monologue) are still typed line by line at the bottom centre.
 
 ### Deploying (Netlify)
 
