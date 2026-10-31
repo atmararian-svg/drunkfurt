@@ -13,7 +13,7 @@ import { cityNav } from './nav';
 import { BEAT, cityTimeScale, disarm, encounter, updateEncounter } from './encounter';
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
-import { LaundryLight, Stranger, StrangerBoundary } from './Stranger';
+import { Hero, LaundryLight, Stranger, StrangerBoundary } from './Stranger';
 import { updateLetter } from './letter';
 import { LetterProp } from './LetterProp';
 import { Street } from './Street';
@@ -111,6 +111,8 @@ export function CityScene({ active }: { active: boolean }) {
       <People crowd={crowd} scroll={() => localProgress('city')} timeScale={timeScale} enabled={active} />
       <StrangerBoundary>
         <Stranger active={active} timeScale={timeScale} />
+        {/* you, seen from behind in the fight */}
+        <Hero active={active} />
       </StrangerBoundary>
       <LaundryLight active={active} />
       {/* the letter he dropped, after the fight */}

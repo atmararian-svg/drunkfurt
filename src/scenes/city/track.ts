@@ -20,6 +20,8 @@ export const cityTrack = new CameraTrack([
   // the knife comes up: your eyes drop to it, his face still in the frame
   { t: BEAT.gate, pos: [6.5, EYE, -34], yaw: deg(2), pitch: deg(-8), fov: 50 },
   { t: 0.86, pos: [6.5, EYE, -34], yaw: deg(2), pitch: deg(-8), fov: 50 },
-  { t: BEAT.aftermath, pos: [5.4, 1.45, -32.6], yaw: deg(-22), pitch: deg(-20), fov: 46 },
-  { t: 1.0, pos: [5.5, 1.4, -32.9], yaw: deg(-24), pitch: deg(-21), fov: 44 },
+  // after the fight, back in your own eyes where it left you (fight.ts: a step back from where
+  // you stood), looking down at him on his back and the letter between you
+  { t: BEAT.aftermath, pos: [6.49, EYE, -33.72], yaw: deg(1), pitch: deg(-31), fov: 48 },
+  { t: 1.0, pos: [6.49, EYE - 0.02, -33.74], yaw: deg(1), pitch: deg(-30), fov: 46 },
 ]);

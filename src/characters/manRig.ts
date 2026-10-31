@@ -21,6 +21,7 @@ import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js
 import { paint } from './anatomy';
 import { loft } from './shapes';
 import { twoBone } from './feet';
+import { HeroLook, dressHero } from './heroLook';
 
 /**
  * The stranger's body: the supplied walking man (a Mixamo-rigged character
@@ -66,6 +67,13 @@ export interface ManRig {
    * (`k` 1, the pose `lie` sets), the arms flung out on the way.
    */
   fall(k: number): void;
+  /**
+   * A frame of the fight (scenes/city/fight.ts): the hips' place and the listed bones' rotations,
+   * both hands closed in fists, laid over the pose he is in now by `w` (0 … 1).
+   */
+  fight(row: ArrayLike<number>, names: readonly string[], w?: number): void;
+  /** Built as you (`buildMan(…, { hero: true })`): how much of you shows (0 … 1). */
+  hero: HeroLook | null;
   /** Where the blade's tip is (world). */
   tip(out: Vector3): Vector3;
   /** Frees what this build made (its materials, the knit textures, the beanie, scarf and knife copies). */
@@ -106,7 +114,7 @@ const knit = (shade: number, rib: number) => {
   return t;
 };
 
-export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
+export function buildMan(gltf: GLTF, knifeGltf: GLTF, opts: { hero?: boolean } = {}): ManRig {
   const root = new Group();
   // his own copy of the loaded model (skeleton re-bound to the copy's bones). The loaded scene is
   // shared and cached: built on directly, a second build (the chapter entered again) found it still
@@ -128,7 +136,8 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   model.scale.setScalar(k);
 
   // printed like everyone in the city: tonal bands and halftone in greys; hair cards without ink lines
-  model.traverse((o) => {
+  // (you are dressed in your own look below)
+  if (!opts.hero) model.traverse((o) => {
     const m = o as SkinnedMesh;
     if (!m.isMesh) return;
     const src = m.material as MeshStandardMaterial;
@@ -262,9 +271,38 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
     parent.add(m);
     return m;
   };
-  wear(beanieGeo, head, 70, 6);
-  wear(scarfGeo, neck, 135, 8);
-  wear(tail, bone('Spine2'), 135, 8);
+  let heroLook: HeroLook | null = null;
+  let hairGeo: BufferGeometry | null = null;
+  if (opts.hero) {
+    // your hair, swept back: from the hairline over the crown, down the back of the head to the nape
+    // (the rings' fronts sit inside the head below the hairline, so only the back shows there)
+    hairGeo = loft(
+      [
+        { at: box.top - 0.19, w: hw * 1.45, front: 0.02, back: hd * 0.92 + 0.012, cz: cz - 0.06 },
+        { at: box.top - 0.125, w: hw * 1.86, front: hd * 0.35, back: hd * 1.04 + 0.018, cz: cz - 0.04 },
+        { at: box.top - 0.07, w: hw * 2 + 0.024, front: hd * 0.84, back: hd * 1.07 + 0.022, cz: cz - 0.004 },
+        { at: box.top - 0.028, w: hw * 1.96 + 0.028, front: hd * 0.98 + 0.03, back: hd * 1.06 + 0.022, cz: cz - 0.004 },
+        { at: box.top + 0.016, w: hw * 1.5, front: hd * 0.74, back: hd * 0.84, cz: cz - 0.018 },
+      ],
+      24,
+    );
+    const pos = hairGeo.getAttribute('position');
+    const uv = new Float32Array(pos.count * 2);
+    for (let i = 0; i < pos.count; i++) {
+      uv[i * 2] = (Math.atan2(pos.getX(i), pos.getZ(i) - cz) / (Math.PI * 2) + 0.5) * 5;
+      uv[i * 2 + 1] = pos.getY(i) * 4;
+    }
+    hairGeo.setAttribute('uv', new Float32BufferAttribute(uv, 2));
+    hairGeo.computeVertexNormals();
+    const hair = new Mesh(hairGeo);
+    hair.applyMatrix4(new Matrix4().copy(head.matrixWorld).invert());
+    head.add(hair);
+    heroLook = dressHero(model, hair, k);
+  } else {
+    wear(beanieGeo, head, 70, 6);
+    wear(scarfGeo, neck, 135, 8);
+    wear(tail, bone('Spine2'), 135, 8);
+  }
 
   // --- the knife: handle across his right palm, blade out past the thumb
   const hand = bone('RightHand');
@@ -303,6 +341,11 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   // fingers closing round the handle: each phalanx turns towards the palm about its own x axis
   const fingers = ['Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((i) => ({ b: bone(`RightHand${f}${i}`), a: [1.25, 1.45, 0.9][i - 1] })));
   const thumbs = [1, 2, 3].map((i) => ({ b: bone(`RightHandThumb${i}`), a: [0.35, 0.5, 0.6][i - 1] }));
+  const leftFingers = ['Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((i) => ({ b: bone(`LeftHand${f}${i}`), a: [1.25, 1.45, 0.9][i - 1] })));
+  const leftThumbs = [1, 2, 3].map((i) => ({ b: bone(`LeftHandThumb${i}`), a: [0.35, 0.5, 0.6][i - 1] }));
+  const kept = list.map(() => new Quaternion());
+  const keptHips = new Vector3();
+  const keptModel = { p: new Vector3(), q: new Quaternion() };
   const QX = new Quaternion();
   const AX = new Vector3(1, 0, 0);
   const AZ = new Vector3(0, 0, 1);
@@ -327,6 +370,7 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
     groundKnife,
     stride: 0,
     startPhase: 0,
+    hero: heroLook,
     stand(phase, walk, upright = 0) {
       model.position.set(0, 0, 0);
       model.rotation.set(0, 0, 0);
@@ -402,6 +446,33 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       model.position.set(0, y0 + (0.11 - y0) * e, 0);
       root.updateMatrixWorld(true);
     },
+    fight(row, names, w = 1) {
+      const blend = w < 1;
+      if (blend) {
+        list.forEach((b, i) => kept[i].copy(b.quaternion));
+        keptHips.copy(bone('Hips').position);
+        keptModel.p.copy(model.position);
+        keptModel.q.copy(model.quaternion);
+      }
+      list.forEach((b, i) => b.quaternion.copy(rest[i]));
+      model.position.set(0, 0, 0);
+      model.rotation.set(0, 0, 0);
+      bone('Hips').position.set(row[0], row[1], row[2]);
+      names.forEach((n, i) => bone(n).quaternion.set(row[3 + i * 4], row[4 + i * 4], row[5 + i * 4], row[6 + i * 4]).normalize());
+      // fists
+      for (const f of fingers) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, f.a));
+      for (const f of thumbs) f.b.quaternion.multiply(QX.setFromAxisAngle(AZ, -f.a));
+      for (const f of leftFingers) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, f.a));
+      for (const f of leftThumbs) f.b.quaternion.multiply(QX.setFromAxisAngle(AZ, f.a));
+      if (blend) {
+        const k = Math.max(0, w);
+        list.forEach((b, i) => b.quaternion.copy(QA.copy(kept[i]).slerp(b.quaternion, k)));
+        bone('Hips').position.lerpVectors(keptHips, bone('Hips').position.clone(), k);
+        model.position.lerpVectors(keptModel.p, model.position.clone(), k);
+        model.quaternion.copy(QA.copy(keptModel.q).slerp(model.quaternion, k));
+      }
+      root.updateMatrixWorld(true);
+    },
     tip(out) {
       return knifeModel.localToWorld(out.set(1, 0, 0));
     },
@@ -412,6 +483,8 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       mats.forEach((m) => m.dispose());
       worn.forEach((m) => m.map?.dispose());
       [beanieGeo, scarfGeo, tail].forEach((g) => g.dispose());
+      hairGeo?.dispose();
+      heroLook?.dispose();
     },
   };
   // distance per cycle: the clip walks in place, 1.70 m per cycle at its own size (centimetres); scaled with him

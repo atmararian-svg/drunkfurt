@@ -513,19 +513,39 @@ built from.
   - **The pixels** (`ui/scenePixels.ts`): the scene-transition effect reused at a steady block
     size: one canvas over the 3D picture, under everything printed, redrawn from the 3D canvas
     after every frame. Its look is a pure function of the scroll and the encounter
-    (`combatLook` in `Overlay.tsx`): nothing while he walks up and threatens; only once you
-    have pressed D, and ACTION has gone (`BLOCK.veil`, 0.18 s), do the blocks grow coarse
-    (to 26 px), blur (the same blocks drawn up smoothed over them) and darken (a dark layer to
-    80%), complete at `BLOCK.dark` (0.75 s, before the first hit), which is what hides the fight;
-    over the first 0.045 of the aftermath all of it resolves to the plain picture. At rest the
-    canvas and its frame watcher are removed. Nothing can leave it stuck: a scrub, a revisit or
-    a reset recomputes it. (The earlier spreading "Ignite" dark is gone.)
-  - **Defended** (you press D in time): the fight is not shown. The street blurs and darkens in
-    its own pixels before anyone moves, and the two hits are printed over it (`drawHits` in `ui/brush.ts`):
-    the design's BAM (top left, with the first hit, at 1.0 s) and POW (bottom right, with the
-    second, at 1.55 s), each fading up a touch large and settling (no hard snap), with its sound (the existing recordings: no new hit sounds came with the
-    design). When the picture clears again he is on his back on the pavement, the knife beside his
-    hand, and your bag is still with you.
+    (`combatLook` in `Overlay.tsx`). A defence no longer uses it (the fight is shown, see below);
+    only a knockout still breaks the street into coarse, blurred, darkening blocks. At rest the
+    canvas and its frame watcher are removed.
+  - **Defended** (you press D): the fight is shown, in full, from a third person's view
+    (`scenes/city/fight.ts`, timings in `BLOCK`, `beats.ts`):
+    - the camera steps out of your eyes over the first second (`thirdPerson` in `encounter.ts`,
+      `fightCamera` in `episode.ts`): back and out to the street side (the shop windows are on the
+      other), a little above your head, looking down the line of the fight; it drifts in a touch
+      and jolts with the uppercut;
+    - his knife hold eases into a guard, then the supplied "rapid punching" animation plays for
+      both of you: your flurry against his cover (the first blow knocks the knife out of his hand;
+      it lies where he stood), then an uppercut that throws him onto his back. BAM is printed with
+      the first blow, POW with the uppercut; each leaves again after 0.9 s, off the action. Every
+      other blow of the flurry is heard (`hits.mp3`'s lighter hit), the uppercut with the heavy one
+      and an exhale, then him landing;
+    - from 5.05 s the camera comes back into your eyes, where the fight left you (a step back from
+      where you stood: the aftermath frame in `track.ts`), looking down at him and the letter.
+    - **The animation** (`tools/bakeFight.mjs` → `scenes/city/fightClip.json`, 141 KB): the source
+      is a two-man AdvancedSkeleton rig (FBX); its deform joints are retargeted onto the walking
+      man's Mixamo skeleton (each joint's world rotation moved from the source's bind pose onto the
+      man's rest pose, then swung so each bone points where the source's bone points), 30 fps, for
+      both men, each in his own frame (he starts over its origin, facing the other man 1.55 m
+      ahead). The thrown man's travel is shortened (55%) so he lands on the sidewalk, about 1.7 m
+      behind where he stood. `fightRow` samples it between frames; `ManRig.fight` lays a frame over
+      the pose (both hands in fists), and can blend it in from the pose he is in.
+    - **You** (`Hero` in `Stranger.tsx`, `characters/heroLook.ts`): the walking man again, built
+      as you after the owner's portrait: dark hair swept back (a loft fitted to his head), his full
+      dark beard, warm brown skin, a black T-shirt, dark jeans. Printed in the manner of the
+      supplied Miles Morales model, without its suit: flat banded colour lit by the street, a hot
+      red rim from the left and a cold violet one from the right and above, halftone dots in the
+      transitions, and the print off register (a red and a violet outline shell, each shifted a
+      couple of pixels, behind the black ink line). You only show while the camera is out of your
+      eyes, fading in and out through a 4 × 4 ordered dither, so you never pop in front of the lens.
   - **Knocked out** is switched off for now (`STRIKES` in `encounter.ts`): he never strikes, and
     the story waits at the gate until you defend. Its sequence is kept: with `STRIKES` on, the
     blade reaches you 3.7 s after the prompt, a blow lands, the eyelids close in ragged ink, the
@@ -1005,6 +1025,24 @@ wipe opens.
 - **Placeholders**: the buildings and road bridge beyond the open end are blocks. Train interiors are a painted texture, not geometry (except
   the open vestibule). Shopfront names are generic.
 - Train numbers, times and destinations on the displays are fictional.
+
+## Performance
+
+- Every frame is drawn about four times (the picture, and the ink's normal and depth buffer in
+  three layers), so pixel density is what costs most. It starts at the screen's own density, at
+  most 1.5 on a desktop and 1.25 on touch screens, and `AdaptiveDpr` (`App.tsx`) lowers it in
+  steps of 0.25 (not below 1) when frames average over 22 ms for 1.5 s, and raises it again on a
+  fast screen with time to spare.
+- The composer multisamples (2×) only below 1.25× density; above it the ink lines already cover
+  the edges.
+- Shadows are drawn every other frame (`ShadowCadence`).
+- A defence no longer copies the 3D canvas into the pixel layer every frame (the fight is shown).
+
+## Single-file build
+
+`node tools/singlefile.mjs` builds the whole site into `dist-single/drunkfurt.html` (code, models,
+textures and sounds inlined; the type from Google Fonts), for hosts that serve one HTML file.
+`--dev` keeps the inspection hooks below.
 
 ## Dev inspection hook
 

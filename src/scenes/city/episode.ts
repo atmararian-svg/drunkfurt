@@ -1,10 +1,12 @@
+import { Vector3 } from 'three';
 import { clamp, deg, smoothstep } from '../../core/math';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 import type { CameraPose } from '../../core/sequence';
 import type { EpisodeDef } from '../../episodes/types';
 import { CityScene } from './CityScene';
-import { BEAT, BLOCK, KO, encounter, encounterAt, resetEncounter } from './encounter';
+import { BEAT, BLOCK, KO, encounter, encounterAt, resetEncounter, thirdPerson } from './encounter';
+import { FIGHT_DIR, FIGHT_FRAME } from './fight';
 import { INVITATION, LETTER, invitationTyped, letter, resetLetter } from './letter';
 import { strangerGroundAt } from './strangerRoute';
 import { cityTrack } from './track';
@@ -54,8 +56,56 @@ function encounterCamera(local: number, pose: CameraPose) {
     pose.position.y += Math.sin(performance.now() / 900) * 0.004 * smoothstep(clamp(t - KO.fallTo, 0, 1));
     return;
   }
+  firstPerson(local, pose, v);
+  // you defended: the camera steps out of your eyes, back and to one side, and watches the fight
+  const tp = thirdPerson(local);
+  if (tp > 0) {
+    fightCamera(v.t, TP);
+    pose.position.lerp(TP.position, tp);
+    pose.yaw += Math.atan2(Math.sin(TP.yaw - pose.yaw), Math.cos(TP.yaw - pose.yaw)) * tp;
+    pose.pitch += (TP.pitch - pose.pitch) * tp;
+    pose.roll += (TP.roll - pose.roll) * tp;
+    pose.fov = (pose.fov ?? 50) + (TP.fov! - (pose.fov ?? 50)) * tp;
+  }
+}
+
+/**
+ * The third person's view of the fight: behind you and off to the street side (the shop windows
+ * are on the other), a little above your head, looking down the line of the fight to where he
+ * will land. It drifts in a touch over the fight and jolts with the uppercut.
+ */
+const TP: CameraPose = { position: new Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 46 };
+function fightCamera(t: number, out: CameraPose) {
+  const you = FIGHT_FRAME.puncher;
+  const d = FIGHT_DIR;
+  // the street side of you (to your left as you face him)
+  const lx = d.z;
+  const lz = -d.x;
+  const drift = smoothstep(clamp(t / BLOCK.backFrom, 0, 1));
+  const back = 2.3 - 0.3 * drift;
+  const side = 3.1 - 0.2 * drift;
+  out.position.set(you.x - d.x * back + lx * side, 1.8, you.z - d.z * back + lz * side);
+  const tx = you.x + d.x * 1.5;
+  const tz = you.z + d.z * 1.5;
+  const dx = tx - out.position.x;
+  const dz = tz - out.position.z;
+  out.yaw = Math.atan2(-dx, -dz);
+  out.pitch = Math.atan2(1.0 - out.position.y, Math.hypot(dx, dz));
+  out.roll = 0;
+  out.fov = 46;
+  // the uppercut lands: a short, decaying jolt
+  const age = t - BLOCK.hit2;
+  if (age > 0) {
+    const k = Math.exp(-age * 7) * 0.6;
+    out.position.x += Math.sin(age * 61) * 0.03 * k;
+    out.position.y += Math.sin(age * 47 + 1) * 0.025 * k;
+    out.roll += Math.sin(age * 53 + 2) * 0.02 * k;
+  }
+}
+
+/** Your own eyes through the approach and the stand-off: kept on him, leaning back from the knife. */
+function firstPerson(local: number, pose: CameraPose, v: ReturnType<typeof encounterAt>) {
   if (local < BEAT.noticed - 0.02 || local > BEAT.cut) return;
-  if (v.outcome === 'blocked' && v.t >= BLOCK.dark) return; // the page is black; he is down
   const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1));
   const him = strangerGroundAt(local);
   const dx = him.x - pose.position.x;

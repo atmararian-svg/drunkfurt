@@ -10,14 +10,11 @@ import { START_PHASE } from '../../characters/walkClip';
 import { lerpAngle } from '../../characters/crowd';
 import { smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
-import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
+import { BEAT, BLOCK, KO, encounter, encounterAt, thirdPerson } from './encounter';
+import { CLIP, CLIP_LEN, FIGHT_BONES, FIGHT_FRAME, fightRow } from './fight';
 import { EYE, VISITOR_STOP } from './layout';
 import { ramp, routeAt, routeS, walkPace } from './strangerRoute';
 
-/** Where he ends up afterwards: on his back on the pavement (his feet here, his head towards the shops). */
-const DOWN = { x: 7.0, z: -36.3, yaw: 0.9 };
-/** How long he takes to go down after the second hit (seconds of the fight's clock). */
-const FALL_S = 0.75;
 /** Your eyes when he comes at you (the camera at the gate). */
 const CAM = new Vector3(VISITOR_STOP[0], EYE, VISITOR_STOP[1]);
 const UP = new Vector3(0, 1, 0);
@@ -58,43 +55,25 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     const t = view.t;
     const root = rig.root;
 
-    // after the fight: on the pavement (you defended), or gone (you went down). Only from the moment the
-    // page is black, so scrolling back brings him back on his feet.
-    // (he goes down in the dark, under the pixels, but not in a cut: the first hit knocks the knife
-    // away and him back a step, the second takes him off his feet onto his back)
-    if (view.outcome === 'blocked' && (t >= BLOCK.hit1 || local >= BEAT.aftermath)) {
+    // the fight (you defended, fight.ts): from the moment its clip starts he is the man taking your
+    // flurry, then the uppercut, then lying on his back where he landed. Before that (the first
+    // fraction of a second after your press) his knife hold eases into his guard, below.
+    const fightT = view.outcome === 'blocked' ? (local >= BEAT.aftermath ? CLIP_LEN : t - BLOCK.fight) : -1;
+    if (view.outcome === 'blocked' && (t >= BLOCK.fight || local >= BEAT.aftermath)) {
       root.visible = true;
-      root.position.set(DOWN.x, 0, DOWN.z);
-      root.rotation.y = DOWN.yaw;
-      rig.lie();
-      rig.knife.visible = false;
-      // the knife where it fell: on the pavement just past his open right hand
-      const hand = rig.bone('RightHand').getWorldPosition(tmp.a);
-      const out = tmp.b.set(hand.x - root.position.x, 0, hand.z - root.position.z).normalize();
-      rig.groundKnife.position.set(hand.x + out.x * 0.16, 0.012, hand.z + out.z * 0.16);
-      rig.groundKnife.rotation.set(0, Math.atan2(out.x, out.z) + 0.5, 0);
-      rig.groundKnife.visible = true;
-      if (key.current) key.current.visible = false;
-      encounter.stranger.x = DOWN.x;
-      encounter.stranger.z = DOWN.z;
-      const fall = local >= BEAT.aftermath ? 1 : ramp(t, BLOCK.hit2, BLOCK.hit2 + FALL_S);
-      if (fall < 1) {
-        // from where he stood (squared up to you) to where he lies; the fall itself gathers speed
-        // (gravity) and settles with a small give as he lands
-        const stood = routeAt(routeS(1));
-        const stoodYaw = Math.atan2(CAM.x - stood.x, CAM.z - stood.z);
-        const stagger = smoothstep(ramp(t, BLOCK.hit1, BLOCK.hit1 + 0.25));
-        const g = fall * fall;
-        const land = g + Math.sin(Math.PI * smoothstep(ramp(fall, 0.85, 1))) * 0.03;
-        const away = tmp.c.set(-Math.sin(stoodYaw), 0, -Math.cos(stoodYaw)).multiplyScalar(0.18 * stagger);
-        root.position.set(lerp(stood.x + away.x, DOWN.x, smoothstep(fall)), 0, lerp(stood.z + away.z, DOWN.z, smoothstep(fall)));
-        root.rotation.y = lerpAngle(stoodYaw, DOWN.yaw, smoothstep(fall));
-        rig.fall(land);
-        // knocked back: the upper body thrown back by the first hit, the head with it
-        if (fall < 0.6) rig.lean(-0.22 * stagger * (1 - fall / 0.6));
-        encounter.stranger.x = root.position.x;
-        encounter.stranger.z = root.position.z;
-      }
+      root.position.set(FIGHT_FRAME.guard.x, 0, FIGHT_FRAME.guard.z);
+      root.rotation.y = FIGHT_FRAME.guard.yaw;
+      rig.fight(fightRow('guard', fightT), FIGHT_BONES);
+      // the first blow knocks the knife out of his hand; it lies where he stood
+      const lost = fightT >= CLIP.flurry[0];
+      rig.knife.visible = !lost;
+      rig.groundKnife.visible = lost;
+      rig.groundKnife.position.set(FIGHT_FRAME.guard.x + 0.38, 0.012, FIGHT_FRAME.guard.z + 0.12);
+      rig.groundKnife.rotation.set(0, 2.1, 0);
+      if (key.current) key.current.visible = fightT < CLIP.land;
+      rig.bone('Hips').getWorldPosition(tmp.a);
+      encounter.stranger.x = tmp.a.x;
+      encounter.stranger.z = tmp.a.z;
       return;
     }
     rig.groundKnife.visible = false;
@@ -152,6 +131,9 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     // his eyes on you from the moment he notices you
     rig.look(CAM, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * lerp(0.6, 0.8, raise));
 
+    // you have pressed D: his hold eases into the guard he takes against your flurry (the clip's first frame)
+    if (view.outcome === 'blocked' && t >= 0) rig.fight(fightRow('guard', 0), FIGHT_BONES, smoothstep(ramp(t, 0.05, BLOCK.fight)));
+
     // --- a key light on his face from the shop windows on your right, so you see who it is
     if (key.current) {
       key.current.visible = local > BEAT.noticed - 0.02;
@@ -179,6 +161,37 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
 }
 
 /**
+ * You, in the fight: the walking man again, built as you (characters/heroLook.ts), standing where
+ * the fight puts you and playing your side of it. You only show while the camera has stepped out
+ * of your eyes (`thirdPerson`), fading in and out through the look's dither.
+ */
+export function Hero({ active }: { active: boolean }) {
+  const gltf = suspend(() => loadGlb(manUrl), ['drunkfurt-man']);
+  const knifeGltf = suspend(() => loadGlb(knifeUrl), ['drunkfurt-knife']);
+  const rig = useMemo(() => {
+    const r = buildMan(gltf, knifeGltf, { hero: true });
+    r.root.name = 'hero';
+    r.root.visible = false;
+    if (import.meta.env.DEV) (window as unknown as { __hero: unknown }).__hero = r;
+    return r;
+  }, [gltf, knifeGltf]);
+  useEffect(() => () => rig.dispose(), [rig]);
+  useFrame(() => {
+    const local = localProgress('city');
+    const tp = active ? thirdPerson(local) : 0;
+    const show = smoothstep(ramp(tp, 0.3, 0.65));
+    rig.hero?.fade(show);
+    rig.root.visible = show > 0.001;
+    if (!rig.root.visible) return;
+    const t = encounterAt(local).t;
+    rig.root.position.set(FIGHT_FRAME.puncher.x, 0, FIGHT_FRAME.puncher.z);
+    rig.root.rotation.y = FIGHT_FRAME.puncher.yaw;
+    rig.fight(fightRow('puncher', Math.max(0, t - BLOCK.fight)), FIGHT_BONES);
+  });
+  return <primitive object={rig.root} />;
+}
+
+/**
  * The light from the laundry window that falls across the man once he is on
  * the pavement (from the moment the page goes black, so scrolling back before
  * it leaves the street as it was). Your bag never leaves your shoulder: he
@@ -188,7 +201,7 @@ export function LaundryLight({ active }: { active: boolean }) {
   const light = useRef<PointLight>(null);
   useFrame(() => {
     const t = encounterAt(localProgress('city')).t;
-    const down = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.dark;
+    const down = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.land;
     if (light.current) light.current.visible = active && t >= down;
   });
   return <pointLight ref={light} position={[9.1, 2.0, -37.2]} color="#f1ece0" intensity={9} distance={7} decay={2} visible={false} />;

@@ -31,16 +31,24 @@ export const KO = {
 } as const;
 
 /**
- * You defended: ACTION goes first, then (from `veil`) the street breaks into
- * pixels and darkens until `dark`; only in that dark do the two hits land
- * (printed as BAM and POW), with room between them, and it opens on him lying
- * there. Seconds of the fight's own clock after the press (spread over
- * gate → aftermath). Unhurried on purpose: one thing after the other.
+ * You defended: the camera steps back out of your eyes to a third person's view, behind you and
+ * to one side, and the fight is played in full (fight.ts): your flurry, the uppercut, him on his
+ * back. Then the camera comes back into your eyes and the story goes on. Seconds of the fight's
+ * own clock after the press (spread over gate → aftermath).
  */
 export const BLOCK = {
-  veil: 0.18,
-  dark: 0.75,
-  hit1: 1.0,
-  hit2: 1.55,
-  resolve: 3.0,
+  /** The camera is out of your eyes by here (it starts at the press). */
+  out: 1.0,
+  /** The fight's clip starts (his knife hold eases into his guard before it). */
+  fight: 0.45,
+  /** BAM: the first blow of the flurry (clip 0.70). */
+  hit1: 1.15,
+  /** POW: the uppercut (clip 3.00). */
+  hit2: 3.45,
+  /** He is on the pavement (clip 3.82). */
+  land: 4.27,
+  /** The camera comes back into your eyes over this stretch. */
+  backFrom: 5.05,
+  backTo: 6.25,
+  resolve: 6.5,
 } as const;

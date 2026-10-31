@@ -1,5 +1,5 @@
-import { Canvas } from '@react-three/fiber';
-import { Component, ReactNode, Suspense, useEffect } from 'react';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Component, ReactNode, Suspense, useEffect, useRef } from 'react';
 import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
 import { story, useStory } from './core/store';
 import { EpisodeId, TOTAL_LENGTH, autoplay, chapterTurn, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
@@ -82,11 +82,64 @@ function EpisodeWorlds() {
 }
 
 /**
- * The 3D page's pixel density: up to 1.75 on a desktop; on touch devices (phones, tablets, with
+ * The 3D page's pixel density: up to 1.5 on a desktop; on touch devices (phones, tablets, with
  * dense screens and small GPUs) up to 1.25, where the comic look's ink and halftone hold up and
- * the frame rate does too.
+ * the frame rate does too. Every frame is drawn about four times over (the picture and the ink's
+ * normal and depth buffer), so density is what costs most: AdaptiveDpr lowers it, in steps, on a
+ * machine that cannot keep up.
  */
-const TOUCH_DPR: [number, number] = window.matchMedia?.('(pointer: coarse)').matches ? [1, 1.25] : [1, 1.75];
+const MAX_DPR = Math.min(window.devicePixelRatio || 1, window.matchMedia?.('(pointer: coarse)').matches ? 1.25 : 1.5);
+
+/**
+ * Lowers the pixel density a step (0.25, not below 1) when the frames have averaged over 22 ms
+ * for a second and a half, and raises it again when there is room to spare (a fast screen
+ * showing frames well under 14 ms). Hidden tabs and single long frames (a chapter loading) are
+ * not counted.
+ */
+function AdaptiveDpr() {
+  const setDpr = useThree((s) => s.setDpr);
+  const st = useRef({ dpr: MAX_DPR, acc: 0, n: 0, good: 0 });
+  useFrame((_, delta) => {
+    const s = st.current;
+    if (delta > 0.25 || document.hidden || document.documentElement.classList.contains('is-preloading')) return;
+    s.acc += delta;
+    s.n++;
+    if (s.acc < 1.5) return;
+    const ms = (s.acc / s.n) * 1000;
+    s.acc = 0;
+    s.n = 0;
+    if (ms > 22 && s.dpr > 1) {
+      s.dpr = Math.max(1, s.dpr - 0.25);
+      s.good = 0;
+      setDpr(s.dpr);
+    } else if (ms < 14 && s.dpr < MAX_DPR) {
+      if (++s.good >= 4) {
+        s.dpr = Math.min(MAX_DPR, s.dpr + 0.25);
+        s.good = 0;
+        setDpr(s.dpr);
+      }
+    } else s.good = 0;
+  });
+  return null;
+}
+
+/**
+ * Shadows are drawn every other frame (each light's shadow is the scene drawn again): at night,
+ * under street lamps, a shadow that lags a frame behind a walking man does not show.
+ */
+function ShadowCadence() {
+  const gl = useThree((s) => s.gl);
+  const frame = useRef(0);
+  useEffect(() => {
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+    return () => void (gl.shadowMap.autoUpdate = true);
+  }, [gl]);
+  useFrame(() => {
+    if ((frame.current++ & 1) === 0) gl.shadowMap.needsUpdate = true;
+  });
+  return null;
+}
 
 export function App() {
   const episode = useStory((s) => s.episode);
@@ -177,7 +230,7 @@ export function App() {
       <div className="stage" role="img" aria-label="DRUNKFURT, Episode 1: arriving at Frankfurt (Main) Hbf at night">
         <Canvas
           shadows={{ type: PCFShadowMap }}
-          dpr={TOUCH_DPR}
+          dpr={MAX_DPR}
           gl={{ antialias: false, stencil: false, powerPreference: 'high-performance' }}
           camera={{ fov: 54, near: 0.05, far: 1300 }}
           onCreated={({ gl }) => {
@@ -187,6 +240,8 @@ export function App() {
           }}
         >
           <Suspense fallback={null}>
+            <AdaptiveDpr />
+            <ShadowCadence />
             <ScrollCameraRig />
             <EpisodeWorlds />
             <Stylizer version={episode} />

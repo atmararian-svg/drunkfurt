@@ -29,19 +29,16 @@ const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
  * How the street looks around the fight: block size (CSS px; 1 = not
  * pixelated), blur and darkness, as pure functions of the progress and the
  * encounter, so a scrub, a revisit or a reset can never leave it stuck.
- * Nothing happens while he only approaches or threatens: it starts when you
- * press D. Over the fight's first moments (to BLOCK.dark, before the first
- * hit) the blocks grow coarse, blur and darken, hiding the fight; on the
- * aftermath all of it resolves, back to the plain picture before the letter.
+ * Nothing happens while he only approaches or threatens. Once you defend, the
+ * fight is shown in full (seen from behind you, scenes/city/fight.ts): no
+ * pixels, no blur, no dark. Only a knockout still goes dark this way.
  */
 function combatLook(id: string, local: number) {
   const none = { block: 1, blur: 0, dark: 0 };
   if (id !== 'city' || local < BEAT.gate) return none;
   const v = encounterAt(local);
-  if (!v.outcome) return none;
-  // defended: the pixels begin once ACTION has gone (BLOCK.veil), and are complete by BLOCK.dark, before the first hit
-  const [from, black] = v.outcome === 'blocked' ? [BLOCK.veil, BLOCK.dark] : [0, KO.dark];
-  const hide = local < BEAT.aftermath ? smoothstep(clamp((v.t - from) / (black - from), 0, 1)) : 1;
+  if (v.outcome !== 'knockedOut') return none;
+  const hide = local < BEAT.aftermath ? smoothstep(clamp(v.t / KO.dark, 0, 1)) : 1;
   const out = local < BEAT.aftermath ? 1 : 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
   const k = hide * out;
   return { block: 1 + (HIDE.block - 1) * k, blur: HIDE.blur * k, dark: HIDE.dark * k };

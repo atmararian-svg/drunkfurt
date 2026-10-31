@@ -98,7 +98,8 @@ export function Stylizer({ version }: { version: unknown }) {
   }, 0.5);
 
   return (
-    <EffectComposer multisampling={4} frameBufferType={HalfFloatType} enableNormalPass={false}>
+    // (multisampling only on a coarse screen: at 1.25× and over, the ink lines already cover the edges it would smooth)
+    <EffectComposer multisampling={viewport.dpr > 1.2 ? 0 : 2} frameBufferType={HalfFloatType} enableNormalPass={false}>
       <primitive object={effect} />
       <Bloom mipmapBlur luminanceThreshold={1.15} luminanceSmoothing={0.1} intensity={0.35} radius={0.55} />
       <Vignette ref={vignette as never} offset={0.32} darkness={0.6} />

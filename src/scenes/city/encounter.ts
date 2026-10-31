@@ -17,7 +17,7 @@ import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, tim
  *   commit → gate           he holds it on you: "Your bag."; time slows to a tenth
  *   gate                    DEFEND: the story waits for your click
  *   gate → aftermath        the outcome, mapped onto progress: defended (black,
- *                           two hits, he is down) or knocked out (hit, fall, darkness)
+ *                           the fight seen from behind you, he is down) or knocked out (hit, fall, darkness)
  *   aftermath → 1           afterwards: he is on the pavement, or gone
  *
  * Once decided, the page plays the outcome by moving the progress itself
@@ -92,6 +92,18 @@ export function encounterAt(local: number): EncounterView {
 }
 
 /**
+ * How far the camera has stepped out of your eyes into the third person's view of the fight
+ * (0 your eyes … 1 behind you, to one side): out from the press, back in before the aftermath.
+ */
+export function thirdPerson(local: number) {
+  const v = encounterAt(local);
+  if (v.outcome !== 'blocked' || v.t < 0 || local >= BEAT.aftermath) return 0;
+  const out = smoothstep(clamp(v.t / BLOCK.out, 0, 1));
+  const back = smoothstep(clamp((v.t - BLOCK.backFrom) / (BLOCK.backTo - BLOCK.backFrom), 0, 1));
+  return out * (1 - back);
+}
+
+/**
  * Time scale of the city: normal through the approach and the stand-off, a
  * tenth from the commit through the fight, a hush afterwards.
  */
@@ -106,11 +118,13 @@ export function cityTimeScale(local: number) {
 interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
-    // each exhale lands with its hit, layered on it
+    // the flurry: every other blow that lands is heard (all of them would be a drum roll), an exhale with the first
     { at: BLOCK.hit1, kind: 'exhale1' },
-    { at: BLOCK.hit1, kind: 'block' },
+    ...[0.7, 1.1, 1.43, 1.8, 2.1, 2.4].map((c) => ({ at: BLOCK.fight + c, kind: 'block' as const })),
+    // the uppercut, with its exhale, and him landing on the pavement
     { at: BLOCK.hit2, kind: 'exhale2' },
     { at: BLOCK.hit2, kind: 'punch' },
+    { at: BLOCK.land, kind: 'fall' },
   ],
   knockedOut: [
     { at: 0, kind: 'exhale2' },
