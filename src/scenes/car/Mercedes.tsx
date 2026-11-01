@@ -99,8 +99,8 @@ export function Mercedes() {
       // forward 20 m and down to the road
       car.toWorld(tmp.set(p.x * 1.6, -0.6, 22), targets[i].position);
       targets[i].updateMatrixWorld();
+      // (dark, not hidden: a light coming and going makes every material compile again)
       s.intensity = 38 * lit;
-      s.visible = lit > 0.01;
     });
 
     // the beats' sounds, as the scroll crosses them (going back plays the reverse action)
@@ -137,7 +137,6 @@ export function Mercedes() {
           penumbra={0.55}
           decay={1.6}
           distance={34}
-          visible={false}
         />
       ))}
     </>

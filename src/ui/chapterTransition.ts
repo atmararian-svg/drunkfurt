@@ -11,7 +11,9 @@ import { hideTitleCard, showTitleCard } from './titleCards';
  * (core/timeline), this takes over, once, and runs it to the end on the wall
  * clock:
  *
- *  1. the scroll is held where it is and the frame on screen is copied;
+ *  1. the scroll is held where it is; what is printed over the page (his face
+ *     and thoughts, the system's tip) leaves through its own pixels first, and
+ *     only then is the frame on screen copied;
  *  2. the copy is laid over the page, the stage hidden under it;
  *  3. the chapter being entered is reset to its beginning (every episode's
  *     `reset`: the encounter, the getaway, the screen) and the progress cuts to
@@ -46,6 +48,17 @@ export function resetChapter(n: number) {
   }
 }
 
+/** Resolves once the text boxes (his face and thoughts, the tip) and the captions are off the page. */
+async function printedGone() {
+  const showing = () =>
+    [...document.querySelectorAll<HTMLElement>('.hero-face, .hero-box, .tip')].some((el) => getComputedStyle(el).visibility !== 'hidden') ||
+    [...document.querySelectorAll<HTMLElement>('.caption')].some((el) => parseFloat(getComputedStyle(el).opacity) > 0.02);
+  if (!showing()) return;
+  while (showing()) await frames(1);
+  // a beat of the plain page before the scene itself turns
+  await frames(6);
+}
+
 function run(z: PageTurn, forward: boolean) {
   return turnTo(forward ? z.to : z.back, forward);
 }
@@ -77,6 +90,9 @@ async function turnTo(target: number, forward: boolean) {
   const chapter = chapterOf(locate(target).id);
   let outgoing: HTMLCanvasElement | null = null;
   try {
+    // the printed matter goes first, through its own pixels (the overlay hides it while a chapter
+    // turns), so nothing of it is cut off by the copy laid over the page
+    await within(printedGone(), 1500);
     outgoing = (await within(grabFrame(), 600)) || null;
     if (outgoing) {
       outgoing.className = 'chapter-out';

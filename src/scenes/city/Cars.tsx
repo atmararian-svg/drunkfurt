@@ -46,6 +46,9 @@ function carParts(): { body: BufferGeometry; glass: BufferGeometry; tyres: Buffe
   return { body, glass, tyres: tb.build()[0].geometry, lights: lb.build()[0].geometry };
 }
 
+/** A moving car's headlight. */
+const HEADLIGHT = 160;
+
 export function Cars({ active, timeScale }: { active: boolean; timeScale: () => number }) {
   const m = cityMaterials();
   const geo = useMemo(carParts, []);
@@ -73,7 +76,13 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
     traffic.cars.forEach((c, i) => {
       const g = groups.current[i];
       if (!g) return;
-      g.visible = c.on && !(getaway && i === 0);
+      // (a car off the street hides its body, but its headlight stays in the scene, dark: a light
+      // coming and going changes the number of lights, and every material in the street is
+      // compiled again, a visible hitch)
+      const on = c.on && !(getaway && i === 0);
+      for (const ch of g.children) if (!(ch as SpotLight).isLight) ch.visible = on;
+      const sp = spots.current[i];
+      if (sp) sp.intensity = on ? HEADLIGHT : 0;
       if (!c.on) {
         passed[i] = false;
         return;
@@ -81,13 +90,11 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
       g.position.set(c.box.x, ROAD_Y, c.box.z);
       g.rotation.y = c.box.yaw;
       const d = defs[i];
-      if (!passed[i] && g.visible && c.s / d.lane.length > d.pass.at && audio.running) {
+      if (!passed[i] && on && c.s / d.lane.length > d.pass.at && audio.running) {
         passed[i] = true;
         audio.carPass(d.pass.from, d.pass.to, 4.5, 0.22);
       }
-      const sp = spots.current[i];
       if (sp) {
-        sp.visible = g.visible;
         target[i].position.set(c.box.x + Math.sin(c.box.yaw) * 12, ROAD_Y, c.box.z + Math.cos(c.box.yaw) * 12);
         target[i].updateMatrixWorld();
       }
@@ -104,7 +111,7 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
         </group>
       ))}
       {defs.map((d, i) => (
-        <group key={`m${i}`} ref={(g) => (groups.current[i] = g)} visible={false}>
+        <group key={`m${i}`} ref={(g) => (groups.current[i] = g)}>
           <mesh geometry={geo.body} material={m.carBody[d.color]} castShadow />
           <mesh geometry={geo.glass} material={m.carGlass} />
           <mesh geometry={geo.tyres} material={m.tyre} />
@@ -115,7 +122,7 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
             target={target[i]}
             position={[0, 0.8, 2.3]}
             color="#f1efe6"
-            intensity={160}
+            intensity={0}
             angle={0.45}
             penumbra={0.5}
             decay={2}

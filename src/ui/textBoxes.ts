@@ -32,7 +32,7 @@ export interface BoxLine {
   kicker?: string;
 }
 
-const PIX = { in: 0.55, out: 0.4, block: 22 };
+const PIX = { in: 0.55, out: 0.55, block: 22 };
 /** The words decode from 80 % of the way in until this long after the box is sharp (s). */
 const DECODE_AFTER = 0.55;
 /** A tip's bar fills in this long (s), then the tip goes. */

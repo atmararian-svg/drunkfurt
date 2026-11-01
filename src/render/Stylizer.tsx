@@ -1,6 +1,6 @@
 import { useFrame, useThree } from '@react-three/fiber';
 import { EffectComposer, Bloom, Vignette } from '@react-three/postprocessing';
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Color, HalfFloatType, Material, Mesh, MeshBasicMaterial, Object3D } from 'three';
 import { applyComic } from './comic';
 import { INK_LAYER, INK_SILHOUETTE_LAYER, InkEffect, OCCLUDER_LAYER, createInkBufferMaterial, createInkTarget } from './ink';
@@ -30,6 +30,7 @@ export function Stylizer({ version }: { version: unknown }) {
   const silMat = useMemo(() => createInkBufferMaterial(0.5), []);
   const effect = useMemo(() => new InkEffect(target.texture), [target]);
   const vignette = useRef<{ darkness: number } | null>(null);
+  const [msaa] = useState(() => (viewport.dpr > 1.2 ? 0 : 2));
   useEffect(() => {
     if (!import.meta.env.DEV) return;
     (window as unknown as Record<string, unknown>).__ink = effect;
@@ -98,8 +99,9 @@ export function Stylizer({ version }: { version: unknown }) {
   }, 0.5);
 
   return (
-    // (multisampling only on a coarse screen: at 1.25× and over, the ink lines already cover the edges it would smooth)
-    <EffectComposer multisampling={viewport.dpr > 1.2 ? 0 : 2} frameBufferType={HalfFloatType} enableNormalPass={false}>
+    // (multisampling only on a coarse screen: at 1.25× and over, the ink lines already cover the edges it would smooth;
+    // decided once, as the page starts: changing it later would rebuild the composer)
+    <EffectComposer multisampling={msaa} frameBufferType={HalfFloatType} enableNormalPass={false}>
       <primitive object={effect} />
       <Bloom mipmapBlur luminanceThreshold={1.15} luminanceSmoothing={0.1} intensity={0.35} radius={0.55} />
       <Vignette ref={vignette as never} offset={0.32} darkness={0.6} />

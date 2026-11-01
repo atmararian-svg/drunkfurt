@@ -1,12 +1,10 @@
-import { Vector3 } from 'three';
 import { clamp, deg, smoothstep } from '../../core/math';
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 import type { CameraPose } from '../../core/sequence';
 import type { EpisodeDef } from '../../episodes/types';
 import { CityScene } from './CityScene';
-import { BEAT, BLOCK, KO, encounter, encounterAt, resetEncounter, thirdPerson } from './encounter';
-import { FIGHT_DIR, FIGHT_FRAME } from './fight';
+import { BEAT, KO, encounter, encounterAt, resetEncounter } from './encounter';
 import { INVITATION, LETTER, invitationTyped, letter, resetLetter } from './letter';
 import { strangerGroundAt } from './strangerRoute';
 import { cityTrack } from './track';
@@ -57,56 +55,19 @@ function encounterCamera(local: number, pose: CameraPose) {
     return;
   }
   firstPerson(local, pose, v);
-  // you defended: the camera steps out of your eyes, back and to one side, and watches the fight
-  const tp = thirdPerson(local);
-  if (tp > 0) {
-    fightCamera(v.t, TP);
-    pose.position.lerp(TP.position, tp);
-    pose.yaw += Math.atan2(Math.sin(TP.yaw - pose.yaw), Math.cos(TP.yaw - pose.yaw)) * tp;
-    pose.pitch += (TP.pitch - pose.pitch) * tp;
-    pose.roll += (TP.roll - pose.roll) * tp;
-    pose.fov = (pose.fov ?? 50) + (TP.fov! - (pose.fov ?? 50)) * tp;
-  }
 }
 
 /**
- * The third person's view of the fight: behind you and off to the street side (the shop windows
- * are on the other), a little above your head, looking down the line of the fight to where he
- * will land. It drifts in a touch over the fight and jolts with the uppercut.
+ * Your own eyes through the approach, the stand-off and (once you defend) the fight under the
+ * blur: kept on him, leaning back from the knife, jolted by every blow. Defended, the hold on him
+ * eases off towards the aftermath, so the camera arrives on the aftermath's frame without a jump.
  */
-const TP: CameraPose = { position: new Vector3(), yaw: 0, pitch: 0, roll: 0, fov: 46 };
-function fightCamera(t: number, out: CameraPose) {
-  const you = FIGHT_FRAME.puncher;
-  const d = FIGHT_DIR;
-  // the street side of you (to your left as you face him)
-  const lx = d.z;
-  const lz = -d.x;
-  const drift = smoothstep(clamp(t / BLOCK.backFrom, 0, 1));
-  const back = 2.3 - 0.3 * drift;
-  const side = 3.1 - 0.2 * drift;
-  out.position.set(you.x - d.x * back + lx * side, 1.8, you.z - d.z * back + lz * side);
-  const tx = you.x + d.x * 1.5;
-  const tz = you.z + d.z * 1.5;
-  const dx = tx - out.position.x;
-  const dz = tz - out.position.z;
-  out.yaw = Math.atan2(-dx, -dz);
-  out.pitch = Math.atan2(1.0 - out.position.y, Math.hypot(dx, dz));
-  out.roll = 0;
-  out.fov = 46;
-  // the uppercut lands: a short, decaying jolt
-  const age = t - BLOCK.hit2;
-  if (age > 0) {
-    const k = Math.exp(-age * 7) * 0.6;
-    out.position.x += Math.sin(age * 61) * 0.03 * k;
-    out.position.y += Math.sin(age * 47 + 1) * 0.025 * k;
-    out.roll += Math.sin(age * 53 + 2) * 0.02 * k;
-  }
-}
-
-/** Your own eyes through the approach and the stand-off: kept on him, leaning back from the knife. */
 function firstPerson(local: number, pose: CameraPose, v: ReturnType<typeof encounterAt>) {
-  if (local < BEAT.noticed - 0.02 || local > BEAT.cut) return;
-  const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1));
+  const fight = v.outcome === 'blocked' && v.t >= 0;
+  const end = fight ? BEAT.aftermath : BEAT.cut;
+  if (local < BEAT.noticed - 0.02 || local > end) return;
+  const release = fight ? 1 - smoothstep(clamp((local - BEAT.cut) / (BEAT.aftermath - BEAT.cut), 0, 1)) : 1;
+  const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1)) * release;
   const him = strangerGroundAt(local);
   const dx = him.x - pose.position.x;
   const dz = him.z - pose.position.z;
@@ -119,10 +80,10 @@ function firstPerson(local: number, pose: CameraPose, v: ReturnType<typeof encou
     pose.pitch += smoothstep(clamp((4 - dist) / 2.5, 0, 1)) * 0.05;
   }
   // lean back from the incoming fist
-  const lean = 0.07 * Math.pow(v.punch, 1.5);
+  const lean = 0.07 * Math.pow(v.punch, 1.5) * release;
   pose.position.x -= Math.sin(pose.yaw) * -lean;
   pose.position.z += Math.cos(pose.yaw) * lean;
-  pose.pitch -= 0.03 * v.punch;
+  pose.pitch -= 0.03 * v.punch * release;
   // impact jolt: a few centimetres and a fraction of a degree, decaying fast (a function of the fight's own clock)
   const k = v.shake * v.shake;
   if (k > 0) {

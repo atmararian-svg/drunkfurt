@@ -92,33 +92,31 @@ const MAX_DPR = Math.min(window.devicePixelRatio || 1, window.matchMedia?.('(poi
 
 /**
  * Lowers the pixel density a step (0.25, not below 1) when the frames have averaged over 22 ms
- * for a second and a half, and raises it again when there is room to spare (a fast screen
- * showing frames well under 14 ms). Hidden tabs and single long frames (a chapter loading) are
- * not counted.
+ * for two seconds. It only ever goes down: each change resizes every buffer of the frame (a
+ * hitch of its own), so going back up and down again would stutter. Hidden tabs, single long
+ * frames (a chapter loading) and chapter turns are not counted.
  */
 function AdaptiveDpr() {
   const setDpr = useThree((s) => s.setDpr);
-  const st = useRef({ dpr: MAX_DPR, acc: 0, n: 0, good: 0 });
+  const st = useRef({ dpr: MAX_DPR, acc: 0, n: 0 });
   useFrame((_, delta) => {
     const s = st.current;
-    if (delta > 0.25 || document.hidden || document.documentElement.classList.contains('is-preloading')) return;
+    if (s.dpr <= 1) return;
+    if (delta > 0.25 || document.hidden || chapterTurn.busy || document.documentElement.classList.contains('is-preloading')) {
+      s.acc = 0;
+      s.n = 0;
+      return;
+    }
     s.acc += delta;
     s.n++;
-    if (s.acc < 1.5) return;
+    if (s.acc < 2) return;
     const ms = (s.acc / s.n) * 1000;
     s.acc = 0;
     s.n = 0;
-    if (ms > 22 && s.dpr > 1) {
+    if (ms > 22) {
       s.dpr = Math.max(1, s.dpr - 0.25);
-      s.good = 0;
       setDpr(s.dpr);
-    } else if (ms < 14 && s.dpr < MAX_DPR) {
-      if (++s.good >= 4) {
-        s.dpr = Math.min(MAX_DPR, s.dpr + 0.25);
-        s.good = 0;
-        setDpr(s.dpr);
-      }
-    } else s.good = 0;
+    }
   });
   return null;
 }

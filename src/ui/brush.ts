@@ -131,7 +131,7 @@ export function drawBrushWipe(ctx: CanvasRenderingContext2D, W: number, H: numbe
 export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, beats: { hit1: number; hit2: number }) {
   ctx.clearRect(0, 0, W, H);
   if (t < 0) return;
-  // (the dark itself is the street's own pixels, blurred and shaded, under this)
+  // (the blur itself is the street's own pixels, under this)
   // the design's own words (Figma "fight-scene"), placed as there on a 1920 × 1080 frame scaled to fit:
   // BAM from the top left with the first hit, POW from the bottom right with the second
   const k = Math.min(W / FRAME.w, H / FRAME.h);
@@ -162,13 +162,7 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
     ctx.rotate(((side * -9 * (1 - travel)) * Math.PI) / 180);
     const sc = 1.22 - 0.22 * sharpen;
     ctx.scale(sc, sc);
-    // the fight is in plain view now: each word leaves again after a moment, off the action
-    const gone = Math.min(1, Math.max(0, (age - HIT_HOLD) / 0.35));
-    if (gone >= 1) {
-      ctx.restore();
-      return;
-    }
-    ctx.globalAlpha = Math.min(1, u / 0.3) * (1 - gone * gone);
+    ctx.globalAlpha = Math.min(1, u / 0.3);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   };
@@ -176,8 +170,6 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
   word(FIGHT_ART.POW, beats.hit2, 'br');
 }
 
-/** How long a hit word stays before it leaves (seconds of the fight's clock). */
-const HIT_HOLD = 0.9;
 /** How long a hit word takes to come in (seconds of the fight's clock). */
 const HIT_IN = 0.3;
 const easeOutBack = (u: number) => {

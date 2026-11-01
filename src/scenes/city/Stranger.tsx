@@ -10,7 +10,7 @@ import { START_PHASE } from '../../characters/walkClip';
 import { lerpAngle } from '../../characters/crowd';
 import { smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
-import { BEAT, BLOCK, KO, encounter, encounterAt, thirdPerson } from './encounter';
+import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
 import { CLIP, CLIP_LEN, FIGHT_BONES, FIGHT_FRAME, fightRow } from './fight';
 import { EYE, VISITOR_STOP } from './layout';
 import { ramp, routeAt, routeS, walkPace } from './strangerRoute';
@@ -70,7 +70,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       rig.groundKnife.visible = lost;
       rig.groundKnife.position.set(FIGHT_FRAME.guard.x + 0.38, 0.012, FIGHT_FRAME.guard.z + 0.12);
       rig.groundKnife.rotation.set(0, 2.1, 0);
-      if (key.current) key.current.visible = fightT < CLIP.land;
+      if (key.current) key.current.intensity = fightT < CLIP.land ? 24 : 0;
       rig.bone('Hips').getWorldPosition(tmp.a);
       encounter.stranger.x = tmp.a.x;
       encounter.stranger.z = tmp.a.z;
@@ -79,7 +79,7 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     rig.groundKnife.visible = false;
     if (view.outcome === 'knockedOut' && (t >= KO.dark || local >= BEAT.aftermath)) {
       root.visible = false;
-      if (key.current) key.current.visible = false;
+      if (key.current) key.current.intensity = 0;
       return;
     }
     root.visible = true;
@@ -136,7 +136,6 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
 
     // --- a key light on his face from the shop windows on your right, so you see who it is
     if (key.current) {
-      key.current.visible = local > BEAT.noticed - 0.02;
       key.current.intensity = 24 * smoothstep(ramp(local, BEAT.noticed - 0.02, BEAT.strangerMoves + 0.05));
       rig.bone('Head').getWorldPosition(keyTarget.position);
       keyTarget.updateMatrixWorld();
@@ -155,40 +154,9 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       <primitive object={rig.root} />
       <primitive object={rig.groundKnife} />
       <primitive object={keyTarget} />
-      <spotLight ref={key} target={keyTarget} color="#efeadf" intensity={0} angle={0.42} penumbra={0.7} decay={2} distance={9} visible={false} />
+      <spotLight ref={key} target={keyTarget} color="#efeadf" intensity={0} angle={0.42} penumbra={0.7} decay={2} distance={9} />
     </>
   );
-}
-
-/**
- * You, in the fight: the walking man again, built as you (characters/heroLook.ts), standing where
- * the fight puts you and playing your side of it. You only show while the camera has stepped out
- * of your eyes (`thirdPerson`), fading in and out through the look's dither.
- */
-export function Hero({ active }: { active: boolean }) {
-  const gltf = suspend(() => loadGlb(manUrl), ['drunkfurt-man']);
-  const knifeGltf = suspend(() => loadGlb(knifeUrl), ['drunkfurt-knife']);
-  const rig = useMemo(() => {
-    const r = buildMan(gltf, knifeGltf, { hero: true });
-    r.root.name = 'hero';
-    r.root.visible = false;
-    if (import.meta.env.DEV) (window as unknown as { __hero: unknown }).__hero = r;
-    return r;
-  }, [gltf, knifeGltf]);
-  useEffect(() => () => rig.dispose(), [rig]);
-  useFrame(() => {
-    const local = localProgress('city');
-    const tp = active ? thirdPerson(local) : 0;
-    const show = smoothstep(ramp(tp, 0.3, 0.65));
-    rig.hero?.fade(show);
-    rig.root.visible = show > 0.001;
-    if (!rig.root.visible) return;
-    const t = encounterAt(local).t;
-    rig.root.position.set(FIGHT_FRAME.puncher.x, 0, FIGHT_FRAME.puncher.z);
-    rig.root.rotation.y = FIGHT_FRAME.puncher.yaw;
-    rig.fight(fightRow('puncher', Math.max(0, t - BLOCK.fight)), FIGHT_BONES);
-  });
-  return <primitive object={rig.root} />;
 }
 
 /**
@@ -202,9 +170,10 @@ export function LaundryLight({ active }: { active: boolean }) {
   useFrame(() => {
     const t = encounterAt(localProgress('city')).t;
     const down = encounter.outcome === 'knockedOut' ? KO.fallFrom : BLOCK.land;
-    if (light.current) light.current.visible = active && t >= down;
+    // (dark rather than hidden: a light coming and going makes every material in the street compile again)
+    if (light.current) light.current.intensity = active && t >= down ? 9 : 0;
   });
-  return <pointLight ref={light} position={[9.1, 2.0, -37.2]} color="#f1ece0" intensity={9} distance={7} decay={2} visible={false} />;
+  return <pointLight ref={light} position={[9.1, 2.0, -37.2]} color="#f1ece0" intensity={0} distance={7} decay={2} />;
 }
 
 /**

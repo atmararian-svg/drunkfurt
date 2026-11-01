@@ -31,14 +31,16 @@ export const KO = {
 } as const;
 
 /**
- * You defended: the camera steps back out of your eyes to a third person's view, behind you and
- * to one side, and the fight is played in full (fight.ts): your flurry, the uppercut, him on his
- * back. Then the camera comes back into your eyes and the story goes on. Seconds of the fight's
- * own clock after the press (spread over gate → aftermath).
+ * You defended: you stay in your own eyes. ACTION goes first, then (from `veil`) the street
+ * breaks into pixels and blurs (complete by `blurred`); the fight is played under the blur
+ * (fight.ts): your flurry against his cover, an exhale with every blow, then the uppercut that
+ * throws him onto his back. The blur clears on the aftermath. Seconds of the fight's own clock
+ * after the press (spread over gate → aftermath).
  */
 export const BLOCK = {
-  /** The camera is out of your eyes by here (it starts at the press). */
-  out: 1.0,
+  veil: 0.18,
+  /** The blur is complete. */
+  blurred: 0.6,
   /** The fight's clip starts (his knife hold eases into his guard before it). */
   fight: 0.45,
   /** BAM: the first blow of the flurry (clip 0.70). */
@@ -47,8 +49,5 @@ export const BLOCK = {
   hit2: 3.45,
   /** He is on the pavement (clip 3.82). */
   land: 4.27,
-  /** The camera comes back into your eyes over this stretch. */
-  backFrom: 5.05,
-  backTo: 6.25,
-  resolve: 6.5,
+  resolve: 4.9,
 } as const;

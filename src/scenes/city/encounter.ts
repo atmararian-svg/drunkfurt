@@ -2,6 +2,7 @@ import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
 import { BEAT, BLOCK, KO } from './beats';
+import { CLIP } from './fight';
 import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 
 /**
@@ -17,7 +18,7 @@ import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, tim
  *   commit → gate           he holds it on you: "Your bag."; time slows to a tenth
  *   gate                    DEFEND: the story waits for your click
  *   gate → aftermath        the outcome, mapped onto progress: defended (black,
- *                           the fight seen from behind you, he is down) or knocked out (hit, fall, darkness)
+ *                           the fight under a blur, he is down) or knocked out (hit, fall, darkness)
  *   aftermath → 1           afterwards: he is on the pavement, or gone
  *
  * Once decided, the page plays the outcome by moving the progress itself
@@ -88,19 +89,12 @@ export function encounterAt(local: number): EncounterView {
   if (t >= 0) punch = local < BEAT.aftermath ? encounter.punchAtDecision : 0;
   let shake = 0;
   if (t >= 0 && o === 'knockedOut') shake = pulse(t, 0.03, 1.4);
+  // defended: every blow you land jolts your view a little, the uppercut more
+  if (t >= 0 && o === 'blocked' && local < BEAT.aftermath) {
+    for (const c of CLIP.flurry) shake = Math.max(shake, pulse(t, BLOCK.fight + c, 0.55));
+    shake = Math.max(shake, pulse(t, BLOCK.hit2, 1.1));
+  }
   return { outcome: o, t, punch, shake };
-}
-
-/**
- * How far the camera has stepped out of your eyes into the third person's view of the fight
- * (0 your eyes … 1 behind you, to one side): out from the press, back in before the aftermath.
- */
-export function thirdPerson(local: number) {
-  const v = encounterAt(local);
-  if (v.outcome !== 'blocked' || v.t < 0 || local >= BEAT.aftermath) return 0;
-  const out = smoothstep(clamp(v.t / BLOCK.out, 0, 1));
-  const back = smoothstep(clamp((v.t - BLOCK.backFrom) / (BLOCK.backTo - BLOCK.backFrom), 0, 1));
-  return out * (1 - back);
 }
 
 /**
@@ -118,9 +112,12 @@ export function cityTimeScale(local: number) {
 interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
-    // the flurry: every other blow that lands is heard (all of them would be a drum roll), an exhale with the first
-    { at: BLOCK.hit1, kind: 'exhale1' },
-    ...[0.7, 1.1, 1.43, 1.8, 2.1, 2.4].map((c) => ({ at: BLOCK.fight + c, kind: 'block' as const })),
+    // every blow of the flurry: the hit, and your breath forced out with it (the boxer's "ts"),
+    // the two recorded exhales taking turns
+    ...CLIP.flurry.flatMap((c, i) => [
+      { at: BLOCK.fight + c, kind: 'block' as const },
+      { at: BLOCK.fight + c, kind: (i % 2 ? 'exhale2' : 'exhale1') as Cue['kind'] },
+    ]),
     // the uppercut, with its exhale, and him landing on the pavement
     { at: BLOCK.hit2, kind: 'exhale2' },
     { at: BLOCK.hit2, kind: 'punch' },

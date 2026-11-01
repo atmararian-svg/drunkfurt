@@ -24,24 +24,29 @@ import { PressPrompt } from './PressPrompt';
 
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
 const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
+/** Defended: the fight under it still reads, as shapes moving behind frosted glass. */
+const VEIL = { block: 12, blur: 0.8, dark: 0.35 };
 
 /**
  * How the street looks around the fight: block size (CSS px; 1 = not
  * pixelated), blur and darkness, as pure functions of the progress and the
  * encounter, so a scrub, a revisit or a reset can never leave it stuck.
- * Nothing happens while he only approaches or threatens. Once you defend, the
- * fight is shown in full (seen from behind you, scenes/city/fight.ts): no
- * pixels, no blur, no dark. Only a knockout still goes dark this way.
+ * Nothing happens while he only approaches or threatens: it starts when you
+ * press D. Defended, once ACTION has gone (BLOCK.veil) the street breaks into
+ * pixels and blurs, by BLOCK.blurred, before the first blow: the fight goes on
+ * under it, seen through it (VEIL); a knockout goes dark (HIDE). On the
+ * aftermath all of it resolves, back to the plain picture before the letter.
  */
 function combatLook(id: string, local: number) {
   const none = { block: 1, blur: 0, dark: 0 };
   if (id !== 'city' || local < BEAT.gate) return none;
   const v = encounterAt(local);
-  if (v.outcome !== 'knockedOut') return none;
-  const hide = local < BEAT.aftermath ? smoothstep(clamp(v.t / KO.dark, 0, 1)) : 1;
+  if (!v.outcome) return none;
+  const [from, full, look] = v.outcome === 'blocked' ? [BLOCK.veil, BLOCK.blurred, VEIL] : [0, KO.dark, HIDE];
+  const hide = local < BEAT.aftermath ? smoothstep(clamp((v.t - from) / (full - from), 0, 1)) : 1;
   const out = local < BEAT.aftermath ? 1 : 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
   const k = hide * out;
-  return { block: 1 + (HIDE.block - 1) * k, blur: HIDE.blur * k, dark: HIDE.dark * k };
+  return { block: 1 + (look.block - 1) * k, blur: look.blur * k, dark: look.dark * k };
 }
 
 /** ACTION is up from the moment he raises the knife until you act: it leaves first, before the pixels and the hits. */
@@ -162,7 +167,8 @@ export function Overlay() {
       const { id, local } = locate(p);
       captions.forEach((c, i) => {
         const when = capDefs[i].when;
-        const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to) && (!when || when());
+        // (while a chapter turns, the captions leave before the page is copied: chapterTransition.ts)
+        const on = !chapterTurn.busy && c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to) && (!when || when());
         c.classList.toggle('is-on', on);
         const t = typed.get(c);
         if (t && t.on !== on) {
