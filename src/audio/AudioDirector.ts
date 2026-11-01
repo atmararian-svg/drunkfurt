@@ -128,7 +128,7 @@ class AudioDirector {
     const ctx = new Ctx();
     this.ctx = ctx;
     this.master = ctx.createGain();
-    this.master.gain.value = this.enabled ? 1 : 0;
+    this.master.gain.value = this.enabled && !this.away ? 1 : 0;
     this.master.connect(ctx.destination);
     this.worldFilter = ctx.createBiquadFilter();
     this.worldFilter.type = 'lowpass';
@@ -180,8 +180,36 @@ class AudioDirector {
   /** Mutes or unmutes everything (the visitor's sound preference). */
   setEnabled(on: boolean) {
     this.enabled = on;
+    this.level();
+  }
+
+  /**
+   * The visitor left the page (another tab, the window minimised, the phone's app switched) or
+   * came back: the sound fades out and the audio stops running while they are away, and comes
+   * back as it was (only if they had it on). Their own sound preference is untouched.
+   */
+  setAway(away: boolean) {
+    if (away === this.away) return;
+    this.away = away;
+    window.clearTimeout(this.sleep);
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (away) {
+      this.level(0.04);
+      // once faded, the audio stops altogether (nothing runs or plays in the background)
+      this.sleep = window.setTimeout(() => this.away && void ctx.suspend().catch(() => undefined), 250);
+    } else {
+      void ctx.resume().catch(() => undefined);
+      this.level(0.2);
+    }
+  }
+
+  private away = false;
+  private sleep = 0;
+
+  private level(tau = 0.15) {
     if (!this.ctx || !this.master) return;
-    this.master.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.15);
+    this.master.gain.setTargetAtTime(this.enabled && !this.away ? 1 : 0, this.ctx.currentTime, tau);
   }
 
   get running() {
@@ -1083,3 +1111,10 @@ class AudioDirector {
 }
 
 export const audio = new AudioDirector();
+
+// no sound while the visitor is not on the page: leaving it (another tab, the window minimised,
+// another app on a phone) mutes it, coming back brings it back as it was
+const away = () => audio.setAway(document.visibilityState === 'hidden');
+document.addEventListener('visibilitychange', away);
+window.addEventListener('pagehide', () => audio.setAway(true));
+window.addEventListener('pageshow', away);

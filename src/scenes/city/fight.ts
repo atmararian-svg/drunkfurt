@@ -26,6 +26,31 @@ export const CLIP = {
   land: 3.82,
 } as const;
 
+/**
+ * Only the last two blows of the sequence are played: the clip starts a moment before the
+ * second-to-last blow, and the swing from it into the uppercut is quickened so the two land
+ * as far apart as the two recorded exhales (0.28 s); after the uppercut it runs at its own pace.
+ */
+export const CLIP_FROM = 2.15;
+/** The two blows (clip time), and how far apart they land in the fight (s). */
+const BLOW_A = 2.4;
+const BLOW_B = CLIP.uppercut;
+export const BLOW_GAP = 0.28;
+/** Fight time (s from the clip's start in the fight) → clip time. */
+export function clipAt(ft: number) {
+  const a = BLOW_A - CLIP_FROM;
+  if (ft <= a) return CLIP_FROM + Math.max(0, ft);
+  if (ft <= a + BLOW_GAP) return BLOW_A + ((ft - a) / BLOW_GAP) * (BLOW_B - BLOW_A);
+  return Math.min(CLIP_LEN, BLOW_B + (ft - a - BLOW_GAP));
+}
+/** Clip time → fight time (for timing things to the clip's moments). */
+export function fightAt(clipT: number) {
+  const a = BLOW_A - CLIP_FROM;
+  if (clipT <= BLOW_A) return clipT - CLIP_FROM;
+  if (clipT <= BLOW_B) return a + ((clipT - BLOW_A) / (BLOW_B - BLOW_A)) * BLOW_GAP;
+  return a + BLOW_GAP + (clipT - BLOW_B);
+}
+
 /** Your eyes before the fight (layout.VISITOR_STOP at EYE): the line from them to him sets where you stand. */
 const EYES: [number, number] = [6.5, -34];
 const dx = STRANGER_STOP[0] - EYES[0];

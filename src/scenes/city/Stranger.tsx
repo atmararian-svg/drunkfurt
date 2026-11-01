@@ -11,7 +11,7 @@ import { lerpAngle } from '../../characters/crowd';
 import { smoothstep } from '../../core/math';
 import { localProgress } from '../../core/timeline';
 import { BEAT, BLOCK, KO, encounter, encounterAt } from './encounter';
-import { CLIP, CLIP_LEN, FIGHT_BONES, FIGHT_FRAME, fightRow } from './fight';
+import { CLIP, CLIP_FROM, CLIP_LEN, FIGHT_BONES, FIGHT_FRAME, clipAt, fightRow } from './fight';
 import { EYE, VISITOR_STOP } from './layout';
 import { ramp, routeAt, routeS, walkPace } from './strangerRoute';
 
@@ -56,16 +56,17 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     const root = rig.root;
 
     // the fight (you defended, fight.ts): from the moment its clip starts he is the man taking your
-    // flurry, then the uppercut, then lying on his back where he landed. Before that (the first
+    // two blows (the last two of the animation), the uppercut, then lying on his back where he landed. Before that (the first
     // fraction of a second after your press) his knife hold eases into his guard, below.
-    const fightT = view.outcome === 'blocked' ? (local >= BEAT.aftermath ? CLIP_LEN : t - BLOCK.fight) : -1;
+    // (clip time: only the last two blows are played, fight.ts)
+    const fightT = view.outcome === 'blocked' ? (local >= BEAT.aftermath ? CLIP_LEN : clipAt(t - BLOCK.fight)) : -1;
     if (view.outcome === 'blocked' && (t >= BLOCK.fight || local >= BEAT.aftermath)) {
       root.visible = true;
       root.position.set(FIGHT_FRAME.guard.x, 0, FIGHT_FRAME.guard.z);
       root.rotation.y = FIGHT_FRAME.guard.yaw;
       rig.fight(fightRow('guard', fightT), FIGHT_BONES);
       // the first blow knocks the knife out of his hand; it lies where he stood
-      const lost = fightT >= CLIP.flurry[0];
+      const lost = t >= BLOCK.hit1 || local >= BEAT.aftermath;
       rig.knife.visible = !lost;
       rig.groundKnife.visible = lost;
       rig.groundKnife.position.set(FIGHT_FRAME.guard.x + 0.38, 0.012, FIGHT_FRAME.guard.z + 0.12);
@@ -131,8 +132,8 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
     // his eyes on you from the moment he notices you
     rig.look(CAM, smoothstep(ramp(local, BEAT.noticed, BEAT.strangerMoves)) * lerp(0.6, 0.8, raise));
 
-    // you have pressed D: his hold eases into the guard he takes against your flurry (the clip's first frame)
-    if (view.outcome === 'blocked' && t >= 0) rig.fight(fightRow('guard', 0), FIGHT_BONES, smoothstep(ramp(t, 0.05, BLOCK.fight)));
+    // you have pressed D: his hold eases into his guard as the clip has it a moment before the second-to-last blow
+    if (view.outcome === 'blocked' && t >= 0) rig.fight(fightRow('guard', CLIP_FROM), FIGHT_BONES, smoothstep(ramp(t, 0.05, BLOCK.fight)));
 
     // --- a key light on his face from the shop windows on your right, so you see who it is
     if (key.current) {
@@ -214,7 +215,7 @@ export function Fists({ active }: { active: boolean }) {
     // where his head is as the fight starts, in his own frame: put there, your eyes are on it
     rig.root.position.set(0, 0, 0);
     rig.root.rotation.set(0, 0, 0);
-    rig.fight(fightRow('puncher', 0), FIGHT_BONES);
+    rig.fight(fightRow('puncher', CLIP_FROM), FIGHT_BONES);
     const head = rig.bone('Head').getWorldPosition(new Vector3());
     if (import.meta.env.DEV) (window as unknown as { __fists: unknown }).__fists = rig;
     return { rig, made, head };
@@ -242,7 +243,7 @@ export function Fists({ active }: { active: boolean }) {
     const hz = -head.x * sn + head.z * c;
     rig.root.position.set(CAM.x - hx, CAM.y - head.y, CAM.z - hz);
     rig.root.rotation.y = f.yaw;
-    rig.fight(fightRow('puncher', Math.max(0, v.t - BLOCK.fight)), FIGHT_BONES);
+    rig.fight(fightRow('puncher', clipAt(v.t - BLOCK.fight)), FIGHT_BONES);
   });
   return <primitive object={built.rig.root} />;
 }

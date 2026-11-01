@@ -257,6 +257,8 @@ export function mountChapterTuner(): () => void {
   let touchOpen = false;
   let focused = false;
   let open = false;
+  /** It has just taken you to a chapter: closed until the pointer leaves it (or a new touch). */
+  let dismissed = false;
   let openK = 0;
   /** The page behind: dims and pixelates on its own, slower curve (in over 0.8 s, out over 0.5 s). */
   let backK = 0;
@@ -360,7 +362,8 @@ export function mountChapterTuner(): () => void {
   };
   const setOpen = () => {
     // (a phone's selector is always open: it is small and along the bottom, with nothing to reveal)
-    open = phone || hover || touchOpen || focused || !!drag || !!wheel;
+    // (once it has taken you to a chapter it closes, and stays closed under a pointer still resting on it)
+    open = phone || (!dismissed && (hover || touchOpen || focused)) || !!drag || !!wheel;
     root.classList.toggle('is-open', open);
   };
   const commit = (n: number) => {
@@ -370,6 +373,12 @@ export function mountChapterTuner(): () => void {
     }
     held = { pos: n, until: performance.now() + 6000 };
     goToChapter(n);
+    // done: it closes by itself (nothing to click away); it opens again once the pointer has left it and comes back
+    dismissed = true;
+    touchOpen = false;
+    focused = false;
+    if (root.contains(document.activeElement)) (document.activeElement as HTMLElement).blur();
+    setOpen();
   };
 
   // --- pointer: open, drag, the strip ---------------------------------------------------------
@@ -381,12 +390,14 @@ export function mountChapterTuner(): () => void {
   const leave = (e: PointerEvent) => {
     if (e.pointerType === 'touch') return;
     hover = false;
+    dismissed = false;
     setOpen();
   };
   const down = (e: PointerEvent) => {
     if (story.getState().phase !== 'ready') return;
     if (e.pointerType === 'touch' && !open && !phone) {
       // on a touch screen the first tap opens it
+      dismissed = false;
       touchOpen = true;
       showActiveTab();
       setOpen();
@@ -480,6 +491,8 @@ export function mountChapterTuner(): () => void {
     }
   };
   const focusIn = () => {
+    // (focus comes by the visitor's own hand, the keyboard or a click: it opens it again)
+    dismissed = false;
     focused = true;
     setOpen();
   };

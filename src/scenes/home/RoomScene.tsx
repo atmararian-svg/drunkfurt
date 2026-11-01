@@ -4,11 +4,13 @@ import { suspend } from 'suspend-react';
 import {
   BoxGeometry,
   BufferGeometry,
+  CanvasTexture,
   Color,
   DoubleSide,
   Group,
   LinearMipmapLinearFilter,
   Material,
+  Matrix4,
   Mesh,
   MeshBasicMaterial,
   MeshStandardMaterial,
@@ -28,7 +30,8 @@ import { story } from '../../core/store';
 import { Gate, gates, localProgress } from '../../core/timeline';
 import { input } from '../../player/input';
 import { postFx } from '../../render/Stylizer';
-import { DISPLAY, HOME_BEAT, ROOM_LIFT } from './layout';
+import { DISPLAY, HOME_BEAT, ROOM_LIFT, SEAT_EYE } from './layout';
+import { CHAPTERS } from '../../core/chapters';
 import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, overAbout, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 import { TOUCH } from '../../ui/touch';
@@ -189,6 +192,8 @@ function buildRoom(gltf: GLTF) {
     // the floor is one big plane: its edges are not drawing lines
     if (name === 'material') mesh.userData.ink = false;
   });
+  // the clock on the rack, left of the chair: the model's own LEDs read 14:47; it shows the story's time instead
+  const clock = storyClock(model, root);
   screens.sort((a, b) => a.name.localeCompare(b.name));
   // the text about the author goes on the screen right of the big display, low (screen_13), in view from the chair
   const wall = buildWallScreens(screens.length, screens.findIndex((s) => s.name === ABOUT_SCREEN));
@@ -202,9 +207,128 @@ function buildRoom(gltf: GLTF) {
     trimmed.forEach((g) => g.dispose());
     steel.dispose();
     led.dispose();
+    clock?.dispose();
   };
   const about = screens.find((s) => s.name === ABOUT_SCREEN) ?? null;
   return { root, wall, dispose, about };
+}
+
+/** Seven-segment digits: which of the segments a b c d e f g each digit lights. */
+const SEGMENTS: Record<string, string> = { '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc', '5': 'afgcd', '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abcfgd' };
+
+/**
+ * The rack's clock (the model's 'leds', the time 14:47 modelled in segments) shows the time the
+ * story comes into the cave (chapter 3, core/chapters.ts) instead: the modelled digits are hidden
+ * and a plane in their place carries the same yellow segments, slanted, drawn on a canvas. The
+ * plane spans the digits' own extent, faces the chair (the box's axis most towards it) and reads
+ * upright from it.
+ */
+function storyClock(model: Object3D, root: Group) {
+  const leds = model.getObjectByName('leds') as Mesh | undefined;
+  if (!leds) return null;
+  const time = CHAPTERS.find((c) => c.number === 3)?.time ?? '00:32';
+  root.updateMatrixWorld(true);
+  leds.geometry.computeBoundingBox();
+  const box = leds.geometry.boundingBox!;
+  // the box's centre and its three axes in the world, the thinnest one the display's normal
+  const centre = box.getCenter(new Vector3()).applyMatrix4(leds.matrixWorld);
+  // the digits' own plane: the line they are read along (from the vertex furthest one way along the
+  // box's longest axis to the one furthest the other way), level, and the normal across it towards
+  // the chair (the display is turned, so the box's own axes do not lie in it)
+  const pos = leds.geometry.getAttribute('position');
+  const pts = Array.from({ length: pos.count }, (_, i) => new Vector3().fromBufferAttribute(pos, i).applyMatrix4(leds.matrixWorld));
+  const size = box.getSize(new Vector3());
+  const long = size.x >= size.y && size.x >= size.z ? 0 : size.y >= size.z ? 1 : 2;
+  const along = new Vector3().setComponent(long, 1).transformDirection(leds.matrixWorld);
+  let lo = pts[0];
+  let hi = pts[0];
+  for (const p of pts) {
+    if (p.dot(along) < lo.dot(along)) lo = p;
+    if (p.dot(along) > hi.dot(along)) hi = p;
+  }
+  const upW = new Vector3(0, 1, 0);
+  const n = new Vector3().subVectors(hi, lo).setY(0).normalize().cross(upW).normalize();
+  const toEye = SEAT_EYE.clone().sub(centre);
+  if (n.dot(toEye) < 0) n.negate();
+  const right = new Vector3().crossVectors(upW, n).normalize();
+  // its size and centre: the digits' extent along it, a little margin round them
+  let r0 = Infinity, r1 = -Infinity, u0 = Infinity, u1 = -Infinity, d1 = -Infinity;
+  for (const p of pts) {
+    const q = p.clone().sub(centre);
+    r0 = Math.min(r0, q.dot(right));
+    r1 = Math.max(r1, q.dot(right));
+    u0 = Math.min(u0, q.dot(upW));
+    u1 = Math.max(u1, q.dot(upW));
+    d1 = Math.max(d1, q.dot(n));
+  }
+  const w = (r1 - r0) * 1.04;
+  const h = (u1 - u0) * 1.08;
+  centre.addScaledVector(right, (r0 + r1) / 2).addScaledVector(upW, (u0 + u1) / 2).addScaledVector(n, d1);
+  const cw = 512;
+  const ch = Math.max(64, Math.round((cw * h) / w));
+  const el = document.createElement('canvas');
+  el.width = cw;
+  el.height = ch;
+  const c = el.getContext('2d')!;
+  c.fillStyle = '#e2bd3a';
+  // 4 digits and a colon, slanted like the modelled ones
+  const pad = ch * 0.08;
+  const dh = ch - pad * 2;
+  const dw = dh * 0.52;
+  const t = dh * 0.15;
+  const gap = dw * 0.28;
+  const colonW = dw * 0.45;
+  const total = dw * 4 + gap * 3 + colonW + gap;
+  let x = (cw - total) / 2;
+  const seg = (k: string, ox: number) => {
+    const half = dh / 2;
+    const r: Record<string, [number, number, number, number]> = {
+      a: [ox + t * 0.6, pad, dw - t * 1.2, t],
+      g: [ox + t * 0.6, pad + half - t / 2, dw - t * 1.2, t],
+      d: [ox + t * 0.6, pad + dh - t, dw - t * 1.2, t],
+      f: [ox, pad + t * 0.6, t, half - t * 1.1],
+      b: [ox + dw - t, pad + t * 0.6, t, half - t * 1.1],
+      e: [ox, pad + half + t * 0.5, t, half - t * 1.1],
+      c: [ox + dw - t, pad + half + t * 0.5, t, half - t * 1.1],
+    };
+    const [rx, ry, rw, rh] = r[k];
+    c.fillRect(rx, ry, rw, rh);
+  };
+  c.save();
+  // the slant: the tops lean to the right
+  c.setTransform(1, 0, -0.14, 1, ch * 0.07, 0);
+  for (const chr of time) {
+    if (chr === ':') {
+      c.fillRect(x + colonW / 2 - t / 2, pad + dh * 0.28, t, t);
+      c.fillRect(x + colonW / 2 - t / 2, pad + dh * 0.66, t, t);
+      x += colonW + gap;
+      continue;
+    }
+    for (const k of SEGMENTS[chr] ?? '') seg(k, x);
+    x += dw + gap;
+  }
+  c.restore();
+  const tex = new CanvasTexture(el);
+  tex.colorSpace = SRGBColorSpace;
+  tex.anisotropy = 4;
+  const mat = new MeshBasicMaterial({ map: tex, color: new Color('#ffffff').multiplyScalar(0.85), transparent: true, toneMapped: false, depthWrite: false });
+  mat.userData.comic = false;
+  const plane = new Mesh(new PlaneGeometry(w, h), mat);
+  plane.name = 'story-clock';
+  plane.userData.ink = 'none';
+  // in the world: its basis, a hair in front of the digits' face, then into the room's frame
+  plane.matrix.makeBasis(right, upW, n).setPosition(centre.clone().addScaledVector(n, 0.001));
+  plane.matrix.premultiply(new Matrix4().copy(root.matrixWorld).invert());
+  plane.matrix.decompose(plane.position, plane.quaternion, plane.scale);
+  root.add(plane);
+  leds.visible = false;
+  return {
+    dispose() {
+      tex.dispose();
+      mat.dispose();
+      plane.geometry.dispose();
+    },
+  };
 }
 
 /**

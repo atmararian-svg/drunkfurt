@@ -32,22 +32,22 @@ export const KO = {
 
 /**
  * You defended: you stay in your own eyes. ACTION goes first, then (from `veil`) the street
- * breaks into pixels and blurs (complete by `blurred`); the fight is played under the blur
- * (fight.ts): your flurry against his cover, an exhale with every blow, then the uppercut that
- * throws him onto his back. The blur clears on the aftermath. Seconds of the fight's own clock
- * after the press (spread over gate → aftermath).
+ * breaks into pixels and blurs (complete by `blurred`); under the blur two blows land (fight.ts:
+ * the last two of the animation, 0.28 s apart, each with its exhale), the second the uppercut
+ * that throws him onto his back. The blur clears on the aftermath. Seconds of the fight's own
+ * clock after the press (spread over gate → aftermath).
  */
 export const BLOCK = {
   veil: 0.18,
   /** The blur is complete. */
-  blurred: 0.6,
+  blurred: 0.55,
   /** The fight's clip starts (his knife hold eases into his guard before it). */
   fight: 0.45,
-  /** BAM: the first blow of the flurry (clip 0.70). */
-  hit1: 1.15,
-  /** POW: the uppercut (clip 3.00). */
-  hit2: 3.45,
+  /** BAM: the second-to-last blow (fight.ts: clip 2.40). */
+  hit1: 0.7,
+  /** POW: the uppercut, 0.28 s later (clip 3.00). */
+  hit2: 0.98,
   /** He is on the pavement (clip 3.82). */
-  land: 4.27,
-  resolve: 4.9,
+  land: 1.8,
+  resolve: 3.0,
 } as const;

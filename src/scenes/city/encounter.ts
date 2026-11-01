@@ -2,7 +2,6 @@ import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
 import { BEAT, BLOCK, KO } from './beats';
-import { CLIP } from './fight';
 import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 
 /**
@@ -89,10 +88,9 @@ export function encounterAt(local: number): EncounterView {
   if (t >= 0) punch = local < BEAT.aftermath ? encounter.punchAtDecision : 0;
   let shake = 0;
   if (t >= 0 && o === 'knockedOut') shake = pulse(t, 0.03, 1.4);
-  // defended: every blow you land jolts your view a little, the uppercut more
+  // defended: each of the two blows jolts your view, the uppercut more
   if (t >= 0 && o === 'blocked' && local < BEAT.aftermath) {
-    for (const c of CLIP.flurry) shake = Math.max(shake, pulse(t, BLOCK.fight + c, 0.55));
-    shake = Math.max(shake, pulse(t, BLOCK.hit2, 1.1));
+    shake = Math.max(pulse(t, BLOCK.hit1, 0.6), pulse(t, BLOCK.hit2, 1.1));
   }
   return { outcome: o, t, punch, shake };
 }
@@ -112,12 +110,9 @@ export function cityTimeScale(local: number) {
 interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
-    // the flurry: the hit of each blow
-    ...CLIP.flurry.map((c) => ({ at: BLOCK.fight + c, kind: 'block' as const })),
-    // the last two blows: the two recorded exhales ("ts, ts") each with its hit, as far apart as
-    // they are in the recordings (exhales 0.28 s, hits 0.24 s), the second on the uppercut
-    { at: BLOCK.hit2 - 0.28, kind: 'exhale1' },
-    { at: BLOCK.hit2 - 0.24, kind: 'block' },
+    // the two blows, "ts, ts": each with its exhale, 0.28 s apart, the second the uppercut; then him landing
+    { at: BLOCK.hit1, kind: 'exhale1' },
+    { at: BLOCK.hit1, kind: 'block' },
     { at: BLOCK.hit2, kind: 'exhale2' },
     { at: BLOCK.hit2, kind: 'punch' },
     { at: BLOCK.land, kind: 'fall' },

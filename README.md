@@ -524,19 +524,19 @@ built from.
     frame watcher are removed.
   - **Defended** (you press D): you stay in your own eyes, and the fight is played under the blur
     (`scenes/city/fight.ts`, timings in `BLOCK`, `beats.ts`): his knife hold eases into a guard,
-    then the supplied "rapid punching" animation (his side of it): your flurry against his cover
-    (the first blow knocks the knife out of his hand; it lies where he stood), then an uppercut
-    that throws him onto his back, about 1.7 m behind where he stood. Your arms throw the blows in
-    front of you (`Fists` in `Stranger.tsx`: your side of the animation on a second copy of the
-    man, of which only the arms are drawn, the jacket's sleeves dark, both hands in fists; he is
-    placed so that his head is where your eyes are). Every blow jolts your view a little, the
-    uppercut more, and is heard (the lighter hit of `hits.mp3`); the last two land as the
-    recordings have them, "ts, ts": the two exhales 0.28 s apart, each with its hit (0.24 s
-    apart), the second on the uppercut; then him landing. BAM is printed with the first blow, POW
-    with the uppercut. The camera's hold on him eases off towards the aftermath, so it arrives
-    there without a jump: where you stood, a little lower, looking down at him and the letter.
-    Episode 3 starts from exactly that frame (`carTrack`), so going on after the invitation does
-    not move you.
+    then only the last two blows of the supplied "rapid punching" animation: the clip starts a
+    moment before its second-to-last blow (2.15 s), and the swing from that blow into the
+    uppercut is quickened (`clipAt`) so the two land 0.28 s apart, as far apart as the two
+    recorded exhales. The first knocks the knife out of his hand (it lies where he stood); the
+    uppercut throws him onto his back, about 1.7 m behind where he stood. Your arms throw the
+    blows in front of you (`Fists` in `Stranger.tsx`: your side of the animation on a second copy
+    of the man, of which only the arms are drawn, the jacket's sleeves dark, both hands in fists;
+    he is placed so that his head is where your eyes are). Each blow jolts your view, the uppercut
+    more, and is heard as the recordings have it, "ts, ts": an exhale with each hit, the second
+    on the uppercut; then him landing. BAM is printed with the first, POW with the uppercut. The
+    camera's hold on him eases off towards the aftermath, so it arrives there without a jump:
+    where you stood, a little lower, looking down at him and the letter. Episode 3 starts from
+    exactly that frame (`carTrack`), so going on after the invitation does not move you.
     - **The animation** (`tools/bakeFight.mjs` → `scenes/city/fightClip.json`, 141 KB): the source
       is a two-man AdvancedSkeleton rig (FBX); its deform joints are retargeted onto the walking
       man's Mixamo skeleton (each joint's world rotation moved from the source's bind pose onto the
@@ -1050,6 +1050,17 @@ wipe opens.
   mesh sets its own line weight on the buffer's material as it is drawn (`inkWeight`).
 - Pixel density only ever goes down (each change resizes every buffer); multisampling is decided
   once, as the page starts.
+
+## Small things
+
+- **The rack's clock** in the cave (the model's `leds`, modelled reading 14:47) shows the time the
+  story comes in, chapter 3's 00:32 (`storyClock` in `RoomScene.tsx`): the modelled digits are
+  hidden and a plane on the digits' own face carries the same yellow, slanted segments.
+- **Sound away from the page**: leaving it (another tab, the window minimised, another app on a
+  phone) fades the sound out and stops the audio; coming back brings it back as it was
+  (`AudioDirector.setAway`). The visitor's own sound setting is untouched.
+- **The chapter selector** closes by itself once it has taken you to a chapter, and stays closed
+  under a pointer still resting on it until the pointer leaves (or a new touch, or focus).
 
 ## Single-file build
 
