@@ -3,7 +3,7 @@ import { suspend } from 'suspend-react';
 import manUrl from '../../assets/man.glb?url';
 import knifeUrl from '../../assets/knife.glb?url';
 import { Component, ReactNode, useEffect, useMemo, useRef } from 'react';
-import { Object3D, PointLight, SpotLight, Vector3 } from 'three';
+import { BufferGeometry, Mesh, MeshStandardMaterial, Object3D, PointLight, SkinnedMesh, SpotLight, Vector3 } from 'three';
 import { loadGlb } from '../../characters/inlineModel';
 import { buildMan } from '../../characters/manRig';
 import { START_PHASE } from '../../characters/walkClip';
@@ -157,6 +157,94 @@ export function Stranger({ active }: { active: boolean; timeScale: () => number 
       <spotLight ref={key} target={keyTarget} color="#efeadf" intensity={0} angle={0.42} penumbra={0.7} decay={2} distance={9} />
     </>
   );
+}
+
+/**
+ * Your arms in the fight, seen from your own eyes under the blur: your side of the fight's
+ * animation (fight.ts) on a second copy of the walking man, of which only the arms are kept (the
+ * jacket's sleeves out from the shoulders, dark, and the hands, closed in fists). He is placed so
+ * that his head, as the fight starts, is where your eyes are; the rest of him is not drawn.
+ */
+export function Fists({ active }: { active: boolean }) {
+  const gltf = suspend(() => loadGlb(manUrl), ['drunkfurt-man']);
+  const knifeGltf = suspend(() => loadGlb(knifeUrl), ['drunkfurt-knife']);
+  const built = useMemo(() => {
+    const rig = buildMan(gltf, knifeGltf);
+    rig.root.name = 'fists';
+    rig.root.visible = false;
+    const k = rig.model.scale.x;
+    const made: (BufferGeometry | MeshStandardMaterial)[] = [];
+    const v = new Vector3();
+    // only the arms: triangles whose corners all lie out along the arms in the bind pose (arms out along x)
+    const cut = (m: SkinnedMesh, from: number) => {
+      const src = m.geometry;
+      const pos = src.getAttribute('position');
+      const idx = src.getIndex();
+      const out: number[] = [];
+      const far = (i: number) => Math.abs(v.fromBufferAttribute(pos, i).applyMatrix4(m.bindMatrix).x * k) > from;
+      const n = idx ? idx.count : pos.count;
+      for (let t = 0; t < n; t += 3) {
+        const a = idx ? idx.getX(t) : t;
+        const b = idx ? idx.getX(t + 1) : t + 1;
+        const c = idx ? idx.getX(t + 2) : t + 2;
+        if (far(a) && far(b) && far(c)) out.push(a, b, c);
+      }
+      const g = new BufferGeometry();
+      for (const name of Object.keys(src.attributes)) g.setAttribute(name, src.getAttribute(name));
+      g.setIndex(out);
+      g.boundingSphere = src.boundingSphere;
+      made.push(g);
+      m.geometry = g;
+    };
+    rig.model.traverse((o) => {
+      const m = o as SkinnedMesh;
+      if (!(m as Mesh).isMesh) return;
+      const name = `${m.name} ${(m.material as MeshStandardMaterial).name}`;
+      if (m.isSkinnedMesh && /top/i.test(name)) {
+        cut(m, 0.21);
+        // a dark sleeve, yours (not his tan canvas)
+        const mat = new MeshStandardMaterial({ color: '#2b2b2e', roughness: 0.9 });
+        mat.userData.comic = { mono: true, halftone: 0.55 };
+        made.push(mat);
+        m.material = mat;
+      } else if (m.isSkinnedMesh && /body/i.test(name) && /^body$/i.test(m.name)) {
+        cut(m, 0.6);
+      } else m.visible = false; // his head, legs, clothes, beanie, scarf, knife
+    });
+    // where his head is as the fight starts, in his own frame: put there, your eyes are on it
+    rig.root.position.set(0, 0, 0);
+    rig.root.rotation.set(0, 0, 0);
+    rig.fight(fightRow('puncher', 0), FIGHT_BONES);
+    const head = rig.bone('Head').getWorldPosition(new Vector3());
+    if (import.meta.env.DEV) (window as unknown as { __fists: unknown }).__fists = rig;
+    return { rig, made, head };
+  }, [gltf, knifeGltf]);
+  useEffect(
+    () => () => {
+      built.made.forEach((x) => x.dispose());
+      built.rig.dispose();
+    },
+    [built],
+  );
+  useFrame(() => {
+    const { rig, head } = built;
+    const local = localProgress('city');
+    const v = encounterAt(local);
+    // from just after the press (under the blur coming in) until he is down
+    const on = active && v.outcome === 'blocked' && local < BEAT.aftermath && v.t >= 0.3 && v.t < BLOCK.land + 0.35;
+    rig.root.visible = on;
+    if (!on) return;
+    const f = FIGHT_FRAME.puncher;
+    // his frame turned to face him; then shifted so his head starts at your eyes (head is in that frame, unturned)
+    const c = Math.cos(f.yaw);
+    const sn = Math.sin(f.yaw);
+    const hx = head.x * c + head.z * sn;
+    const hz = -head.x * sn + head.z * c;
+    rig.root.position.set(CAM.x - hx, CAM.y - head.y, CAM.z - hz);
+    rig.root.rotation.y = f.yaw;
+    rig.fight(fightRow('puncher', Math.max(0, v.t - BLOCK.fight)), FIGHT_BONES);
+  });
+  return <primitive object={built.rig.root} />;
 }
 
 /**

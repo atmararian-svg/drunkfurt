@@ -1,6 +1,5 @@
 import { useFrame, useThree } from '@react-three/fiber';
-import { useEffect, useMemo, useRef } from 'react';
-import { Object3D } from 'three';
+import { useEffect, useMemo } from 'react';
 import { audio } from '../../audio/AudioDirector';
 import { createCrowd } from '../../characters/crowd';
 import { People } from '../../characters/People';
@@ -14,7 +13,7 @@ import { cityNav } from './nav';
 import { BEAT, cityTimeScale, disarm, encounter, updateEncounter } from './encounter';
 import { PORTAL, STATION_FACE_Z } from './layout';
 import { Skyline } from './Skyline';
-import { LaundryLight, Stranger, StrangerBoundary } from './Stranger';
+import { Fists, LaundryLight, Stranger, StrangerBoundary } from './Stranger';
 import { updateLetter } from './letter';
 import { LetterProp } from './LetterProp';
 import { Street } from './Street';
@@ -26,50 +25,6 @@ const timeScale = () => {
   if (car <= 0) return cityTimeScale(localProgress('city'));
   return cityTimeScale(1) + (1 - cityTimeScale(1)) * smoothstep(clamp(car / 0.3, 0, 1));
 };
-
-/**
- * Compiles every material of the street once, as the chapter opens, including those of things
- * that only appear later (the knife on the pavement, the letter, the laundry window's light on
- * him): otherwise each is compiled the moment it first shows, a hitch right after the fight. Its
- * marker sits in the city's own group; the hidden parts are shown for the compile and hidden
- * again at once (nothing is drawn in between).
- */
-function Precompile({ active }: { active: boolean }) {
-  const { gl, scene, camera } = useThree();
-  const marker = useRef<Object3D>(null);
-  const done = useRef(false);
-  useEffect(() => {
-    if (!active || done.current) return;
-    let raf = 0;
-    let n = 0;
-    // a few frames in, after the print treatment has patched the street's materials
-    const go = () => {
-      if (++n < 4) {
-        raf = requestAnimationFrame(go);
-        return;
-      }
-      const root = marker.current?.parent;
-      if (!root) return;
-      const hidden: Object3D[] = [];
-      root.traverse((o) => {
-        if (!o.visible) {
-          hidden.push(o);
-          o.visible = true;
-        }
-      });
-      try {
-        gl.compile(root, camera, scene);
-      } catch (err) {
-        console.warn('[city] precompile', err);
-      }
-      hidden.forEach((o) => (o.visible = false));
-      done.current = true;
-    };
-    raf = requestAnimationFrame(go);
-    return () => cancelAnimationFrame(raf);
-  }, [active, gl, scene, camera]);
-  return <object3D ref={marker} />;
-}
 
 /** The city's sound: a quiet bed that thins out and muffles as the stranger closes in. */
 function Soundscape({ active }: { active: boolean }) {
@@ -156,6 +111,8 @@ export function CityScene({ active }: { active: boolean }) {
       <People crowd={crowd} scroll={() => localProgress('city')} timeScale={timeScale} enabled={active} />
       <StrangerBoundary>
         <Stranger active={active} timeScale={timeScale} />
+        {/* your arms in the fight, under the blur */}
+        <Fists active={active} />
       </StrangerBoundary>
       <LaundryLight active={active} />
       {/* the letter he dropped, after the fight */}
@@ -163,7 +120,6 @@ export function CityScene({ active }: { active: boolean }) {
       {/* the getaway car stands at the kerb from the start; episode 3 is played with it */}
       <Mercedes />
       <Soundscape active={active} />
-      <Precompile active={active} />
     </>
   );
 }

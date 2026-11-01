@@ -87,6 +87,8 @@ const STANCE_T = 0.8;
 /** Height he is scaled to (m). */
 export const MAN_HEIGHT = 1.8;
 const KNIFE_LENGTH = 0.28;
+/** How far each joint of the thumb folds across a fist (rad). */
+const FIST_THUMB = [0.45, 0.6, 0.55];
 
 const knit = (shade: number, rib: number) => {
   const c = document.createElement('canvas');
@@ -309,7 +311,8 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   const fingers = ['Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((i) => ({ b: bone(`RightHand${f}${i}`), a: [1.25, 1.45, 0.9][i - 1] })));
   const thumbs = [1, 2, 3].map((i) => ({ b: bone(`RightHandThumb${i}`), a: [0.35, 0.5, 0.6][i - 1] }));
   const leftFingers = ['Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((i) => ({ b: bone(`LeftHand${f}${i}`), a: [1.25, 1.45, 0.9][i - 1] })));
-  const leftThumbs = [1, 2, 3].map((i) => ({ b: bone(`LeftHandThumb${i}`), a: [0.35, 0.5, 0.6][i - 1] }));
+  const leftThumbs = [1, 2, 3].map((i) => ({ b: bone(`LeftHandThumb${i}`), i: i - 1 }));
+  const fistThumbs = [1, 2, 3].map((i) => ({ b: bone(`RightHandThumb${i}`), i: i - 1 }));
   const kept = list.map(() => new Quaternion());
   const keptHips = new Vector3();
   const keptModel = { p: new Vector3(), q: new Quaternion() };
@@ -425,11 +428,11 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       model.rotation.set(0, 0, 0);
       bone('Hips').position.set(row[0], row[1], row[2]);
       names.forEach((n, i) => bone(n).quaternion.set(row[3 + i * 4], row[4 + i * 4], row[5 + i * 4], row[6 + i * 4]).normalize());
-      // fists
+      // fists: the fingers rolled into the palm, the thumb folded across them (both turn about their
+      // own x on either hand: checked on the model, the tips go into the palm)
       for (const f of fingers) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, f.a));
-      for (const f of thumbs) f.b.quaternion.multiply(QX.setFromAxisAngle(AZ, -f.a));
       for (const f of leftFingers) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, f.a));
-      for (const f of leftThumbs) f.b.quaternion.multiply(QX.setFromAxisAngle(AZ, f.a));
+      for (const f of [...fistThumbs, ...leftThumbs]) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, FIST_THUMB[f.i]));
       if (blend) {
         const k = Math.max(0, w);
         list.forEach((b, i) => b.quaternion.copy(QA.copy(kept[i]).slerp(b.quaternion, k)));

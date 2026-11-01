@@ -13,6 +13,51 @@ import { INK_LAYER, INK_SILHOUETTE_LAYER, InkEffect, OCCLUDER_LAYER, createInkBu
 export const postFx = { clean: 0 };
 
 /**
+ * Prints a part of the scene: comic bands on its lit materials, its opaque meshes sorted into the
+ * ink and occluder layers. Each material is patched once; doing it again changes nothing, so a
+ * world can be stylised ahead of time (to compile its shaders before it is shown, App.tsx).
+ */
+export function stylize(root: Object3D, dpr: number) {
+  root.traverse((o: Object3D) => {
+    const mesh = o as Mesh;
+    if (!mesh.isMesh) return;
+    const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[];
+    mats.forEach((m) => applyComic(m, dpr));
+    const transparent = mats.some((m) => m.transparent || (m as MeshBasicMaterial).blending > 1);
+    if (transparent || o.userData.ink === 'none') return;
+    // Each opaque mesh is drawn into the ink buffer exactly once: as ink, or as an occluder.
+    const glow = mats.every((m) => m instanceof MeshBasicMaterial);
+    if (!glow && o.userData.ink === 'silhouette') inkWeight(o, INK_SILHOUETTE_LAYER, 0.5);
+    else if (!glow && o.userData.ink !== false) inkWeight(o, INK_LAYER, 1);
+    else inkWeight(o, OCCLUDER_LAYER, 0);
+  });
+}
+
+/** The ink buffer's one material; each object sets its own line weight on it just before it is drawn. */
+const INK_BUFFER = createInkBufferMaterial(1);
+const WEIGHTED = new WeakSet<Object3D>();
+
+/**
+ * Puts a mesh in its ink layer and has it set its line weight (ink 1, silhouette 0.5, occluder 0)
+ * on the ink buffer's material as it is drawn into that buffer, so the whole buffer is one pass
+ * over the scene instead of three.
+ */
+function inkWeight(o: Object3D, layer: number, w: number) {
+  o.layers.enable(layer);
+  o.userData.inkWeight = w;
+  if (WEIGHTED.has(o)) return;
+  WEIGHTED.add(o);
+  const before = o.onBeforeRender;
+  o.onBeforeRender = function (renderer, scene, camera, geometry, material, group) {
+    if (material === INK_BUFFER) {
+      INK_BUFFER.uniforms.uWeight.value = this.userData.inkWeight;
+      INK_BUFFER.uniformsNeedUpdate = true;
+    }
+    before.call(this, renderer, scene, camera, geometry, material, group);
+  };
+}
+
+/**
  * Turns the lit scene into a printed page:
  *  1. every lit material gets comic tonal bands with halftone transitions;
  *  2. opaque meshes are sorted into ink / occluder layers;
@@ -25,9 +70,6 @@ export const postFx = { clean: 0 };
 export function Stylizer({ version }: { version: unknown }) {
   const { gl, scene, camera, size, viewport } = useThree();
   const target = useMemo(createInkTarget, []);
-  const occMat = useMemo(() => createInkBufferMaterial(0), []);
-  const inkMat = useMemo(() => createInkBufferMaterial(1), []);
-  const silMat = useMemo(() => createInkBufferMaterial(0.5), []);
   const effect = useMemo(() => new InkEffect(target.texture), [target]);
   const vignette = useRef<{ darkness: number } | null>(null);
   const [msaa] = useState(() => (viewport.dpr > 1.2 ? 0 : 2));
@@ -38,21 +80,7 @@ export function Stylizer({ version }: { version: unknown }) {
   }, [effect, scene]);
 
   // Classify the scene once it is mounted (and whenever the episode changes).
-  useEffect(() => {
-    const dpr = viewport.dpr;
-    scene.traverse((o: Object3D) => {
-      const mesh = o as Mesh;
-      if (!mesh.isMesh) return;
-      const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]) as Material[];
-      mats.forEach((m) => applyComic(m, dpr));
-      const transparent = mats.some((m) => m.transparent || (m as MeshBasicMaterial).blending > 1);
-      if (transparent || o.userData.ink === 'none') return;
-      // Each opaque mesh is drawn into the ink buffer exactly once: as ink, or as an occluder.
-      const glow = mats.every((m) => m instanceof MeshBasicMaterial);
-      if (!glow && o.userData.ink === 'silhouette') o.layers.enable(INK_SILHOUETTE_LAYER);
-      else o.layers.enable(!glow && o.userData.ink !== false ? INK_LAYER : OCCLUDER_LAYER);
-    });
-  }, [scene, viewport.dpr, version]);
+  useEffect(() => stylize(scene, viewport.dpr), [scene, viewport.dpr, version]);
 
   useEffect(() => {
     const w = Math.floor(size.width * viewport.dpr);
@@ -80,14 +108,11 @@ export function Stylizer({ version }: { version: unknown }) {
     gl.setRenderTarget(target);
     gl.setClearColor(clear, 1);
     gl.clear(true, true, true);
+    // one pass: the occluders, the ink and the silhouettes together, each with its own weight (inkWeight)
     camera.layers.set(OCCLUDER_LAYER);
-    scene.overrideMaterial = occMat;
-    gl.render(scene, camera);
-    camera.layers.set(INK_LAYER);
-    scene.overrideMaterial = inkMat;
-    gl.render(scene, camera);
-    camera.layers.set(INK_SILHOUETTE_LAYER);
-    scene.overrideMaterial = silMat;
+    camera.layers.enable(INK_LAYER);
+    camera.layers.enable(INK_SILHOUETTE_LAYER);
+    scene.overrideMaterial = INK_BUFFER;
     gl.render(scene, camera);
     scene.overrideMaterial = null;
     camera.layers.mask = mask;

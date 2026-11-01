@@ -1,12 +1,12 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Component, ReactNode, Suspense, useEffect, useRef } from 'react';
-import { NoToneMapping, PCFShadowMap, SRGBColorSpace } from 'three';
+import { FogExp2, Group, HalfFloatType, NoToneMapping, Object3D, PCFShadowMap, SRGBColorSpace, Scene, WebGLRenderTarget } from 'three';
 import { story, useStory } from './core/store';
 import { EpisodeId, TOTAL_LENGTH, autoplay, chapterTurn, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
-import { Stylizer } from './render/Stylizer';
+import { Stylizer, stylize } from './render/Stylizer';
 import { FrameGrab } from './render/FrameGrab';
 import { chapterOf, chapterReadiness } from './core/chapters';
 import { preloadRoom } from './scenes/home/RoomScene';
@@ -71,6 +71,8 @@ function EpisodeWorlds() {
             <WorldBoundary chapter={chapter}>
               <Suspense fallback={null}>
                 <e.World active={shown(e.id)} />
+                {/* (only the worlds still to come: one left behind is not compiled again) */}
+                <Prewarm ahead={!loading && !shown(e.id) && list.indexOf(e) > i} />
                 {e.id !== 'car' && e.id !== 'home' && <ChapterReady chapter={chapter} />}
               </Suspense>
             </WorldBoundary>
@@ -79,6 +81,53 @@ function EpisodeWorlds() {
       })}
     </>
   );
+}
+
+/** For a world's shaders compiled ahead of time: a linear target (for passes that draw into one), and a fog of the kind every world uses. */
+const PREWARM_RT = new WebGLRenderTarget(1, 1, { type: HalfFloatType });
+const PREWARM_FOG = new FogExp2('#000000', 0.01);
+
+/**
+ * Compiles a world's shaders while another is on screen, so the chapter turn into it does not
+ * stall on them. A shader depends on the lights it is drawn with: under the loading veil every
+ * mounted world draws at once, all their lights together, so those shaders do not fit any one
+ * world, and they were compiled again, all of them, at the turn (the long stall). Here the world
+ * is compiled on its own, with its own lights and its fog, for both colour spaces a frame draws it
+ * in (to the screen's and into a linear target), after
+ * the print treatment has patched its materials; with KHR_parallel_shader_compile the driver does
+ * it off the main thread. Once per mount, a moment after the world is ready.
+ */
+function Prewarm({ ahead }: { ahead: boolean }) {
+  const { gl, camera } = useThree();
+  const marker = useRef<Object3D>(null);
+  const done = useRef(false);
+  useEffect(() => {
+    if (!ahead || done.current) return;
+    const id = window.setTimeout(() => {
+      const root = marker.current?.parent as (Group & { fog?: FogExp2 | null }) | undefined;
+      if (!root || done.current) return;
+      done.current = true;
+      const wasVisible = root.visible;
+      const prevTarget = gl.getRenderTarget();
+      gl.setRenderTarget(null);
+      try {
+        stylize(root, gl.getPixelRatio());
+        root.visible = true;
+        root.fog = PREWARM_FOG;
+        void gl.compileAsync(root, camera, root as unknown as Scene).catch(() => undefined);
+        gl.setRenderTarget(PREWARM_RT);
+        void gl.compileAsync(root, camera, root as unknown as Scene).catch(() => undefined);
+      } catch (err) {
+        console.warn('[prewarm]', err);
+      } finally {
+        gl.setRenderTarget(prevTarget);
+        root.fog = null;
+        root.visible = wasVisible;
+      }
+    }, 1500);
+    return () => window.clearTimeout(id);
+  }, [ahead, gl, camera]);
+  return <object3D ref={marker} />;
 }
 
 /**
@@ -235,6 +284,7 @@ export function App() {
             gl.toneMapping = NoToneMapping;
             gl.outputColorSpace = SRGBColorSpace;
             watchContextLoss(gl.domElement);
+            if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__gl = gl;
           }}
         >
           <Suspense fallback={null}>

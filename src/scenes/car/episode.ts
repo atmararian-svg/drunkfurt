@@ -36,8 +36,8 @@ const SEAT = W(DRIVER_EYE.x, DRIVER_EYE.y, DRIVER_EYE.z);
 
 export const carTrack = new CameraTrack([
   // episode 2's last frame, exactly (city track, t = 1)
-  { t: 0, pos: [5.5, 1.4, -32.9], yaw: deg(-24), pitch: deg(-21), fov: 44 },
-  { t: CAR_BEAT.hold, pos: [5.5, 1.4, -32.9], yaw: deg(-24), pitch: deg(-21), fov: 44 },
+  { t: 0, pos: [6.35, 1.52, -33.8], yaw: deg(-4), pitch: deg(-28), fov: 45 },
+  { t: CAR_BEAT.hold, pos: [6.35, 1.52, -33.8], yaw: deg(-4), pitch: deg(-28), fov: 45 },
   // up, looking on down the street past him: the Mercedes stands at the kerb ahead
   { t: CAR_BEAT.turn, pos: [5.4, 1.68, -33.2], yaw: deg(18), pitch: deg(-7), fov: 50 },
   { t: 0.2, pos: [5.15, 1.68, -34.3], yaw: deg(24), pitch: deg(-6), fov: 50 },

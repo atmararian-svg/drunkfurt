@@ -517,8 +517,8 @@ built from.
     size: one canvas over the 3D picture, under everything printed, redrawn from the 3D canvas
     after every frame. Its look is a pure function of the scroll and the encounter
     (`combatLook` in `Overlay.tsx`): nothing while he walks up and threatens; once you have
-    pressed D and ACTION has gone (`BLOCK.veil`, 0.18 s), the blocks grow (to 12 px), blur and
-    darken a little (35%), complete at `BLOCK.blurred` (0.6 s): the fight goes on under it, its
+    pressed D and ACTION has gone (`BLOCK.veil`, 0.18 s), the blocks grow (to 9 px), blur and
+    darken a little (30%), complete at `BLOCK.blurred` (0.6 s): the fight goes on under it, its
     shapes moving behind frosted glass. Over the first 0.045 of the aftermath it all resolves to
     the plain picture. (A knockout still goes dark: 26 px blocks, 80%.) At rest the canvas and its
     frame watcher are removed.
@@ -526,12 +526,17 @@ built from.
     (`scenes/city/fight.ts`, timings in `BLOCK`, `beats.ts`): his knife hold eases into a guard,
     then the supplied "rapid punching" animation (his side of it): your flurry against his cover
     (the first blow knocks the knife out of his hand; it lies where he stood), then an uppercut
-    that throws him onto his back, about 1.7 m behind where he stood. Every blow jolts your view a
-    little, the uppercut more; every blow is heard with your breath forced out with it (the hit
-    from `hits.mp3` and the two recorded exhales taking turns), the uppercut with the heavy hit,
-    then him landing. BAM is printed with the first blow, POW with the uppercut. The camera's hold
-    on him eases off towards the aftermath, so it arrives there without a jump: in your eyes, a
-    step back from where you stood, looking down at him and the letter.
+    that throws him onto his back, about 1.7 m behind where he stood. Your arms throw the blows in
+    front of you (`Fists` in `Stranger.tsx`: your side of the animation on a second copy of the
+    man, of which only the arms are drawn, the jacket's sleeves dark, both hands in fists; he is
+    placed so that his head is where your eyes are). Every blow jolts your view a little, the
+    uppercut more, and is heard (the lighter hit of `hits.mp3`); the last two land as the
+    recordings have them, "ts, ts": the two exhales 0.28 s apart, each with its hit (0.24 s
+    apart), the second on the uppercut; then him landing. BAM is printed with the first blow, POW
+    with the uppercut. The camera's hold on him eases off towards the aftermath, so it arrives
+    there without a jump: where you stood, a little lower, looking down at him and the letter.
+    Episode 3 starts from exactly that frame (`carTrack`), so going on after the invitation does
+    not move you.
     - **The animation** (`tools/bakeFight.mjs` → `scenes/city/fightClip.json`, 141 KB): the source
       is a two-man AdvancedSkeleton rig (FBX); its deform joints are retargeted onto the walking
       man's Mixamo skeleton (each joint's world rotation moved from the source's bind pose onto the
@@ -1033,8 +1038,16 @@ wipe opens.
   in the scene is compiled again (a hitch of a good part of a second). Lights are dimmed to 0
   instead: the moving cars' headlights (a car off the street hides its body only), the Mercedes'
   headlights, the key light on the stranger, the laundry window's light on him after the fight.
-- `Precompile` (`CityScene.tsx`) compiles every material of the street as the chapter opens,
-  including those of things that only show later (the knife on the pavement, the letter).
+- `Prewarm` (`App.tsx`) compiles the next world's shaders while the current one plays, so a
+  chapter turn does not stall on them. A shader depends on the lights it is drawn with: under the
+  loading veil every mounted world draws at once, all their lights together, so those shaders fit
+  no single world and were all compiled again at the turn (the long stall going from chapter 1 to
+  2). The world is compiled on its own (its lights, its fog, both colour spaces a frame draws in,
+  after the print treatment has patched it), with KHR_parallel_shader_compile off the main thread.
+  Checked in a headless browser: before, the turn into the city made 45 to 60 new programs; now
+  it makes none for the city.
+- The ink buffer is one pass over the scene (it was three: occluders, ink, silhouettes): each
+  mesh sets its own line weight on the buffer's material as it is drawn (`inkWeight`).
 - Pixel density only ever goes down (each change resizes every buffer); multisampling is decided
   once, as the page starts.
 

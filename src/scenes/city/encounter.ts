@@ -112,13 +112,12 @@ export function cityTimeScale(local: number) {
 interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
-    // every blow of the flurry: the hit, and your breath forced out with it (the boxer's "ts"),
-    // the two recorded exhales taking turns
-    ...CLIP.flurry.flatMap((c, i) => [
-      { at: BLOCK.fight + c, kind: 'block' as const },
-      { at: BLOCK.fight + c, kind: (i % 2 ? 'exhale2' : 'exhale1') as Cue['kind'] },
-    ]),
-    // the uppercut, with its exhale, and him landing on the pavement
+    // the flurry: the hit of each blow
+    ...CLIP.flurry.map((c) => ({ at: BLOCK.fight + c, kind: 'block' as const })),
+    // the last two blows: the two recorded exhales ("ts, ts") each with its hit, as far apart as
+    // they are in the recordings (exhales 0.28 s, hits 0.24 s), the second on the uppercut
+    { at: BLOCK.hit2 - 0.28, kind: 'exhale1' },
+    { at: BLOCK.hit2 - 0.24, kind: 'block' },
     { at: BLOCK.hit2, kind: 'exhale2' },
     { at: BLOCK.hit2, kind: 'punch' },
     { at: BLOCK.land, kind: 'fall' },

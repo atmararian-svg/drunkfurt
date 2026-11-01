@@ -25,7 +25,7 @@ import { PressPrompt } from './PressPrompt';
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
 const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
 /** Defended: the fight under it still reads, as shapes moving behind frosted glass. */
-const VEIL = { block: 12, blur: 0.8, dark: 0.35 };
+const VEIL = { block: 9, blur: 0.6, dark: 0.3 };
 
 /**
  * How the street looks around the fight: block size (CSS px; 1 = not

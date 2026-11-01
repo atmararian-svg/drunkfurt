@@ -20,8 +20,8 @@ export const cityTrack = new CameraTrack([
   // the knife comes up: your eyes drop to it, his face still in the frame
   { t: BEAT.gate, pos: [6.5, EYE, -34], yaw: deg(2), pitch: deg(-8), fov: 50 },
   { t: 0.86, pos: [6.5, EYE, -34], yaw: deg(2), pitch: deg(-8), fov: 50 },
-  // after the fight, back in your own eyes where it left you (fight.ts: a step back from where
-  // you stood), looking down at him on his back and the letter between you
-  { t: BEAT.aftermath, pos: [6.49, EYE, -33.72], yaw: deg(1), pitch: deg(-31), fov: 48 },
-  { t: 1.0, pos: [6.49, EYE - 0.02, -33.74], yaw: deg(1), pitch: deg(-30), fov: 46 },
+  // after the fight: where you stood, a little lower, looking down at him on his back and the
+  // letter between you. Episode 3 starts from exactly this frame (car/episode.ts), so nothing jumps.
+  { t: BEAT.aftermath, pos: [6.35, 1.55, -33.75], yaw: deg(-3), pitch: deg(-27), fov: 46 },
+  { t: 1.0, pos: [6.35, 1.52, -33.8], yaw: deg(-4), pitch: deg(-28), fov: 45 },
 ]);
