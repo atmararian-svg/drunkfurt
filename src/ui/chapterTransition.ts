@@ -36,8 +36,14 @@ const frames = (n: number) =>
   });
 const within = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<void>((r) => window.setTimeout(r, ms))]);
 
-/** Puts a chapter's episodes back to their beginning. */
+/**
+ * Puts a chapter's episodes back to their beginning. The waits of this chapter and every later
+ * one count again (a chapter played from its beginning is played as it comes, whatever the
+ * chapter selector skipped before).
+ */
 export function resetChapter(n: number) {
+  const later = new Set(CHAPTERS.filter((c) => c.number >= n).flatMap((c) => c.episodes as string[]));
+  for (const g of gates) if (later.has(g.episode)) g.passed = false;
   const ch = CHAPTERS.find((c) => c.number === n);
   for (const id of ch?.episodes ?? []) {
     try {
@@ -75,7 +81,9 @@ export function goToChapter(n: number) {
   const target = chapterStarts()[n - 1];
   if (target === undefined) return;
   const forward = target > timeline.progress + 1e-4;
-  if (forward) for (const g of gates) if (globalProgress(g.episode, g.at) < target) g.open = true;
+  // the waits on the way there are passed for good: an episode that is not on screen cannot open
+  // its own (a letter not read, say), and must not pull the page back to it
+  if (forward) for (const g of gates) if (globalProgress(g.episode, g.at) < target) (g.open = true), (g.passed = true);
   void turnTo(target, forward);
 }
 
@@ -99,6 +107,8 @@ async function turnTo(target: number, forward: boolean) {
       document.body.appendChild(outgoing);
     }
     resetChapter(chapter.number);
+    // whatever the page was asking for (defend, the letter, the screen) belongs to where it was
+    story.setState({ prompt: null });
     jumpTo(target);
     // the chapter's world on screen, drawn a few times (its shaders compiled), or give up waiting after 4 s
     const id = locate(target).id;
@@ -106,6 +116,8 @@ async function turnTo(target: number, forward: boolean) {
       (async () => {
         while (story.getState().episode !== id) await frames(1);
         await frames(4);
+        // (and again once it is on screen: the chapter left behind may have asked once more on its way out)
+        if (story.getState().prompt && story.getState().prompt !== 'monitor') story.setState({ prompt: null });
       })(),
       4000,
     );

@@ -10,7 +10,7 @@ import { Stylizer, stylize } from './render/Stylizer';
 import { FrameGrab } from './render/FrameGrab';
 import { chapterOf, chapterReadiness } from './core/chapters';
 import { preloadRoom } from './scenes/home/RoomScene';
-import { installChapterTransitions } from './ui/chapterTransition';
+import { goToChapter, installChapterTransitions } from './ui/chapterTransition';
 import { Overlay } from './ui/Overlay';
 import { watchContextLoss } from './ui/stub';
 import { Preloader } from './ui/Preloader';
@@ -333,6 +333,7 @@ export function App() {
         EPISODES,
         encounter,
         encounterAt,
+        goToChapter,
         get scene() {
           return (window as unknown as { __scene?: unknown }).__scene;
         },

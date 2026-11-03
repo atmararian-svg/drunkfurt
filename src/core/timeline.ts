@@ -244,6 +244,12 @@ export interface Gate {
   /** Local progress of the episode where the story waits. */
   at: number;
   open: boolean;
+  /**
+   * Gone past by the chapter selector (a later chapter was chosen): the story no longer waits
+   * here, whatever the episode's own state says (its letter unread, its fight not fought), until
+   * the chapter is played again from its beginning (ui/chapterTransition.ts `resetChapter`).
+   */
+  passed?: boolean;
 }
 export const gates: Gate[] = [];
 
@@ -255,7 +261,7 @@ export function globalProgress(id: EpisodeId, local: number) {
 /** The furthest progress currently allowed by closed gates. */
 export function gateLimit() {
   let limit = 1;
-  for (const g of gates) if (!g.open) limit = Math.min(limit, globalProgress(g.episode, g.at));
+  for (const g of gates) if (!g.open && !g.passed) limit = Math.min(limit, globalProgress(g.episode, g.at));
   return limit;
 }
 

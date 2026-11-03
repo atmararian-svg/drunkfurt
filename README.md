@@ -1081,6 +1081,12 @@ Measured in a headless browser, at 1280 × 720 (video memory for textures, progr
 - **Sound away from the page**: leaving it (another tab, the window minimised, another app on a
   phone) fades the sound out and stops the audio; coming back brings it back as it was
   (`AudioDirector.setAway`). The visitor's own sound setting is untouched.
+- **Going ahead with the chapter selector** passes the waits on the way for good (`Gate.passed`):
+  a chapter skipped that way cannot pull the page back to its fight or its letter (an episode off
+  screen cannot open its own waits), and whatever the page was asking for is cleared at the turn.
+  Playing a chapter again from its beginning makes its waits count again.
+- **The pointer's trail**: fine 7 px glyphs in pure white (the difference blend makes them an exact
+  negative), a little smaller and sparser than before; none on the preloader or the sound choice.
 - **The chapter selector** closes by itself once it has taken you to a chapter, and stays closed
   under a pointer still resting on it until the pointer leaves (or a new touch, or focus).
 
