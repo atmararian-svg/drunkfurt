@@ -77,15 +77,14 @@ export function StreetFurniture({ active }: { active: boolean }) {
     return b.build();
   }, []);
 
-  // real lights only for the lamps near the visitor's path; the rest glow
+  // real lights only for the lamps near the visitor's path (to the fight at z -34 and the car beyond it); the rest glow
+  // (every light is paid for by every lit pixel: the pair at z -63, far down the street, only glow)
   const near = useMemo(
     () => [
       { p: [LAMP_X - 1.6, LAMP_H - 0.3, -27], shadow: false },
       { p: [LAMP_X - 1.6, LAMP_H - 0.3, -45], shadow: true },
-      { p: [LAMP_X - 1.6, LAMP_H - 0.3, -63], shadow: false },
       { p: [-LAMP_X + 1.6, LAMP_H - 0.3, -27], shadow: false },
       { p: [-LAMP_X + 1.6, LAMP_H - 0.3, -45], shadow: false },
-      { p: [-LAMP_X + 1.6, LAMP_H - 0.3, -63], shadow: false },
       { p: [PLAZA_LAMPS[0][0] - 0.9, LAMP_H - 0.3, PLAZA_LAMPS[0][1]], shadow: false },
       { p: [PLAZA_LAMPS[1][0] - 0.9, LAMP_H - 0.3, PLAZA_LAMPS[1][1]], shadow: true },
     ],

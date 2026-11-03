@@ -9,6 +9,8 @@ import { story } from '../core/store';
 import { pixelCover, pixelReveal } from './pixelReveal';
 import { SoundChoice, mountSoundChoice } from './soundChoice';
 import { showTitleCard } from './titleCards';
+import { takeResume } from './resume';
+import { goToChapter } from './chapterTransition';
 
 /**
  * The preloader (Figma "Drunkfurt": Preloader-Start → Preloader-Final), a
@@ -225,14 +227,20 @@ export function Preloader() {
         await decodeIn(status, 380, 0);
         await wait(220);
         if (!alive) return;
-        // the preloader leaves in the transition's blocks; only once it has gone does the sound choice come in
-        const uncover = await pixelCover(PAGE_BG, 'up');
-        if (!alive) return uncover();
-        el.classList.add('is-choosing');
-        el.setAttribute('aria-busy', 'false');
-        choice = mountSoundChoice(q<HTMLElement>('.pl-sound'));
-        uncover();
-        const on = await choice.chosen;
+        // coming back after the graphics card gave out (ui/resume.ts): the sound as it was, no choice asked
+        const resume = takeResume();
+        let on: boolean;
+        if (resume) on = resume.sound;
+        else {
+          // the preloader leaves in the transition's blocks; only once it has gone does the sound choice come in
+          const uncover = await pixelCover(PAGE_BG, 'up');
+          if (!alive) return uncover();
+          el.classList.add('is-choosing');
+          el.setAttribute('aria-busy', 'false');
+          choice = mountSoundChoice(q<HTMLElement>('.pl-sound'));
+          uncover();
+          on = await choice.chosen;
+        }
         if (!alive) return;
         // the choice is the page's sound setting (the click is also the gesture audio needs to start)
         story.setState({ sound: on });
@@ -249,7 +257,9 @@ export function Preloader() {
         });
         // (the preloader itself is gone by now, removed once the blocks covered it: carry on regardless)
         pinScroll(false);
-        showTitleCard(1);
+        // back to the chapter the visitor was in, from its beginning
+        if (resume && resume.chapter > 1) goToChapter(resume.chapter);
+        else showTitleCard(1);
       } catch (err) {
         console.error('[preloader]', err);
       }

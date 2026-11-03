@@ -1,5 +1,6 @@
 import { SITE } from '../scenes/home/monitor';
 import { TOUCH } from './touch';
+import { saveResume } from './resume';
 
 /**
  * The page in place of the story where it cannot run as it should: a browser
@@ -132,7 +133,9 @@ export function watchContextLoss(canvas: HTMLCanvasElement) {
   let timer = 0;
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
-    timer = window.setTimeout(() => showStub('lost'), 2500);
+    // not handed back in a moment: reload and come back to this chapter (ui/resume.ts);
+    // a second loss soon after a reload shows the stub instead
+    timer = window.setTimeout(() => (saveResume() ? location.reload() : showStub('lost')), 1200);
   });
   canvas.addEventListener('webglcontextrestored', () => window.clearTimeout(timer));
 }

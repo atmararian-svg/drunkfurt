@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber';
 import { useEffect, useMemo, useRef } from 'react';
-import { BufferGeometry, ExtrudeGeometry, Group, Object3D, Shape, SpotLight } from 'three';
+import { BufferGeometry, ExtrudeGeometry, Group, Shape } from 'three';
 import { audio } from '../../audio/AudioDirector';
 import { GeoBatch } from '../../core/geometry';
 import { localProgress, locate, timeline } from '../../core/timeline';
@@ -46,9 +46,6 @@ function carParts(): { body: BufferGeometry; glass: BufferGeometry; tyres: Buffe
   return { body, glass, tyres: tb.build()[0].geometry, lights: lb.build()[0].geometry };
 }
 
-/** A moving car's headlight. */
-const HEADLIGHT = 160;
-
 export function Cars({ active, timeScale }: { active: boolean; timeScale: () => number }) {
   const m = cityMaterials();
   const geo = useMemo(carParts, []);
@@ -62,9 +59,7 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
     if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__traffic = { traffic, step: (sec: number) => stepTraffic(traffic, sec, null) };
   }, [traffic]);
   const groups = useRef<(Group | null)[]>([]);
-  const spots = useRef<(SpotLight | null)[]>([]);
   const passed = useMemo(() => defs.map(() => false), [defs]);
-  const target = useMemo(() => defs.map(() => new Object3D()), [defs]);
 
   useFrame((_, rawDt) => {
     if (!active) return;
@@ -76,13 +71,8 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
     traffic.cars.forEach((c, i) => {
       const g = groups.current[i];
       if (!g) return;
-      // (a car off the street hides its body, but its headlight stays in the scene, dark: a light
-      // coming and going changes the number of lights, and every material in the street is
-      // compiled again, a visible hitch)
       const on = c.on && !(getaway && i === 0);
-      for (const ch of g.children) if (!(ch as SpotLight).isLight) ch.visible = on;
-      const sp = spots.current[i];
-      if (sp) sp.intensity = on ? HEADLIGHT : 0;
+      g.visible = on;
       if (!c.on) {
         passed[i] = false;
         return;
@@ -93,10 +83,6 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
       if (!passed[i] && on && c.s / d.lane.length > d.pass.at && audio.running) {
         passed[i] = true;
         audio.carPass(d.pass.from, d.pass.to, 4.5, 0.22);
-      }
-      if (sp) {
-        target[i].position.set(c.box.x + Math.sin(c.box.yaw) * 12, ROAD_Y, c.box.z + Math.cos(c.box.yaw) * 12);
-        target[i].updateMatrixWorld();
       }
     });
   });
@@ -116,25 +102,12 @@ export function Cars({ active, timeScale }: { active: boolean; timeScale: () => 
           <mesh geometry={geo.glass} material={m.carGlass} />
           <mesh geometry={geo.tyres} material={m.tyre} />
           <mesh geometry={geo.lights} material={m.lamp} />
-          {/* headlight beam and its reflection in the wet road */}
-          <spotLight
-            ref={(s) => (spots.current[i] = s)}
-            target={target[i]}
-            position={[0, 0.8, 2.3]}
-            color="#f1efe6"
-            intensity={0}
-            angle={0.45}
-            penumbra={0.5}
-            decay={2}
-            distance={30}
-          />
+          {/* the headlights' beam on the wet road (drawn, not lit: a moving light is paid for by every
+              lit pixel of the street, and a light coming and going recompiles every material in it) */}
           <mesh material={m.streak} position={[0, 0.02, 6]} rotation={[-Math.PI / 2, 0, Math.PI]}>
             <planeGeometry args={[1.6, 8]} />
           </mesh>
         </group>
-      ))}
-      {target.map((t, i) => (
-        <primitive key={`tg${i}`} object={t} />
       ))}
     </group>
   );

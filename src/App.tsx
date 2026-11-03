@@ -1,6 +1,6 @@
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Component, ReactNode, Suspense, useEffect, useRef } from 'react';
-import { FogExp2, Group, HalfFloatType, Material, Mesh, NoToneMapping, Object3D, PCFShadowMap, SRGBColorSpace, Scene, WebGLRenderTarget } from 'three';
+import { Component, ReactNode, Suspense, useEffect, useLayoutEffect, useRef } from 'react';
+import { FogExp2, Group, HalfFloatType, Material, Mesh, NoToneMapping, Object3D, PCFShadowMap, SRGBColorSpace, Scene, Texture, WebGLRenderTarget } from 'three';
 import { story, useStory } from './core/store';
 import { EpisodeId, TOTAL_LENGTH, autoplay, chapterTurn, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
@@ -58,7 +58,9 @@ function EpisodeWorlds() {
   const activeId = episode === 'outro' ? list[list.length - 1].id : episode;
   // an episode that plays in another's world (episode 3 on episode 2's street) draws and runs that world too
   const host = EPISODES[activeId as EpisodeId]?.sharesWorld;
-  const near = episode === 'outro' ? list.slice(-1) : list.slice(Math.max(0, i - 1), i + 2);
+  // the world you are in and the next (and the world an episode plays in): one left behind is
+  // unmounted and its video memory freed (going back builds it again from the loaded models)
+  const near = episode === 'outro' ? list.slice(-1) : list.slice(i, i + 2);
   const mounted = list.filter((e) => near.includes(e) || e.id === host);
   const shown = (id: EpisodeId) => id === activeId || id === host;
   return (
@@ -73,6 +75,7 @@ function EpisodeWorlds() {
                 <e.World active={shown(e.id)} />
                 {/* (only the worlds still to come: one left behind is not compiled again) */}
                 <Prewarm ahead={!loading && !shown(e.id) && list.indexOf(e) > i} />
+                <FreeOnUnmount />
                 {e.id !== 'car' && e.id !== 'home' && <ChapterReady chapter={chapter} />}
               </Suspense>
             </WorldBoundary>
@@ -81,6 +84,33 @@ function EpisodeWorlds() {
       })}
     </>
   );
+}
+
+/**
+ * A world left behind is unmounted; this frees what it held on the graphics card: every
+ * geometry, material and texture under its group (in the unmount, while they are still there).
+ * Three keeps the objects usable: whatever is drawn again is simply uploaded again.
+ */
+function FreeOnUnmount() {
+  const marker = useRef<Object3D>(null);
+  useLayoutEffect(() => {
+    const world = marker.current?.parent;
+    return () => {
+      if (!world) return;
+      const seen = new Set<{ dispose(): void }>();
+      world.traverse((o) => {
+        const m = o as Mesh;
+        if (m.geometry) seen.add(m.geometry);
+        const mats = (Array.isArray(m.material) ? m.material : m.material ? [m.material] : []) as Material[];
+        for (const mat of mats) {
+          seen.add(mat);
+          for (const v of Object.values(mat)) if (v && (v as Texture).isTexture) seen.add(v as Texture);
+        }
+      });
+      seen.forEach((x) => x.dispose());
+    };
+  }, []);
+  return <object3D ref={marker} />;
 }
 
 /** For a world's shaders compiled ahead of time: a linear target (for passes that draw into one), and a fog of the kind every world uses. */
@@ -187,13 +217,13 @@ function Prewarm({ ahead }: { ahead: boolean }) {
 }
 
 /**
- * The 3D page's pixel density: up to 1.5 on a desktop; on touch devices (phones, tablets, with
- * dense screens and small GPUs) up to 1.25, where the comic look's ink and halftone hold up and
- * the frame rate does too. Every frame is drawn about four times over (the picture and the ink's
+ * The 3D page's pixel density: up to 1.25, desktop and touch alike (the comic look's ink and
+ * halftone hold up at it; at 1.5 a retina screen's frame buffers alone took some 300 MB of video
+ * memory, which is what makes a browser take a page's WebGL away). Every frame is drawn about four times over (the picture and the ink's
  * normal and depth buffer), so density is what costs most: AdaptiveDpr lowers it, in steps, on a
  * machine that cannot keep up.
  */
-const MAX_DPR = Math.min(window.devicePixelRatio || 1, window.matchMedia?.('(pointer: coarse)').matches ? 1.25 : 1.5);
+const MAX_DPR = Math.min(window.devicePixelRatio || 1, 1.25);
 
 /**
  * Lowers the pixel density a step (0.25, not below 1) when the frames have averaged over 22 ms

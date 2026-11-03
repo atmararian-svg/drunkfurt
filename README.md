@@ -1027,6 +1027,28 @@ wipe opens.
 
 ## Performance
 
+Measured in a headless browser, at 1280 × 720 (video memory for textures, programs, lights):
+
+| | before | now |
+| --- | --- | --- |
+| station | 83 MB, 61 programs, 13 spots, 3 shadows | 78 MB, 56 programs, 8 spots, 2 shadows |
+| city | 159 MB, 123 programs, 14 spots | 112 MB, 69 programs, 9 spots |
+| cave | 166 MB, 118 programs | 80 MB, 28 programs |
+
+- **Worlds left behind are unmounted** (only the one you are in and the next stay, plus the one an
+  episode plays in) and `FreeOnUnmount` frees their geometries, materials and textures on the
+  graphics card. Going back builds a world again from the loaded models.
+- **Fewer lights**: every light is paid for by every lit pixel. The station's masts behind the
+  door (29 m and more behind where you start, never looked at) only glow; the street's pair of
+  lamps at z -63 only glow; the moving cars' headlights are their drawn beam on the road, not
+  lights. Two shadow-casting lights in each world, not three.
+- **Pixel density** at most 1.25 (it was 1.5 on a desktop: a retina screen's frame buffers alone
+  took some 300 MB).
+- **When the graphics card gives out** (the browser takes WebGL away and does not hand it back),
+  the page reloads itself and comes back to the chapter the visitor was in, from its beginning,
+  with their sound setting and without the sound choice (`ui/resume.ts`); a second loss within
+  45 s shows the stub instead of reloading again.
+
 - Every frame is drawn about four times (the picture, and the ink's normal and depth buffer in
   three layers), so pixel density is what costs most. It starts at the screen's own density, at
   most 1.5 on a desktop and 1.25 on touch screens, and `AdaptiveDpr` (`App.tsx`) lowers it in
