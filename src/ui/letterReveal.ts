@@ -172,6 +172,52 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
  * the page (its centre and its size, CSS px), so it is lifted from there;
  * `onClosed` runs when it has crumpled up and left the page.
  */
+interface LetterGl {
+  renderer: WebGLRenderer;
+  scene: Scene;
+  cam: PerspectiveCamera;
+  geo: PlaneGeometry;
+  mat: ShaderMaterial;
+  tex: Texture;
+  faint: Texture;
+  sheet: Mesh;
+}
+let gl: LetterGl | null = null;
+function makeGl(): LetterGl {
+  const renderer = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
+  renderer.outputColorSpace = SRGBColorSpace;
+  renderer.setClearColor(0x000000, 0);
+  renderer.domElement.className = 'letter-canvas';
+  const scene = new Scene();
+  const cam = new PerspectiveCamera(30, 1, 0.01, 20);
+  const geo = new PlaneGeometry(ASPECT, 1, 70, 88);
+  const tex = new Texture();
+  tex.colorSpace = SRGBColorSpace;
+  tex.anisotropy = 8;
+  const faint = new Texture();
+  faint.colorSpace = SRGBColorSpace;
+  faint.anisotropy = 8;
+  const mat = new ShaderMaterial({
+    vertexShader: vertex,
+    fragmentShader: fragment,
+    side: DoubleSide,
+    uniforms: {
+      uMap: { value: tex },
+      uFaint: { value: faint },
+      uUnfold: { value: 0 },
+      uTime: { value: 0 },
+      uLight: { value: new Vector2(0.3, 0.4) },
+      uLines: { value: LINE_BANDS },
+      // nothing read yet (the faint words); 99: all of it in full ink
+      uLine: { value: 99 },
+      uX: { value: 0 },
+    },
+  });
+  const sheet = new Mesh(geo, mat);
+  scene.add(sheet);
+  return { renderer, scene, cam, geo, mat, tex, faint, sheet };
+}
+
 export function openLetter(onClosed: () => void, spot?: { x: number; y: number; size: number }) {
   if (current) return;
   letter.open = true;
@@ -240,45 +286,22 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   // voice (the sound off), shown in full ink at once ('done')
   let reading: 'wait' | 'reading' | 'done' = 'wait';
   let readFrom = 0;
-  let geo: PlaneGeometry | null = null;
   let scene: Scene | null = null;
   let cam: PerspectiveCamera | null = null;
   let sheet: Mesh | null = null;
   let fallback: HTMLImageElement | null = null;
   try {
-    renderer = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
-    renderer.outputColorSpace = SRGBColorSpace;
+    // one renderer for every reading, made the first time and kept (making and throwing away a WebGL
+    // context each time stalls the page just as the sheet drops away)
+    gl ??= makeGl();
+    ({ renderer, scene, cam, mat, tex, faint, sheet } = gl);
+    mat.uniforms.uUnfold.value = 0;
+    mat.uniforms.uTime.value = 0;
+    mat.uniforms.uLight.value = light;
+    mat.uniforms.uLine.value = 99;
+    mat.uniforms.uX.value = 0;
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    renderer.setClearColor(0x000000, 0);
-    renderer.domElement.className = 'letter-canvas';
     stageEl.appendChild(renderer.domElement);
-    scene = new Scene();
-    cam = new PerspectiveCamera(30, 1, 0.01, 20);
-    geo = new PlaneGeometry(ASPECT, 1, 70, 88);
-    tex = new Texture();
-    tex.colorSpace = SRGBColorSpace;
-    tex.anisotropy = 8;
-    faint = new Texture();
-    faint.colorSpace = SRGBColorSpace;
-    faint.anisotropy = 8;
-    mat = new ShaderMaterial({
-      vertexShader: vertex,
-      fragmentShader: fragment,
-      side: DoubleSide,
-      uniforms: {
-        uMap: { value: tex },
-        uFaint: { value: faint },
-        uUnfold: { value: 0 },
-        uTime: { value: 0 },
-        uLight: { value: light },
-        uLines: { value: LINE_BANDS },
-        // nothing read yet (the faint words); 99: all of it in full ink
-        uLine: { value: 99 },
-        uX: { value: 0 },
-      },
-    });
-    sheet = new Mesh(geo, mat);
-    scene.add(sheet);
   } catch (err) {
     console.warn('[letter] no WebGL, unfolding the image in CSS', err);
     renderer = null;
@@ -483,12 +506,7 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     cancelAnimationFrame(raf);
     window.removeEventListener('resize', size);
     window.removeEventListener('keydown', key);
-    renderer?.dispose();
-    renderer?.forceContextLoss();
-    geo?.dispose();
-    mat?.dispose();
-    tex?.dispose();
-    faint?.dispose();
+    // (the renderer and the sheet are kept for the next reading; the canvas leaves with the page)
     root.remove();
     document.documentElement.classList.remove('is-reading');
     current = null;
@@ -503,15 +521,17 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   Promise.all([image(), voiced ? image(letterLightUrl).catch(() => null) : Promise.resolve(null)])
     .then(([img, faintImg]) => {
       if (closed) return;
-      if (tex) {
+      // (uploaded once: the same images every time)
+      if (tex && tex.image !== img) {
         tex.image = img;
         tex.needsUpdate = true;
       }
-      if (faint) {
-        faint.image = faintImg ?? img;
+      const f = faintImg ?? img;
+      if (faint && faint.image !== f) {
+        faint.image = f;
         faint.needsUpdate = true;
-        if (!faintImg) reading = 'done';
       }
+      if (!faintImg) reading = 'done';
       audio.paper('unfold');
       t0 = performance.now();
       raf = requestAnimationFrame(draw);

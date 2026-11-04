@@ -2,7 +2,7 @@ import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
 import { BEAT, BLOCK, KO } from './beats';
-import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
+import { Floor, Gate, autoplay, floors, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 
 /**
  * The encounter. What you see is a function of the scroll progress and of one
@@ -45,6 +45,9 @@ export const encounter = {
 
 const gate: Gate = { episode: 'city', at: BEAT.gate, open: false };
 gates.push(gate);
+/** Once fought, the fight is behind you: the scroll cannot be taken back into it (only the chapter selector goes back). */
+const fought: Floor = { episode: 'city', at: BEAT.aftermath + 0.045, on: false };
+floors.push(fought);
 
 /**
  * Whether he strikes when you do not act: off for now. He stands and threatens,
@@ -140,6 +143,8 @@ export function updateEncounter() {
     }
     if (STRIKES && encounter.armed && encounterAt(local).punch >= 1) decide('knockedOut');
   }
+  // the fight played to its end: from here on there is no going back into it
+  if (encounter.outcome && local >= fought.at - 0.0005) fought.on = true;
   // sound follows the playback forwards only, and only while the page plays it
   const t = sequenceTime(local);
   const prev = Math.max(lastT, -0.001);
@@ -163,6 +168,7 @@ export function resetEncounter() {
   encounter.armed = false;
   encounter.armedAt = 0;
   gate.open = false;
+  fought.on = false;
   lastT = -1;
   if (story.getState().prompt === 'defend') story.setState({ prompt: null });
 }
@@ -186,6 +192,7 @@ function decide(o: 'blocked' | 'knockedOut') {
   const to = BEAT.aftermath + 0.045;
   const seconds = sequenceSeconds(o) * ((to - from) / (BEAT.aftermath - from));
   lastT = -1;
-  playProgress(globalProgress('city', from), globalProgress('city', to), seconds);
+  // (locked: played through as it comes, not rewound by a hand on the scroll)
+  playProgress(globalProgress('city', from), globalProgress('city', to), seconds, true);
   timeline.target = timeline.progress = globalProgress('city', from);
 }

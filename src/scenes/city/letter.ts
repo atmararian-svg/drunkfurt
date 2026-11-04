@@ -1,7 +1,7 @@
 import { audio } from '../../audio/AudioDirector';
 import { Camera, Mesh, Raycaster, Vector2, Vector3 } from 'three';
 import { story } from '../../core/store';
-import { Gate, gates, localProgress, readScroll } from '../../core/timeline';
+import { Gate, gates, localProgress, readScroll, locate, timeline } from '../../core/timeline';
 import { BEAT } from './beats';
 import { encounter } from './encounter';
 
@@ -35,6 +35,8 @@ export const letter = {
   read: false,
   /** The invitation has been said (typed and held): the story may go on. */
   invited: false,
+  /** Said, and the page has gone on past it (to the car): it is not said again, whatever the scroll does. */
+  saidAndGone: false,
   /** The pointer is over the sheet on the pavement. */
   over: false,
   /** Set by the prop: the sheet's mesh, and the camera to pick with. */
@@ -53,6 +55,7 @@ export const letterThere = (local = localProgress('city')) => encounter.outcome 
 /** Called every frame by the city world: the gate and the prompt follow the state. */
 export function updateLetter() {
   const local = localProgress('city');
+  if (letter.invited && locate(timeline.progress).id !== 'city') letter.saidAndGone = true;
   // only the defended outcome has a letter; otherwise nothing waits here
   gate.open = encounter.outcome !== 'blocked' || letter.invited;
   // (it can be picked up as soon as the street is clear again after the fight: the fight's own playback ends there, no scroll needed)
@@ -89,6 +92,7 @@ export function resetLetter() {
   letter.open = false;
   letter.read = false;
   letter.invited = false;
+  letter.saidAndGone = false;
   letter.over = false;
   gate.open = true;
   const p = story.getState().prompt;

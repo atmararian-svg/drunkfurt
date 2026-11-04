@@ -253,6 +253,25 @@ export interface Gate {
 }
 export const gates: Gate[] = [];
 
+/**
+ * A point the scroll cannot be taken back past once the story has gone beyond it (`on`): what lies
+ * before it has happened and is not played again (the fight, once fought). Only the chapter selector
+ * goes back past it, playing the chapter from its beginning (`resetChapter` clears it).
+ */
+export interface Floor {
+  episode: EpisodeId;
+  at: number;
+  on: boolean;
+}
+export const floors: Floor[] = [];
+
+/** The furthest back the scroll may go now (0: anywhere). */
+export function floorLimit() {
+  let f = 0;
+  for (const g of floors) if (g.on) f = Math.max(f, globalProgress(g.episode, g.at));
+  return f;
+}
+
 export function globalProgress(id: EpisodeId, local: number) {
   const r = episodeRange(id);
   return r.start + (r.end - r.start) * local;
@@ -277,5 +296,11 @@ export function readScroll() {
   // pixel below it) must not land back inside the transition and turn the chapter back. Only that
   // edge: snapping to where a transition begins would make one entered going forward look backward.
   for (const z of pageTurns()) if (raw < z.to && z.to - raw < 0.0015) raw = z.to;
+  // not back past what has happened: the page is put back on the floor
+  const floor = floorLimit();
+  if (raw < floor) {
+    raw = floor;
+    window.scrollTo({ top: floor * max, behavior: 'auto' });
+  }
   timeline.target = Math.min(raw, gateLimit());
 }

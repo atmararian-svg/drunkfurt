@@ -127,8 +127,9 @@ export function Overlay() {
     });
     const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;
     let thoughtsOn = false;
-    /** The thought last shown fresh (for saying its line once each time it comes up). */
+    /** The thought last shown fresh (for saying its line as it comes up), and those already said this pass. */
     let lastThought: string | null = null;
+    const said = new Set<string>();
     /** When the car's thoughts were last started being said (for the typing to keep pace with the voice). */
     let monologueAt = 0;
     const monologueLines = MONOLOGUE.split('\n');
@@ -224,9 +225,15 @@ export function Overlay() {
       const thought = fresh ?? boxDefs.find((d) => d.ep === id && !!d.c.voice && d.c.voice === saying);
       // his line, said as his thought comes up (each time it comes up afresh)
       const thoughtKey = fresh?.key ?? null;
+      // (once per pass through a chapter: scrolling back and forth shows the thought again, but it is not said
+      // again; a chapter turn starts a fresh pass)
+      if (chapterTurn.busy) said.clear();
       if (thoughtKey !== lastThought) {
         lastThought = thoughtKey;
-        if (fresh?.c.voice && !chapterTurn.busy) audio.speak(fresh.c.voice);
+        if (fresh?.c.voice && !chapterTurn.busy && !said.has(fresh.key)) {
+          said.add(fresh.key);
+          audio.speak(fresh.c.voice);
+        }
       }
       // a line from a chapter no longer on screen (a turn, a jump back) is not said on into another
       if (saying && saying !== '15' && saying !== 'letter' && !allDefs.some((d) => d.ep === id && d.c.voice === saying)) audio.hush();

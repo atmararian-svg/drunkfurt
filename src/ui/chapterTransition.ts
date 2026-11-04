@@ -1,6 +1,6 @@
 import { CHAPTERS, chapterOf } from '../core/chapters';
 import { story } from '../core/store';
-import { PageTurn, chapterStarts, chapterTurn, gates, globalProgress, holdScroll, jumpTo, locate, pinScroll, stopAutoplay, timeline } from '../core/timeline';
+import { PageTurn, chapterStarts, chapterTurn, floors, gates, globalProgress, holdScroll, jumpTo, locate, pinScroll, stopAutoplay, timeline } from '../core/timeline';
 import { EPISODES } from '../episodes';
 import { grabFrame } from '../render/FrameGrab';
 import { pixelReveal } from './pixelReveal';
@@ -44,6 +44,7 @@ const within = <T,>(p: Promise<T>, ms: number) => Promise.race([p, new Promise<v
 export function resetChapter(n: number) {
   const later = new Set(CHAPTERS.filter((c) => c.number >= n).flatMap((c) => c.episodes as string[]));
   for (const g of gates) if (later.has(g.episode)) g.passed = false;
+  for (const f of floors) if (later.has(f.episode)) f.on = false;
   const ch = CHAPTERS.find((c) => c.number === n);
   for (const id of ch?.episodes ?? []) {
     try {

@@ -46,7 +46,9 @@ export const thoughtsShown = (local = localProgress('car')) => local >= THOUGHTS
 /** Called every frame by the overlay while the car episode is on. Returns whether they should be playing. */
 export function updateThoughts() {
   const local = localProgress('car');
-  if (local < THOUGHTS.from - 0.01 && (thoughts.started || thoughts.done)) resetThoughts();
+  // scrolled back out of the seat before they were all said: they start again next time; once said, they are
+  // not said again (only the chapter played from its beginning plays them again)
+  if (local < THOUGHTS.from - 0.01 && thoughts.started && !thoughts.done) resetThoughts();
   gate.open = thoughts.done;
   const waiting = !gate.open && local >= THOUGHTS.gate - 0.003;
   const now = story.getState().prompt;
