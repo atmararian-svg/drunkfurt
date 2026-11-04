@@ -2,7 +2,7 @@ import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Component, ReactNode, Suspense, useEffect, useLayoutEffect, useRef } from 'react';
 import { FogExp2, Group, HalfFloatType, Material, Mesh, NoToneMapping, Object3D, PCFShadowMap, SRGBColorSpace, Scene, Texture, WebGLRenderTarget } from 'three';
 import { story, useStory } from './core/store';
-import { EpisodeId, TOTAL_LENGTH, autoplay, chapterTurn, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
+import { EpisodeId, TOTAL_LENGTH, autoplay, globalProgress, chapterTurn, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
@@ -78,6 +78,7 @@ function EpisodeWorlds() {
                 {/* (only the worlds still to come: one left behind is not compiled again) */}
                 <Prewarm ahead={!loading && !shown(e.id) && list.indexOf(e) > i} />
                 <FreeOnUnmount />
+                {BACKDROP && <BackdropShown />}
                 {e.id !== 'car' && e.id !== 'home' && <ChapterReady chapter={chapter} />}
               </Suspense>
             </WorldBoundary>
@@ -113,6 +114,36 @@ function FreeOnUnmount() {
     };
   }, []);
   return <object3D ref={marker} />;
+}
+
+/**
+ * On a phone the story does not run: the page in its place (ui/stub.ts) shows chapter 3's room behind
+ * it, just entered, as a picture that lives (the camera drifting a little on the spot), with nothing to
+ * scroll, click or hear. Set before the app is rendered (main.tsx).
+ */
+let BACKDROP = false;
+export const setBackdrop = (on: boolean) => void (BACKDROP = on);
+/** The room just inside the door (home's own progress), and how far the camera drifts either way of it. */
+const BACKDROP_AT = 0.17;
+const BACKDROP_SWAY = 0.035;
+/** The room drawn a few times: the page shows it (fading it in over the stub's own black). */
+function BackdropShown() {
+  useEffect(() => {
+    let n = 0;
+    let raf = 0;
+    const f = () => (++n < 6 ? (raf = requestAnimationFrame(f)) : document.documentElement.classList.add('backdrop-on'));
+    raf = requestAnimationFrame(f);
+    return () => cancelAnimationFrame(raf);
+  }, []);
+  return null;
+}
+/** The backdrop's drift: slowly to and fro around the spot (no scroll page under it). */
+function BackdropDrift() {
+  useFrame(({ clock }) => {
+    const t = clock.elapsedTime;
+    timeline.target = globalProgress('home', BACKDROP_AT + BACKDROP_SWAY * Math.sin((t * Math.PI * 2) / 26));
+  });
+  return null;
 }
 
 /** For a world's shaders compiled ahead of time: a linear target (for passes that draw into one), and a fog of the kind every world uses. */
@@ -280,7 +311,7 @@ export function App() {
   const episode = useStory((s) => s.episode);
 
   // chapters change through the chapter transition; chapter 3's assets load once chapter 2 is in
-  useEffect(() => installChapterTransitions(), []);
+  useEffect(() => (BACKDROP ? undefined : installChapterTransitions()), []);
   useEffect(() => {
     let started = false;
     const next = () => {
@@ -299,6 +330,12 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (BACKDROP) {
+      // straight into the room, the story already under way (nothing loads but the room)
+      timeline.target = timeline.progress = globalProgress('home', BACKDROP_AT);
+      story.setState({ phase: 'ready', episode: 'home', sound: false });
+      return;
+    }
     if ('scrollRestoration' in history) history.scrollRestoration = 'manual';
     window.scrollTo(0, 0);
     readScroll();
@@ -365,7 +402,7 @@ export function App() {
 
   return (
     <>
-      <div className="stage" role="img" aria-label="DRUNKFURT, Episode 1: arriving at Frankfurt (Main) Hbf at night">
+      <div className={BACKDROP ? 'stage stage--backdrop' : 'stage'} aria-hidden={BACKDROP || undefined} role="img" aria-label="DRUNKFURT, Episode 1: arriving at Frankfurt (Main) Hbf at night">
         <Canvas
           shadows={{ type: PCFShadowMap }}
           dpr={MAX_DPR}
@@ -374,7 +411,9 @@ export function App() {
           onCreated={({ gl }) => {
             gl.toneMapping = NoToneMapping;
             gl.outputColorSpace = SRGBColorSpace;
-            watchContextLoss(gl.domElement);
+            // (behind the phone's page, a lost context only takes the picture away)
+            if (BACKDROP) gl.domElement.addEventListener('webglcontextlost', () => document.documentElement.classList.remove('backdrop-on'));
+            else watchContextLoss(gl.domElement);
             if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__gl = gl;
           }}
         >
@@ -385,12 +424,17 @@ export function App() {
             <EpisodeWorlds />
             <Stylizer version={episode} />
             <FrameGrab />
+            {BACKDROP && <BackdropDrift />}
           </Suspense>
         </Canvas>
       </div>
-      <div className="scroll-track" style={{ height: `${TOTAL_LENGTH * 100}vh` }} aria-hidden />
-      <Overlay />
-      <Preloader />
+      {!BACKDROP && (
+        <>
+          <div className="scroll-track" style={{ height: `${TOTAL_LENGTH * 100}vh` }} aria-hidden />
+          <Overlay />
+          <Preloader />
+        </>
+      )}
     </>
   );
 }

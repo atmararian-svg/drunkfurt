@@ -92,7 +92,6 @@ export function Overlay() {
     const capDefs = allDefs.filter((d) => d.c.tone === 'speech').map((d) => d.c);
     const boxDefs = allDefs.filter((d) => d.c.tone !== 'speech');
     const boxes = mountTextBoxes(el);
-    const cue = el.querySelector<HTMLElement>('.cue')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
     // balloons are typed in (the supplied typewriter); the thoughts in the car as well, line by line
     const typed = new Map<HTMLElement, { tw: Typewriter; on: boolean }>();
@@ -281,7 +280,6 @@ export function Overlay() {
           void thoughtTw.play(MONOLOGUE).then(() => thoughtsTyped(() => thoughtTw.erase()));
         }
       }
-      cue.classList.toggle('is-on', p < 0.004);
       const canSkip = skippable();
       if (skipBtn.classList.contains('is-on') !== canSkip) {
         skipBtn.classList.toggle('is-on', canSkip);
@@ -514,11 +512,6 @@ export function Overlay() {
           </>
         )}
       </button>
-
-      <div className="cue">
-        <span>Scroll</span>
-        <i />
-      </div>
 
       {/* the chapter tuner (chapterTuner.ts) is its own element on the page, so the dimming of the page behind it leaves it alone */}
 

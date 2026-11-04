@@ -43,7 +43,7 @@ const THOUGHT_GRACE = 0.9;
 const ease = (u: number) => u * u * (3 - 2 * u);
 
 /** A pixelating SVG filter for one element: `set(block)`, 1 for none. */
-function pixelFilter(defs: SVGDefsElement, id: string) {
+export function pixelFilter(defs: SVGDefsElement, id: string) {
   const NS = 'http://www.w3.org/2000/svg';
   const f = document.createElementNS(NS, 'filter');
   f.setAttribute('id', id);
@@ -88,7 +88,7 @@ function pixelFilter(defs: SVGDefsElement, id: string) {
 type Phase = 'hidden' | 'in' | 'shown' | 'out';
 
 /** One box's coming and going: pixels and opacity over time, the words decoding in on the way. */
-function presence(el: HTMLElement, pix: (el: HTMLElement, b: number) => void, delay = 0) {
+export function presence(el: HTMLElement, pix: (el: HTMLElement, b: number) => void, delay = 0) {
   let phase: Phase = 'hidden';
   let t0 = 0;
   let decoding: HTMLElement[] = [];
