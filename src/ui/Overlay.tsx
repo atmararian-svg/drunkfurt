@@ -293,15 +293,18 @@ export function Overlay() {
       // defended, the page goes black and the two hits are printed into the dark;
       // knocked out, a flash, then the lights go out as you fall
       const v = id === 'city' ? encounterAt(local) : null;
-      const hitT = !v || v.t < 0 || local >= BEAT.aftermath ? -1 : v.t;
+      // (BAM and POW leave as the blur clears, over the aftermath's first frames: back into blocks, fading)
+      const HIT_LEAVE = 0.03;
+      const hitLeave = v?.outcome === 'blocked' ? clamp((local - BEAT.aftermath) / HIT_LEAVE, 0, 1) : 0;
+      const hitT = !v || v.t < 0 || (local >= BEAT.aftermath && (v.outcome !== 'blocked' || hitLeave >= 1)) ? -1 : v.t;
       // episode 3: the rush at the end of the launch, in speed lines
       const run = id === 'car' ? launchAt(local) : null;
       const rush = run && run.rpm >= 0 ? run.rush : 0;
-      const hitKey = hitT >= 0 ? `${v!.outcome}${hitT.toFixed(3)}${hit.width}` : rush > 0 ? `rush${rush.toFixed(2)}${Math.floor(run!.t * 24)}${hit.width}` : '';
+      const hitKey = hitT >= 0 ? `${v!.outcome}${hitT.toFixed(3)}${hitLeave.toFixed(3)}${hit.width}` : rush > 0 ? `rush${rush.toFixed(2)}${Math.floor(run!.t * 24)}${hit.width}` : '';
       if (hitKey !== lastHit) {
         hctx.clearRect(0, 0, hit.width, hit.height);
         if (hitT >= 0 && v!.outcome === 'knockedOut') drawKnockout(hctx, hit.width, hit.height, hitT, KO.dark);
-        else if (hitT >= 0) drawHits(hctx, hit.width, hit.height, hitT, BLOCK);
+        else if (hitT >= 0) drawHits(hctx, hit.width, hit.height, hitT, BLOCK, hitLeave);
         else if (rush > 0) drawSpeedLines(hctx, hit.width, hit.height, rush, run!.t);
         lastHit = hitKey;
         // nothing to show: the layer is taken off the page as well as cleared, so no earlier picture on it can stay up

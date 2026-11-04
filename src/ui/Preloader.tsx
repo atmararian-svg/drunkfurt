@@ -87,10 +87,14 @@ export function Preloader() {
     // --- the writing: the pen's strokes as one continuous line, drawn on along their length
     const lengths = strokes.map((p) => p.getTotalLength());
     const total = lengths.reduce((a, b) => a + b, 0);
+    // (a stroke not yet begun is hidden outright: its round cap would otherwise show the glyph under it, a
+    // blot at each stroke's start before the pen got there)
     strokes.forEach((p, i) => {
-      p.style.strokeDasharray = `${lengths[i]} ${lengths[i]}`;
+      p.style.strokeDasharray = `${lengths[i]} ${lengths[i] + 1}`;
       p.style.strokeDashoffset = `${lengths[i]}`;
+      p.style.visibility = 'hidden';
     });
+    const inked = q<SVGGElement>('.pl-ink');
     let written = 0; // 0..1 along all the pen's strokes
     let speed = 0; // the pen's speed now (of the whole word per second), eased, so it never jumps
     let writing = false; // chapter 3 is loading (or in): the hand is at work
@@ -102,8 +106,11 @@ export function Preloader() {
         const l = lengths[i];
         const k = Math.max(0, Math.min(l, along));
         p.style.strokeDashoffset = `${l - k}`;
+        p.style.visibility = k > 0.5 ? 'visible' : 'hidden';
         along -= l;
       });
+      // written: the whole word, every edge of it (the pen's centre lines leave the odd ragged tip uncovered)
+      if (written >= 1) inked.removeAttribute('mask');
     };
     const frame = (now: number) => {
       const dt = Math.min(0.25, (now - last) / 1000);
@@ -307,7 +314,7 @@ export function Preloader() {
                 ))}
               </g>
             </mask>
-            <g mask="url(#pl-pen)" fill={DRUNK_COLOR}>
+            <g className="pl-ink" mask="url(#pl-pen)" fill={DRUNK_COLOR}>
               {DRUNK_GLYPHS.map((g, i) => (
                 <path key={i} d={g.d} transform={`translate(${g.x} ${g.y}) scale(${DRUNK_SIZE} ${-DRUNK_SIZE})`} />
               ))}
