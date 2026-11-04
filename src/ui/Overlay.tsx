@@ -20,6 +20,7 @@ import { letter, letterSpot, pickLetter, skipInvitation } from '../scenes/city/l
 import { closeLetterNow, openLetter } from './letterReveal';
 import { mountChapterTuner, tunerAway, tunerBackdrop, updateTuner } from './chapterTuner';
 import { MONOLOGUE, skipThoughts, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
+import { MONOLOGUE_LINES } from '../audio/voices';
 import { PressPrompt } from './PressPrompt';
 
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
@@ -103,9 +104,25 @@ export function Overlay() {
     // (the last two words of each line are held together, so a narrower page never leaves one word alone on a line)
     const spoken = (text: string) => text.replace(/ß/g, 'ẞ').replace(/ (\S+)$/gm, '\u00a0$1');
     const thoughtEl = el.querySelector<HTMLElement>('.thoughts-text')!;
-    const thoughtTw = createTypewriter(thoughtEl, { content: 'lines', stableHeight: false, startDelay: 500, pauseAfterType: (t) => 900 + 24 * t.length });
+    // each line stands until his voice reaches the next one (MONOLOGUE_LINES); the last until he has said it
+    const thoughtTw = createTypewriter(thoughtEl, {
+      content: 'lines',
+      stableHeight: false,
+      startDelay: 500,
+      pauseAfterType: (t) => {
+        const i = monologueLines.indexOf(t);
+        if (!monologueAt || i < 0) return 900 + 24 * t.length;
+        const next = i + 1 < MONOLOGUE_LINES.length ? MONOLOGUE_LINES[i + 1] * 1000 : performance.now() - monologueAt + audio.sayingLeft() + 300;
+        return Math.max(250, next - (performance.now() - monologueAt));
+      },
+    });
     const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;
     let thoughtsOn = false;
+    /** The thought last shown fresh (for saying its line once each time it comes up). */
+    let lastThought: string | null = null;
+    /** When the car's thoughts were last started being said (for the typing to keep pace with the voice). */
+    let monologueAt = 0;
+    const monologueLines = MONOLOGUE.split('\n');
     // SKIP DIALOGUE (bottom right, or S): while the invitation is said, or the thoughts in the car are typed
     const skipBtn = el.querySelector<HTMLButtonElement>('.skip')!;
     const skippable = () => {
@@ -114,6 +131,8 @@ export function Overlay() {
     };
     const skip = () => {
       if (!skippable()) return;
+      // (skipped: his voice stops with the words)
+      audio.hush();
       if (story.getState().prompt === 'thought') {
         thoughtTw.stop();
         skipThoughts();
@@ -173,8 +192,15 @@ export function Overlay() {
         const t = typed.get(c);
         if (t && t.on !== on) {
           t.on = on;
-          if (on) void t.tw.play(spoken(c.dataset.text ?? '')).then(() => capDefs[i].onTyped?.());
-          else t.tw.stop();
+          const voice = capDefs[i].voice;
+          if (on) {
+            // his recorded line with it, started as the typing starts (after its start delay)
+            if (voice) window.setTimeout(() => t.on && audio.speak(voice), 250);
+            void t.tw.play(spoken(c.dataset.text ?? '')).then(() => capDefs[i].onTyped?.());
+          } else {
+            t.tw.stop();
+            if (voice && audio.saying() === voice) audio.hush();
+          }
         }
       });
       // the fight: ACTION and PRESS D TO DEFEND, and the street breaking into coarse pixels (blurred and dark once you defend)
@@ -183,7 +209,18 @@ export function Overlay() {
       // his thoughts and the system's tips: the first that holds here of each; both keep out of the way while the
       // page asks you to act, the letter is open, a chapter turns, or the page is handed over to the site
       const holds = (d: (typeof boxDefs)[number]) => d.ep === id && local >= d.c.from && local <= d.c.to && (!d.c.when || d.c.when());
-      const thought = boxDefs.find((d) => d.c.tone !== 'tip' && holds(d));
+      // (a thought whose recorded line is still being said stays up until it is said, unless another comes)
+      const fresh = boxDefs.find((d) => d.c.tone !== 'tip' && holds(d));
+      const saying = audio.saying();
+      const thought = fresh ?? boxDefs.find((d) => d.ep === id && !!d.c.voice && d.c.voice === saying);
+      // his line, said as his thought comes up (each time it comes up afresh)
+      const thoughtKey = fresh?.key ?? null;
+      if (thoughtKey !== lastThought) {
+        lastThought = thoughtKey;
+        if (fresh?.c.voice && !chapterTurn.busy) audio.speak(fresh.c.voice);
+      }
+      // a line from a chapter no longer on screen (a turn, a jump back) is not said on into another
+      if (saying && saying !== '15' && !allDefs.some((d) => d.ep === id && d.c.voice === saying)) audio.hush();
       const tipDef = boxDefs.find((d) => d.c.tone === 'tip' && holds(d));
       const html = document.documentElement.classList;
       const busy =
@@ -211,12 +248,22 @@ export function Overlay() {
         if (!think) {
           thoughtTw.stop();
           if (!thoughts.done) thoughts.started = false;
+          if (audio.saying() === '15') audio.hush();
         }
       }
       if (think && !thoughts.started) {
         thoughts.started = true;
         if (thoughts.done) thoughtTw.show(MONOLOGUE);
-        else void thoughtTw.play(MONOLOGUE).then(() => thoughtsTyped(() => thoughtTw.erase()));
+        else {
+          // said as typed: the voice starts with the first line (after the typing's start delay)
+          monologueAt = 0;
+          window.setTimeout(() => {
+            if (!thoughtsOn || thoughts.done) return;
+            audio.speak('15');
+            monologueAt = performance.now();
+          }, 500);
+          void thoughtTw.play(MONOLOGUE).then(() => thoughtsTyped(() => thoughtTw.erase()));
+        }
       }
       cue.classList.toggle('is-on', p < 0.004);
       const canSkip = skippable();

@@ -6,6 +6,7 @@ import exhalesUrl from '../assets/audio/exhales.mp3?url';
 import hitsUrl from '../assets/audio/hits.mp3?url';
 import gearShiftUrl from '../assets/audio/gear-shift.mp3?url';
 import wheelsUrl from '../assets/audio/wheels.mp3?url';
+import { VOICES, VoiceId } from './voices';
 
 /**
  * Audio foundation. Recorded cues are declared with `src: null` and silently
@@ -143,6 +144,95 @@ class AudioDirector {
     body.connect(this.master);
     this.buses.set('body', body);
     void this.preload();
+    void this.preloadVoices();
+  }
+
+  // -------------------------------------------------------------------------
+  // his voice: the narrator's recorded lines (audio/voices.ts), one at a time
+
+  private voiceBuffers = new Map<VoiceId, AudioBuffer>();
+  private speaking: { id: VoiceId; src: AudioBufferSourceNode; gain: GainNode; ends: number } | null = null;
+  /** A line asked for before its recording was decoded: played as soon as it is. */
+  private pendingVoice: VoiceId | null = null;
+
+  private async preloadVoices() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    for (const id of Object.keys(VOICES) as VoiceId[]) {
+      try {
+        this.voiceBuffers.set(id, await ctx.decodeAudioData(await bytesOf(VOICES[id].src)));
+        if (this.pendingVoice === id) {
+          this.pendingVoice = null;
+          this.speak(id);
+        }
+      } catch (err) {
+        console.warn(`[audio] could not load voice "${id}"`, err);
+      }
+    }
+  }
+
+  /**
+   * Says a line (stopping one still being said). Straight to the master, past the world's muffling
+   * filter; the ambience ducks under it while it lasts.
+   */
+  speak(id: VoiceId) {
+    const ctx = this.ctx;
+    // (with the sound off his lines are not said at all: nothing then waits on a silent one)
+    if (!ctx || !this.master || !this.enabled) return;
+    if (this.speaking?.id === id) return;
+    this.hush();
+    const buffer = this.voiceBuffers.get(id);
+    if (!buffer) {
+      this.pendingVoice = id;
+      return;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.value = (VOICES[id] as { gain?: number }).gain ?? 1;
+    src.connect(gain).connect(this.master);
+    const t = ctx.currentTime + 0.02;
+    src.start(t);
+    const mine = { id, src, gain, ends: performance.now() + (buffer.duration + 0.02) * 1000 };
+    this.speaking = mine;
+    this.duck(true);
+    src.onended = () => {
+      if (this.speaking !== mine) return;
+      this.speaking = null;
+      this.duck(false);
+    };
+  }
+
+  /** Stops the line being said (a quick fade), if any. */
+  hush(fade = 0.12) {
+    this.pendingVoice = null;
+    const s = this.speaking;
+    if (!s || !this.ctx) return;
+    this.speaking = null;
+    const t = this.ctx.currentTime;
+    s.gain.gain.setTargetAtTime(0, t, fade / 3);
+    try {
+      s.src.stop(t + fade);
+    } catch {
+      // already stopped
+    }
+    this.duck(false);
+  }
+
+  /** The line being said now (or about to be, once decoded), if any. */
+  saying(): VoiceId | null {
+    return this.speaking?.id ?? this.pendingVoice;
+  }
+
+  /** How long the line being said has still to go (ms); 0 when none. */
+  sayingLeft() {
+    return this.speaking ? Math.max(0, this.speaking.ends - performance.now()) : 0;
+  }
+
+  private duck(on: boolean) {
+    const amb = this.buses.get('ambience');
+    if (!amb || !this.ctx) return;
+    amb.gain.setTargetAtTime(on ? 0.45 : 1, this.ctx.currentTime, on ? 0.12 : 0.6);
   }
 
   private async preload() {
@@ -180,6 +270,7 @@ class AudioDirector {
   /** Mutes or unmutes everything (the visitor's sound preference). */
   setEnabled(on: boolean) {
     this.enabled = on;
+    if (!on) this.hush();
     this.level();
   }
 

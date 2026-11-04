@@ -1,3 +1,4 @@
+import { audio } from '../../audio/AudioDirector';
 import { Camera, Mesh, Raycaster, Vector2, Vector3 } from 'three';
 import { story } from '../../core/store';
 import { Gate, gates, localProgress, readScroll } from '../../core/timeline';
@@ -70,7 +71,8 @@ export function invitationTyped() {
     updateLetter();
     // the page may already be scrolled past the wait: carry on from where it is, without another scroll
     readScroll();
-  }, LETTER.hold);
+    // (and not before his voice has said it)
+  }, Math.max(LETTER.hold, audio.sayingLeft() + 300));
 }
 
 /** SKIP DIALOGUE: the invitation is taken as said, at once (the overlay shows it whole); the story may go on. */

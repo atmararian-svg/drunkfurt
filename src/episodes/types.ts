@@ -1,3 +1,4 @@
+import type { VoiceId } from '../audio/voices';
 import type { ComponentType } from 'react';
 import type { CameraTrack } from '../core/cameraTrack';
 import type { CameraPose } from '../core/sequence';
@@ -23,6 +24,8 @@ export interface Caption {
   when?: () => boolean;
   /** A balloon's text is typed in (ui/typewriter.ts); called each time it has been typed in full. */
   onTyped?: () => void;
+  /** His recorded line (audio/voices.ts), said as the words come up; his thought stays up until it is said. */
+  voice?: VoiceId;
 }
 
 export interface EpisodeDef {

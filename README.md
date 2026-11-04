@@ -1073,6 +1073,19 @@ Measured in a headless browser, at 1280 × 720 (video memory for textures, progr
 - Pixel density only ever goes down (each change resizes every buffer); multisampling is decided
   once, as the page starts.
 
+## His voice
+
+His lines are said in his own recorded voice (`src/assets/audio/voice/`, `audio/voices.ts`; made by the
+owner with ElevenLabs, trimmed of silence, levelled to -18 LUFS, mono 64 kbit/s, 700 KB in all). Each
+thought is said as it comes up in the box by his face, and the box stays up until it is said (unless
+another thought comes); the invitation ("Hey, man…", `ME:`) is said as it is typed and the story waits
+for it to be said; the thoughts in the car are typed in step with the recording (each line stands
+until the voice reaches the next, `MONOLOGUE_LINES`) and the story waits for the last word. The voice
+goes straight to the master, past the world's muffling filter, and the ambience ducks under it. With
+the sound off nothing is said (and nothing waits on it); SKIP DIALOGUE stops it; a line from a chapter
+no longer on screen is stopped. Where the recording says more than the page did, the page now says
+what he says. Line 19 ("Time to get out of Drunkfurt.") has no recording yet.
+
 ## Small things
 
 - **The rack's clock** in the cave (the model's `leds`, modelled reading 14:47) shows the time the

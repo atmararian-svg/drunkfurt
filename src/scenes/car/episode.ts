@@ -125,7 +125,7 @@ export const carEpisode: EpisodeDef = {
     o.z *= k;
   },
   captions: [
-    { from: 0.15, to: 0.3, place: 'tl', text: 'The bag stayed on my shoulder. The car was waiting.' },
+    { from: 0.15, to: 0.3, place: 'tl', text: 'The bag stayed on my shoulder. The car was waiting.', voice: '14' },
     { from: 0.67, to: 0.95, place: 'tl', tone: 'yellow', text: 'Time to get out of Drunkfurt.' },
   ],
   beats: [0, CAR_BEAT.turn, CAR_BEAT.walk, CAR_BEAT.doorOpened, CAR_BEAT.doorClosed + 0.002, CAR_BEAT.rev, 1],
