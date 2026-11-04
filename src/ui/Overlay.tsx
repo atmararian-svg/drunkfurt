@@ -229,7 +229,7 @@ export function Overlay() {
         if (fresh?.c.voice && !chapterTurn.busy) audio.speak(fresh.c.voice);
       }
       // a line from a chapter no longer on screen (a turn, a jump back) is not said on into another
-      if (saying && saying !== '15' && !allDefs.some((d) => d.ep === id && d.c.voice === saying)) audio.hush();
+      if (saying && saying !== '15' && saying !== 'letter' && !allDefs.some((d) => d.ep === id && d.c.voice === saying)) audio.hush();
       const tipDef = boxDefs.find((d) => d.c.tone === 'tip' && holds(d));
       const html = document.documentElement.classList;
       const busy =

@@ -24,6 +24,8 @@ export const VOICES = {
   '19': { src: src('19') },
   '20': { src: src('20') },
   attacker: { src: src('attacker') },
+  // the letter, read out ("Wyman, the storyteller", ElevenLabs) as it is open, its words filling in as they are said (ui/letterReveal.ts)
+  letter: { src: src('letter') },
 } satisfies Record<string, { src: string; gain?: number }>;
 
 export type VoiceId = keyof typeof VOICES;

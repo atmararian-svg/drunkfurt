@@ -1086,6 +1086,20 @@ the sound off nothing is said (and nothing waits on it); SKIP DIALOGUE stops it;
 no longer on screen is stopped. Where the recording says more than the page did, the page now says
 what he says. Line 19 ("Time to get out of Drunkfurt.") has no recording yet.
 
+## The letter, read out
+
+- Opened, the letter is read out (a storyteller's voice, ElevenLabs, `voice-letter.mp3`) and its
+  body's words fill in as they are said, like a karaoke line: they wait faint (`letter-light.webp`,
+  the supplied letter with the body's ink faded to a fifth, the paper untouched; the heading and the
+  signature as they are) and go to full ink up to where the voice is, line by line, each word
+  filling from left to right as it is said, with a soft edge. It is all in the sheet's shader (two
+  textures and two numbers a frame, `uLine`, `uX`), so the ink lies exactly on the printed words; the
+  words' places come from the image itself and their times from the recording
+  (`scenes/city/letterWords.json`, 135 words). Without the sound the letter is shown as it is.
+- Its paper sounds (freesound): unfolding as it opens, crumpling as it is closed (the voice stops),
+  and, once the ball has dropped out of view, it landing on the pavement, muffled (down by your
+  feet, not by your ears).
+
 ## Small things
 
 - **The rack's clock** in the cave (the model's `leds`, modelled reading 14:47) shows the time the

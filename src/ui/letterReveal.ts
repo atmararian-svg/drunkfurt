@@ -11,8 +11,12 @@ import {
   WebGLRenderer,
 } from 'three';
 import letterUrl from '../assets/letter.webp';
+import letterLightUrl from '../assets/letter-light.webp';
+import words from '../scenes/city/letterWords.json';
+import { audio } from '../audio/AudioDirector';
 import { letter } from '../scenes/city/letter';
 import { pinScroll } from '../core/timeline';
+import { story } from '../core/store';
 import { TOUCH } from './touch';
 
 /**
@@ -88,10 +92,28 @@ void main(){
 
 const fragment = /* glsl */ `
 uniform sampler2D uMap;
+uniform sampler2D uFaint;
 uniform vec2 uLight;
 uniform float uUnfold;
+uniform vec2 uLines[${words.lines.length}];
+uniform float uLine;
+uniform float uX;
 varying vec2 vUv;
 varying vec3 vPos;
+// read out: the body's words are faint (uFaint) until the voice has said them, then in full ink (uMap);
+// up to the line being read (uLine), and on it up to where the voice is (uX), a soft edge on the way
+float said(){
+  for (int i = 0; i < ${words.lines.length}; i++) {
+    vec2 b = uLines[i];
+    if (vUv.y <= b.x && vUv.y >= b.y) {
+      float li = float(i);
+      if (li < uLine) return 1.0;
+      if (li > uLine) return 0.0;
+      return 1.0 - smoothstep(uX - 0.006, uX + 0.006, vUv.x);
+    }
+  }
+  return 0.0;
+}
 void main(){
   vec3 n = normalize(cross(dFdx(vPos), dFdy(vPos)));
   if (!gl_FrontFacing) n = -n;
@@ -100,7 +122,7 @@ void main(){
   // crumpled, the facets are strongly shaded; flat, only the creases show
   float shade = mix(0.55 + 0.6 * d, 0.86 + 0.18 * d, smoothstep(0.6, 1.0, uUnfold));
   vec3 paper = vec3(0.925, 0.905, 0.86);
-  vec3 col = gl_FrontFacing ? texture2D(uMap, vUv).rgb : paper;
+  vec3 col = gl_FrontFacing ? mix(texture2D(uFaint, vUv).rgb, texture2D(uMap, vUv).rgb, said()) : paper;
   gl_FragColor = vec4(col * shade, 1.0);
   #include <colorspace_fragment>
 }`;
@@ -110,15 +132,38 @@ interface Open {
   close: () => void;
 }
 let current: Open | null = null;
-let picture: Promise<HTMLImageElement> | null = null;
-const image = () =>
-  (picture ??= new Promise((resolve, reject) => {
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = letterUrl;
-  }));
+const pictures = new Map<string, Promise<HTMLImageElement>>();
+const image = (url = letterUrl) => {
+  let p = pictures.get(url);
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+    pictures.set(url, p);
+  }
+  return p;
+};
+
+/**
+ * Where the voice is in the letter at `t` s of its recording (letterWords.json: each word's line, its
+ * x from/to on the sheet, and when it is said): the line, and how far along it the ink has come (the
+ * word being said fills in as it is said; between words it rests at the end of the last).
+ */
+function readAt(t: number) {
+  const ws = words.words as [number, number, number, number, number][];
+  if (t < ws[0][3]) return { line: ws[0][0], x: ws[0][1] };
+  let i = 0;
+  while (i + 1 < ws.length && ws[i + 1][3] <= t) i++;
+  const [line, x0, x1, t0, t1] = ws[i];
+  const k = Math.min(1, Math.max(0, (t - t0) / Math.max(0.05, t1 - t0)));
+  return { line, x: x0 + (x1 - x0) * k };
+}
+/** The body's lines on the sheet, in its texture's coordinates (y up), a little taller than the ink. */
+const LINE_BANDS = words.lines.flatMap(([a, b]) => [1 - a + 0.004, 1 - b - 0.004]);
 
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
@@ -190,6 +235,11 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   let renderer: WebGLRenderer | null = null;
   let mat: ShaderMaterial | null = null;
   let tex: Texture | null = null;
+  let faint: Texture | null = null;
+  // the reading: 'wait' until it is open, then read out ('reading', the words filling in) or, without the
+  // voice (the sound off), shown in full ink at once ('done')
+  let reading: 'wait' | 'reading' | 'done' = 'wait';
+  let readFrom = 0;
   let geo: PlaneGeometry | null = null;
   let scene: Scene | null = null;
   let cam: PerspectiveCamera | null = null;
@@ -208,11 +258,24 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     tex = new Texture();
     tex.colorSpace = SRGBColorSpace;
     tex.anisotropy = 8;
+    faint = new Texture();
+    faint.colorSpace = SRGBColorSpace;
+    faint.anisotropy = 8;
     mat = new ShaderMaterial({
       vertexShader: vertex,
       fragmentShader: fragment,
       side: DoubleSide,
-      uniforms: { uMap: { value: tex }, uUnfold: { value: 0 }, uTime: { value: 0 }, uLight: { value: light } },
+      uniforms: {
+        uMap: { value: tex },
+        uFaint: { value: faint },
+        uUnfold: { value: 0 },
+        uTime: { value: 0 },
+        uLight: { value: light },
+        uLines: { value: LINE_BANDS },
+        // nothing read yet (the faint words); 99: all of it in full ink
+        uLine: { value: 99 },
+        uX: { value: 0 },
+      },
     });
     sheet = new Mesh(geo, mat);
     scene.add(sheet);
@@ -262,6 +325,26 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     unfold = closing ? from * (1 - ease(Math.min(1, u / C))) : from + (to - from) * ease(u);
     const drop = closing ? Math.pow(Math.max(0, (u - (C - 0.1)) / (1.1 - C)), 2) : 0;
     light.lerp(target, 0.08);
+    // open: the voice reads it out, the words filling in as they are said
+    if (!closing && reading === 'wait' && u >= 1) {
+      audio.speak('letter');
+      reading = audio.saying() === 'letter' ? 'reading' : 'done';
+      readFrom = now;
+    }
+    if (mat) {
+      if (reading === 'reading') {
+        if (audio.saying() === 'letter') {
+          const r = readAt(audio.sayingTime());
+          mat.uniforms.uLine.value = r.line;
+          mat.uniforms.uX.value = r.x;
+        } else if (audio.sayingLeft() === 0 && now - readFrom > 500) {
+          // said to the end (or stopped): all of it in ink
+          reading = 'done';
+        }
+      }
+      if (reading === 'done') mat.uniforms.uLine.value = 99;
+      else if (reading === 'wait') mat.uniforms.uLine.value = faint?.image ? -1 : 99;
+    }
     if (renderer && mat && sheet && scene && cam) {
       mat.uniforms.uUnfold.value = unfold;
       // lifted from where it lay, rising and unfolding on one curve, so it is fully open as it arrives in the middle
@@ -382,6 +465,9 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   function close() {
     if (closing) return;
     closing = true;
+    // the voice stops; the sheet is crumpled up
+    if (audio.saying() === 'letter') audio.hush(0.3);
+    audio.paper('crumple');
     zoomTo = 1;
     from = unfold;
     to = 0;
@@ -392,6 +478,8 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   function finish() {
     if (closed) return;
     closed = true;
+    // the ball has dropped out of view: it lands on the pavement, by your feet
+    if (closing) audio.paper('land');
     cancelAnimationFrame(raf);
     window.removeEventListener('resize', size);
     window.removeEventListener('keydown', key);
@@ -400,6 +488,7 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     geo?.dispose();
     mat?.dispose();
     tex?.dispose();
+    faint?.dispose();
     root.remove();
     document.documentElement.classList.remove('is-reading');
     current = null;
@@ -409,13 +498,21 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   }
 
   current = { root, close };
-  image()
-    .then((img) => {
+  // the faint sheet only when it will be read out (with the sound on); without it, the letter as it is
+  const voiced = story.getState().sound && audio.running;
+  Promise.all([image(), voiced ? image(letterLightUrl).catch(() => null) : Promise.resolve(null)])
+    .then(([img, faintImg]) => {
       if (closed) return;
       if (tex) {
         tex.image = img;
         tex.needsUpdate = true;
       }
+      if (faint) {
+        faint.image = faintImg ?? img;
+        faint.needsUpdate = true;
+        if (!faintImg) reading = 'done';
+      }
+      audio.paper('unfold');
       t0 = performance.now();
       raf = requestAnimationFrame(draw);
       button.focus({ preventScroll: true });

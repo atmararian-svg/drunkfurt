@@ -7,6 +7,9 @@ import hitsUrl from '../assets/audio/hits.mp3?url';
 import gearShiftUrl from '../assets/audio/gear-shift.mp3?url';
 import wheelsUrl from '../assets/audio/wheels.mp3?url';
 import { VOICES, VoiceId } from './voices';
+import paperUnfoldUrl from '../assets/audio/paper-unfold.mp3?url';
+import paperCrumpleUrl from '../assets/audio/paper-crumple.mp3?url';
+import paperTossUrl from '../assets/audio/paper-toss.mp3?url';
 
 /**
  * Audio foundation. Recorded cues are declared with `src: null` and silently
@@ -57,6 +60,11 @@ export const cues = {
   carDoorOpen: { src: doorOpenUrl, bus: 'sfx', gain: 0.85 },
   engineStart: { src: engineStartUrl, bus: 'body', gain: 0.85 },
   engineIdle: { src: engineDefaultUrl, bus: 'body', gain: 0.75 },
+  // the letter (supplied recordings, freesound): unfolding it as it is lifted and opened, crumpling it up,
+  // and the ball landing on the pavement once it has dropped out of view (`paper`)
+  paperUnfold: { src: paperUnfoldUrl, bus: 'body', gain: 0.9 },
+  paperCrumple: { src: paperCrumpleUrl, bus: 'body', gain: 0.9 },
+  paperToss: { src: paperTossUrl, bus: 'body', gain: 0.55 },
   // still synthesised until a recording is set here: carUnlock (central locking, two clacks),
   // carDoorClose (a heavy, damped shut), and engineLoop: a seamless loop of the engine recorded at
   // ENGINE_LOOP_RPM under load, pitched by rpm (playbackRate = rpm / ENGINE_LOOP_RPM).
@@ -151,7 +159,7 @@ class AudioDirector {
   // his voice: the narrator's recorded lines (audio/voices.ts), one at a time
 
   private voiceBuffers = new Map<VoiceId, AudioBuffer>();
-  private speaking: { id: VoiceId; src: AudioBufferSourceNode; gain: GainNode; ends: number } | null = null;
+  private speaking: { id: VoiceId; src: AudioBufferSourceNode; gain: GainNode; ends: number; starts: number } | null = null;
   /** A line asked for before its recording was decoded: played as soon as it is. */
   private pendingVoice: VoiceId | null = null;
 
@@ -193,7 +201,7 @@ class AudioDirector {
     src.connect(gain).connect(this.master);
     const t = ctx.currentTime + 0.02;
     src.start(t);
-    const mine = { id, src, gain, ends: performance.now() + (buffer.duration + 0.02) * 1000 };
+    const mine = { id, src, gain, starts: performance.now() + 20, ends: performance.now() + (buffer.duration + 0.02) * 1000 };
     this.speaking = mine;
     this.duck(true);
     src.onended = () => {
@@ -201,6 +209,31 @@ class AudioDirector {
       this.speaking = null;
       this.duck(false);
     };
+  }
+
+  /**
+   * The letter's paper: 'unfold' as it is opened, 'crumple' as it is closed, 'land' when the ball,
+   * gone out of view, hits the pavement: down there, by your feet, not by your ears, so muffled
+   * (a low-pass) and quieter.
+   */
+  paper(kind: 'unfold' | 'crumple' | 'land') {
+    const ctx = this.ctx;
+    const id = ({ unfold: 'paperUnfold', crumple: 'paperCrumple', land: 'paperToss' } as const)[kind];
+    const buffer = this.buffers.get(id);
+    const bus = this.buses.get('body');
+    if (!ctx || !buffer || !bus) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.value = (cues[id] as CueDef).gain ?? 1;
+    if (kind === 'land') {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1100;
+      lp.Q.value = 0.5;
+      src.connect(lp).connect(g).connect(bus);
+    } else src.connect(g).connect(bus);
+    src.start();
   }
 
   /** Stops the line being said (a quick fade), if any. */
@@ -222,6 +255,11 @@ class AudioDirector {
   /** The line being said now (or about to be, once decoded), if any. */
   saying(): VoiceId | null {
     return this.speaking?.id ?? this.pendingVoice;
+  }
+
+  /** How far into the line being said its voice is (s); 0 when none (or not yet begun, still decoding). */
+  sayingTime() {
+    return this.speaking ? Math.max(0, (performance.now() - this.speaking.starts) / 1000) : 0;
   }
 
   /** How long the line being said has still to go (ms); 0 when none. */
