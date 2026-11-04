@@ -1,8 +1,8 @@
 /**
  * His recorded lines (the owner's own voice, made with ElevenLabs; trimmed of silence, levelled to
  * -18 LUFS, mono): each is said as its words come up on the page (ui/Overlay.tsx). Keyed by the
- * line's number in the script: 11 is the invitation (three lines, one recording), 15 the thoughts in
- * the car (four lines, one recording). Line 19 ("Time to get out of Drunkfurt.") has no recording.
+ * line's number in the script ('attacker' is the stranger's one line, a voice of its own): 11 is the invitation (three lines, one recording), 15 the thoughts in
+ * the car (four lines, one recording).
  */
 const urls = import.meta.glob('../assets/audio/voice/voice-*.mp3', { eager: true, query: '?url', import: 'default' }) as Record<string, string>;
 const src = (n: string) => urls[`../assets/audio/voice/voice-${n}.mp3`];
@@ -21,7 +21,9 @@ export const VOICES = {
   '11': { src: src('11') },
   '14': { src: src('14') },
   '15': { src: src('15') },
+  '19': { src: src('19') },
   '20': { src: src('20') },
+  attacker: { src: src('attacker') },
 } satisfies Record<string, { src: string; gain?: number }>;
 
 export type VoiceId = keyof typeof VOICES;

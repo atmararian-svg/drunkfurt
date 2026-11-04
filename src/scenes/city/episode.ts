@@ -121,8 +121,8 @@ export const cityEpisode: EpisodeDef = {
     { from: 0.46, to: 0.58, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet. Wow.', voice: '08' },
     { from: 0.63, to: 0.72, place: 'bl', tone: 'yellow', text: 'Speak of the devil. Some people walk somewhere. He was walking at me. Damn.', voice: '09' },
     // he says it with the knife on you, and keeps saying it while the story waits for you
-    { from: 0.79, to: 0.9, place: 'tr', tone: 'speech', kicker: 'ATTACKER:', text: 'Your bag. Give it to me. Now.', when: () => !encounter.outcome },
-    { from: 0.92, to: 0.955, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', voice: '10', when: () => encounter.outcome === 'blocked' },
+    { from: 0.79, to: 0.9, place: 'tr', tone: 'speech', kicker: 'ATTACKER:', text: 'Your bag. Give it to me. Now.', voice: 'attacker', when: () => !encounter.outcome },
+    { from: 0.92, to: 0.955, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', voice: '10', when: () => encounter.outcome === 'blocked' && !letter.open && !letter.read },
     // the letter he dropped: the story waits until it has been read (letter.ts), then you tell him where to find you
     // (from where the fight's own playback ends: the letter can be picked up from there, see letter.ts)
     { from: LETTER.from + 0.04, to: 1, place: 'bl', tone: 'tip', text: `Something fell out of his coat. A letter. ${TOUCH ? 'Tap' : 'Click'} it.`, when: () => encounter.outcome === 'blocked' && !letter.read },

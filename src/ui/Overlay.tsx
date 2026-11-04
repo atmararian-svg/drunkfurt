@@ -104,16 +104,25 @@ export function Overlay() {
     // (the last two words of each line are held together, so a narrower page never leaves one word alone on a line)
     const spoken = (text: string) => text.replace(/ß/g, 'ẞ').replace(/ (\S+)$/gm, '\u00a0$1');
     const thoughtEl = el.querySelector<HTMLElement>('.thoughts-text')!;
-    // each line stands until his voice reaches the next one (MONOLOGUE_LINES); the last until he has said it
+    // typed as he says it: each line typed quickly enough to keep up with his voice (the longest, 97
+    // characters, in the 4 s he takes over it), wiped at once, and the next begun as his voice reaches it
+    // (MONOLOGUE_LINES); the last stands until he has said it. Without the voice, the old reading pace.
+    const MONO = { type: 36, del: 8, afterDelete: 60 };
     const thoughtTw = createTypewriter(thoughtEl, {
       content: 'lines',
       stableHeight: false,
       startDelay: 500,
+      typeSpeed: MONO.type,
+      deleteSpeed: MONO.del,
+      pauseAfterDelete: MONO.afterDelete,
       pauseAfterType: (t) => {
         const i = monologueLines.indexOf(t);
         if (!monologueAt || i < 0) return 900 + 24 * t.length;
-        const next = i + 1 < MONOLOGUE_LINES.length ? MONOLOGUE_LINES[i + 1] * 1000 : performance.now() - monologueAt + audio.sayingLeft() + 300;
-        return Math.max(250, next - (performance.now() - monologueAt));
+        const elapsed = performance.now() - monologueAt;
+        if (i + 1 >= MONOLOGUE_LINES.length) return Math.max(250, audio.sayingLeft() + 300);
+        // the wipe and the pause after it come before the next line: the next starts on the voice's cue
+        const wipe = t.length * MONO.del + MONO.afterDelete;
+        return Math.max(120, MONOLOGUE_LINES[i + 1] * 1000 - elapsed - wipe);
       },
     });
     const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;

@@ -6,6 +6,7 @@ import { EpisodeId, TOTAL_LENGTH, autoplay, chapterTurn, gates, locate, readScro
 import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
+import { letter } from './scenes/city/letter';
 import { Stylizer, stylize } from './render/Stylizer';
 import { FrameGrab } from './render/FrameGrab';
 import { chapterOf, chapterReadiness } from './core/chapters';
@@ -334,6 +335,7 @@ export function App() {
         encounter,
         encounterAt,
         goToChapter,
+        letter,
         get scene() {
           return (window as unknown as { __scene?: unknown }).__scene;
         },
