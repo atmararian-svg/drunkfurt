@@ -1,6 +1,7 @@
 import heroUrl from '../assets/hero.webp';
 import { decodeAll, splitChars } from './decode';
 import { diagNote } from './diag';
+import { mountHeroFx } from './heroFx';
 
 /**
  * The two text boxes of the page (Figma "Drunkfurt-text-boxes", frame
@@ -154,11 +155,10 @@ export function mountTextBoxes(host: HTMLElement) {
   svg.append(defs);
 
   // his thoughts: the face in the corner and the box beside it
-  const face = document.createElement('img');
+  // (a canvas: the portrait printed with its live halftone, heroFx.ts)
+  const face = document.createElement('canvas');
   face.className = 'hero-face';
-  face.src = heroUrl;
-  face.alt = '';
-  face.decoding = 'async';
+  face.setAttribute('aria-hidden', 'true');
   const box = document.createElement('div');
   box.className = 'hero-box';
   box.setAttribute('role', 'status');
@@ -187,6 +187,7 @@ export function mountTextBoxes(host: HTMLElement) {
   tip.append(row, bar);
 
   host.append(svg, face, box, tip);
+  const unFx = mountHeroFx(face, box, heroUrl);
   const faceP = presence(face, pixelFilter(defs, 'df-px-face'));
   const boxP = presence(box, pixelFilter(defs, 'df-px-thought'), 0.12);
   // (a plain tip has no pixels: no filter at all on it, just its fade)
@@ -263,6 +264,7 @@ export function mountTextBoxes(host: HTMLElement) {
     update,
     dispose() {
       svg.remove();
+      unFx();
       face.remove();
       box.remove();
       tip.remove();

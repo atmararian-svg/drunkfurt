@@ -853,7 +853,7 @@ body { cursor: pointer; }
   place-items: center;
   pointer-events: none;
 }
-.letter-canvas { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.55)); }
+.letter-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .letter-img { box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55); transform-origin: 50% 60%; opacity: 0; }
 /* the cursor: the label follows the pointer (a real pointer only) */
 .letter-cursor {
@@ -1271,3 +1271,6 @@ body { cursor: pointer; }
 .mstub-btn:focus-visible .mstub-hint,
 .mstub-btn--a.is-done .mstub-hint { color: rgba(255, 255, 255, 0.75); }
 @media (prefers-reduced-motion: reduce) { .mstub-msg::after { animation: none; } .stage--backdrop { transition: none; } }
+/* the thought box's live halftone (ui/heroFx.ts), under its words */
+.hero-box-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.hero-box > :not(.hero-box-fx) { position: relative; }
