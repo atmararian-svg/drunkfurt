@@ -15,8 +15,13 @@ const EXIT = { duration: 800, easing: 'cubic-bezier(0.7, 0, 0.84, 0)' };
 
 let current: { el: HTMLElement; anim: Animation | null; timer: number } | null = null;
 
+/** When the last card went (performance.now()). */
+let endedAt = 0;
+export const sinceTitleCard = () => (current ? 0 : performance.now() - endedAt);
+
 function stop() {
   if (!current) return;
+  endedAt = performance.now();
   window.clearTimeout(current.timer);
   current.anim?.cancel();
   current.el.classList.remove('is-on');

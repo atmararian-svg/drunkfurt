@@ -17,6 +17,7 @@ import { Overlay } from './ui/Overlay';
 import { watchContextLoss } from './ui/stub';
 import { Preloader } from './ui/Preloader';
 import { DIAG, diagFrame, diagNote } from './ui/diag';
+import { sinceTitleCard, titleCardOn, titleCardPlayed } from './ui/titleCards';
 
 /**
  * Marks a chapter ready once its world has rendered: placed inside the
@@ -185,7 +186,12 @@ function Prewarm({ ahead }: { ahead: boolean }) {
     let next = 0;
     const later = (ms: number) => (timer = window.setTimeout(step, ms));
     // (and not while a tip is up: the first one comes as the page settles, and the two would fall together)
+    // (nor before the chapter's title card has come and gone: the page is just handed over, the card is
+    // sliding in over a live 3D frame, and compiling as well tipped a retina Mac into a hang)
     const busy = () =>
+      titleCardOn() ||
+      !titleCardPlayed() ||
+      sinceTitleCard() < 9000 ||
       document.querySelector<HTMLElement>('.tip')?.style.visibility === 'visible' ||
       chapterTurn.busy || document.hidden || !!document.querySelector('.pixel-reveal, .chapter-out') || document.documentElement.classList.contains('is-preloading');
     const step = () => {
