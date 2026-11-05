@@ -25,6 +25,7 @@ function stop() {
 /** Slides chapter `n`'s card in, holds it, slides it out. */
 export function showTitleCard(n: number) {
   stop();
+  played = true;
   const el = document.querySelector<HTMLElement>(`.tcard[data-chapter="${n}"]`);
   const slide = el?.querySelector<HTMLElement>('.tcard-slide');
   if (!el || !slide) return;
@@ -53,6 +54,12 @@ export function showTitleCard(n: number) {
   if (entry.anim) entry.anim.finished.then(arrived, () => undefined);
   else arrived();
 }
+
+/** Whether a card is on the page (coming, holding or going). */
+export const titleCardOn = () => current !== null;
+/** Whether a card has been shown and has gone again (the page has been handed over and has settled). */
+let played = false;
+export const titleCardPlayed = () => played && current === null;
 
 /** Takes any card away at once (a chapter is being left). */
 export function hideTitleCard() {
