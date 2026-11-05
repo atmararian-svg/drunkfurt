@@ -242,7 +242,7 @@ export function Overlay() {
         actionShown(id, local) || ask === 'defend' || ask === 'rev' || letter.open || chapterTurn.busy || monitor.entering || html.contains('is-preloading') || html.contains('site-handoff');
       boxes.update(
         thought ? { key: thought.key, text: thought.c.text, kicker: thought.c.kicker } : null,
-        tipDef ? { key: tipDef.key, text: tipDef.c.text } : null,
+        tipDef ? { key: tipDef.key, text: tipDef.c.text, plain: tipDef.c.plain } : null,
         busy,
       );
       updateCombatPrompts(actionShown(id, local) || ask === 'rev', ask === 'defend' ? 'defend' : ask === 'rev' ? 'rev' : null);

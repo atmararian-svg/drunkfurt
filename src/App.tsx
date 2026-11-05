@@ -181,7 +181,9 @@ function Prewarm({ ahead }: { ahead: boolean }) {
     let waiting: { isReady(): boolean } | null = null;
     let next = 0;
     const later = (ms: number) => (timer = window.setTimeout(step, ms));
+    // (and not while a tip is up: the first one comes as the page settles, and the two would fall together)
     const busy = () =>
+      document.querySelector<HTMLElement>('.tip')?.style.visibility === 'visible' ||
       chapterTurn.busy || document.hidden || !!document.querySelector('.pixel-reveal, .chapter-out') || document.documentElement.classList.contains('is-preloading');
     const step = () => {
       const root = marker.current?.parent as (Group & { fog?: FogExp2 | null }) | undefined;

@@ -30,6 +30,8 @@ export interface BoxLine {
   key: string;
   text: string;
   kicker?: string;
+  /** Fades in and out only, no pixels (a tip). */
+  plain?: boolean;
 }
 
 const PIX = { in: 0.55, out: 0.55, block: 22 };
@@ -186,7 +188,10 @@ export function mountTextBoxes(host: HTMLElement) {
   host.append(svg, face, box, tip);
   const faceP = presence(face, pixelFilter(defs, 'df-px-face'));
   const boxP = presence(box, pixelFilter(defs, 'df-px-thought'), 0.12);
-  const tipP = presence(tip, pixelFilter(defs, 'df-px-tip'));
+  // (a plain tip has no pixels: no filter at all on it, just its fade)
+  const tipPix = pixelFilter(defs, 'df-px-tip');
+  let tipPlain = false;
+  const tipP = presence(tip, (el, b) => tipPix(el, tipPlain ? 1 : b));
 
   let thoughtKey = '';
   let lastThought = 0;
@@ -231,6 +236,7 @@ export function mountTextBoxes(host: HTMLElement) {
     if (tipDone && tipWant?.key !== tipDone) tipDone = '';
     if (tipWant && tipWant.key !== tipKey && tipWant.key !== tipDone) {
       tipKey = tipWant.key;
+      tipPlain = !!tipWant.plain;
       setLine(tipText, tipWant.text);
       splitChars(label);
       tipP.show(now, [label, tipText]);
