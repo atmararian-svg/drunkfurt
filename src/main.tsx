@@ -4,6 +4,10 @@ import './fonts.css';
 import './styles.css';
 import { mountDitherCursor } from './ui/ditherCursor';
 import { showStub, stubReason } from './ui/stub';
+import { mountDiag } from './ui/diag';
+
+// (?diag: what makes the page wait, in a panel: ui/diag.ts)
+mountDiag();
 
 // where the story cannot run as it should (no WebGL; a phone or tablet), a page of its own in its
 // place (with no WebGL, none of the 3D is loaded)

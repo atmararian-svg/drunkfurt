@@ -1,4 +1,5 @@
 import { decodeIn } from './decode';
+import { diagNote } from './diag';
 
 /**
  * The chapter title cards (Figma "Drunkfurt", Example-chapter-1…3): a frosted
@@ -26,6 +27,7 @@ function stop() {
 export function showTitleCard(n: number) {
   stop();
   played = true;
+  diagNote(`title card ${n} in`);
   const el = document.querySelector<HTMLElement>(`.tcard[data-chapter="${n}"]`);
   const slide = el?.querySelector<HTMLElement>('.tcard-slide');
   if (!el || !slide) return;

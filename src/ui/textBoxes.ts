@@ -1,5 +1,6 @@
 import heroUrl from '../assets/hero.webp';
 import { decodeAll, splitChars } from './decode';
+import { diagNote } from './diag';
 
 /**
  * The two text boxes of the page (Figma "Drunkfurt-text-boxes", frame
@@ -237,6 +238,7 @@ export function mountTextBoxes(host: HTMLElement) {
     if (tipWant && tipWant.key !== tipKey && tipWant.key !== tipDone) {
       tipKey = tipWant.key;
       tipPlain = !!tipWant.plain;
+      diagNote(`tip in: ${tipWant.text.slice(0, 40)}`);
       setLine(tipText, tipWant.text);
       splitChars(label);
       tipP.show(now, [label, tipText]);

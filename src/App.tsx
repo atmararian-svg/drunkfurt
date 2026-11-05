@@ -16,6 +16,7 @@ import { goToChapter, installChapterTransitions } from './ui/chapterTransition';
 import { Overlay } from './ui/Overlay';
 import { watchContextLoss } from './ui/stub';
 import { Preloader } from './ui/Preloader';
+import { DIAG, diagFrame, diagNote } from './ui/diag';
 
 /**
  * Marks a chapter ready once its world has rendered: placed inside the
@@ -218,7 +219,9 @@ function Prewarm({ ahead }: { ahead: boolean }) {
           root.visible = true;
           root.fog = PREWARM_FOG;
           gl.setRenderTarget(pass === 0 ? null : PREWARM_RT);
+          const c0 = performance.now();
           gl.compile(o, camera, root as unknown as Scene);
+          if (DIAG) diagNote(`prewarm compile ${o.name || o.type} ${(performance.now() - c0).toFixed(0)} ms (programs ${gl.info.programs?.length})`);
           // a new program made: wait for it before the next (an existing one: go straight on)
           if ((gl.info.programs?.length ?? 0) > before) {
             const mat = (Array.isArray(o.material) ? o.material[0] : o.material) as Material;
@@ -417,6 +420,14 @@ export function App() {
             if (BACKDROP) gl.domElement.addEventListener('webglcontextlost', () => document.documentElement.classList.remove('backdrop-on'));
             else watchContextLoss(gl.domElement);
             if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__gl = gl;
+            if (DIAG) {
+              const render = gl.render.bind(gl);
+              gl.render = (s, c) => {
+                const r0 = performance.now();
+                render(s, c);
+                diagFrame(performance.now() - r0, `${story.getState().episode}, programs ${gl.info.programs?.length}, dpr ${gl.getPixelRatio()}`);
+              };
+            }
           }}
         >
           <Suspense fallback={null}>

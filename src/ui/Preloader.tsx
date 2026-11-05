@@ -11,6 +11,7 @@ import { SoundChoice, mountSoundChoice } from './soundChoice';
 import { showTitleCard } from './titleCards';
 import { takeResume } from './resume';
 import { goToChapter } from './chapterTransition';
+import { diagNote } from './diag';
 
 /**
  * The preloader (Figma "Drunkfurt": Preloader-Start → Preloader-Final), a
@@ -259,6 +260,7 @@ export function Preloader() {
             // hidden at once (React removes it a moment later), so the fade to the sharp page shows the stage
             el.style.visibility = 'hidden';
             document.documentElement.classList.remove('is-preloading');
+            diagNote('preloader gone: the station is on');
             setGone(true);
           },
         });
