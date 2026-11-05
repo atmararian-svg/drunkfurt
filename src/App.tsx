@@ -111,7 +111,9 @@ function FreeOnUnmount() {
           for (const v of Object.values(mat)) if (v && (v as Texture).isTexture) seen.add(v as Texture);
         }
       });
+      const d0 = performance.now();
       seen.forEach((x) => x.dispose());
+      if (DIAG) diagNote(`world freed: ${seen.size} objects in ${(performance.now() - d0).toFixed(0)} ms`);
     };
   }, []);
   return <object3D ref={marker} />;
@@ -422,6 +424,11 @@ export function App() {
             else watchContextLoss(gl.domElement);
             if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__gl = gl;
             if (DIAG) {
+              (window as unknown as { __diagState?: () => string }).__diagState = () => {
+                const l = locate(timeline.progress);
+                const m = gl.info.memory;
+                return `${l.id} ${l.local.toFixed(3)}, prompt ${story.getState().prompt}, geo ${m.geometries} tex ${m.textures} programs ${gl.info.programs?.length}, dpr ${gl.getPixelRatio()}, letter ${letter.open ? 'open' : letter.read ? 'read' : '-'}`;
+              };
               const render = gl.render.bind(gl);
               gl.render = (s, c) => {
                 const r0 = performance.now();

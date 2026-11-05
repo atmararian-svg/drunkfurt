@@ -29,14 +29,21 @@ function listen() {
   );
 }
 
-/** How much the pointer is felt at a page point (0…1), and the unit vector away from it. */
+/** How much the pointer is felt at a page point (0…1), and the unit vector away from it (one object, reused: no garbage per dot). */
+const p = { k: 0, ux: 0, uy: 0 };
 function near(px: number, py: number) {
   const dx = px - pointer.x;
   const dy = py - pointer.y;
   const d = Math.hypot(dx, dy);
-  if (d > REACH) return { k: 0, ux: 0, uy: 0 };
+  if (d > REACH) {
+    p.k = p.ux = p.uy = 0;
+    return p;
+  }
   const u = 1 - d / REACH;
-  return { k: u * u * (3 - 2 * u), ux: d > 0 ? dx / d : 0, uy: d > 0 ? dy / d : 0 };
+  p.k = u * u * (3 - 2 * u);
+  p.ux = d > 0 ? dx / d : 0;
+  p.uy = d > 0 ? dy / d : 0;
+  return p;
 }
 
 function fitCanvas(c: HTMLCanvasElement, w: number, h: number) {
@@ -105,7 +112,7 @@ export function mountHeroFx(face: HTMLCanvasElement, box: HTMLElement, src: stri
           if (m < 0.08) continue;
           const x = i * CELL + (j % 2) * (CELL / 2);
           const y = j * CELL;
-          const p = near(r.left + x, r.top + y);
+          near(r.left + x, r.top + y);
           const wave = 0.5 + 0.5 * Math.sin(t * 1.3 - (x + y) * 0.022 + side * 0.6);
           // (near the pointer the dots grow with the ink that is there: the face stays readable)
           const rad = Math.min(CELL * 0.48, m * (0.35 + 0.5 * wave + p.k * 0.7) * CELL * 0.32 + p.k * CELL * 0.08);
@@ -139,7 +146,7 @@ export function mountHeroFx(face: HTMLCanvasElement, box: HTMLElement, src: stri
         for (let i = 0; i < c; i++) {
           const x = i * CELL + (j % 2) * (CELL / 2);
           const y = j * CELL;
-          const p = near(r.left + x, r.top + y);
+          near(r.left + x, r.top + y);
           let rad: number;
           if (side === 0) {
             // the paper's own screen: a fine dot, rising and falling in a slow diagonal wave

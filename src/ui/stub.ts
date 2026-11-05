@@ -4,6 +4,7 @@ import { saveResume } from './resume';
 import { decodeAll, splitChars } from './decode';
 import { pixelFilter, presence } from './textBoxes';
 import logoSvg from '../assets/drunkfurt-logo.svg?raw';
+import { requestTilt, tryTilt } from '../player/input';
 
 /**
  * The page in place of the story where it cannot run as it should: a browser
@@ -220,6 +221,9 @@ function showPhoneStub() {
     if (busy) requestAnimationFrame(frame);
   };
   requestAnimationFrame(frame);
+
+  // the room behind turns with the phone's tilt: at once where no permission is asked, else from the first tap
+  if (!tryTilt()) root.addEventListener('pointerdown', requestTilt, { once: true });
 
   // [A]: the address to the clipboard (or, where there is none, the phone's share sheet), said on the button
   const a = q('.mstub-btn--a');
