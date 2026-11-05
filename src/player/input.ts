@@ -29,6 +29,8 @@ export const input = {
     window.removeEventListener('blur', onLeave);
   },
   pointer,
+  /** How far the look turns for the same pointer (the phone's tilt turns it further than a mouse does). */
+  gain: 1,
 };
 
 /**
@@ -60,8 +62,17 @@ const onTilt = (e: DeviceOrientationEvent) => {
 function startTilt() {
   if (tiltOn) return;
   tiltOn = true;
+  input.gain = 2;
+  tiltListeners.forEach((f) => f());
   window.addEventListener('deviceorientation', onTilt);
 }
+
+const tiltListeners = new Set<() => void>();
+/** Called once the tilt is on (the page can say so). */
+export const onTiltOn = (f: () => void) => void tiltListeners.add(f);
+/** Whether the tilt must be asked for with a tap (iOS). */
+export const tiltNeedsTap = () =>
+  typeof (window as unknown as { DeviceOrientationEvent?: { requestPermission?: unknown } }).DeviceOrientationEvent?.requestPermission === 'function';
 
 /** Starts the tilt where no permission is asked (Android); true if it could. */
 export function tryTilt() {

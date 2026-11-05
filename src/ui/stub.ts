@@ -4,7 +4,7 @@ import { saveResume } from './resume';
 import { decodeAll, splitChars } from './decode';
 import { pixelFilter, presence } from './textBoxes';
 import logoSvg from '../assets/drunkfurt-logo.svg?raw';
-import { requestTilt, tryTilt } from '../player/input';
+import { onTiltOn, requestTilt, tiltNeedsTap, tryTilt } from '../player/input';
 
 /**
  * The page in place of the story where it cannot run as it should: a browser
@@ -222,8 +222,23 @@ function showPhoneStub() {
   };
   requestAnimationFrame(frame);
 
-  // the room behind turns with the phone's tilt: at once where no permission is asked, else from the first tap
-  if (!tryTilt()) root.addEventListener('pointerdown', requestTilt, { once: true });
+  // the room behind turns with the phone's tilt: at once where no permission is asked; on iOS the permission
+  // can only be asked from a tap (a touchend or a click: Safari does not count a pointerdown), so the page
+  // says so under the hour until it is on
+  if (!tryTilt() && tiltNeedsTap()) {
+    const hint = document.createElement('p');
+    hint.className = 'mstub-tilt';
+    hint.textContent = 'TAP, THEN TILT YOUR PHONE TO LOOK AROUND';
+    root.querySelector('.mstub-time')?.after(hint);
+    const ask = () => requestTilt();
+    document.addEventListener('touchend', ask);
+    document.addEventListener('click', ask);
+    onTiltOn(() => {
+      document.removeEventListener('touchend', ask);
+      document.removeEventListener('click', ask);
+      hint.remove();
+    });
+  }
 
   // [A]: the address to the clipboard (or, where there is none, the phone's share sheet), said on the button
   const a = q('.mstub-btn--a');

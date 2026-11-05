@@ -7,6 +7,7 @@ import { EPISODES, builtEpisodes } from './episodes';
 import { cameraDirector, rigPose, ScrollCameraRig } from './player/ScrollCameraRig';
 import { encounter, encounterAt } from './scenes/city/encounter';
 import { letter } from './scenes/city/letter';
+import { getaway } from './scenes/car/getaway';
 import { LETTER_REVEAL, openLetter } from './ui/letterReveal';
 import { Stylizer, stylize } from './render/Stylizer';
 import { FrameGrab } from './render/FrameGrab';
@@ -389,6 +390,7 @@ export function App() {
         letter,
         openLetter,
         LETTER_REVEAL,
+        getaway,
         get scene() {
           return (window as unknown as { __scene?: unknown }).__scene;
         },

@@ -68,6 +68,7 @@ export function Mercedes() {
   }, [active]);
 
   const clock = useRef(0);
+  const steerAngle = useRef(0);
   useFrame(() => {
     const local = localProgress('car');
     // the revs run on the wall clock, so the climb takes the same time at any frame rate
@@ -80,6 +81,13 @@ export function Mercedes() {
     car.root.position.set(at.x, ROAD_Y, at.z);
     car.root.rotation.y = at.yaw;
     car.roll(run.s);
+    // the wheel in your hands follows the road: the front wheels' angle for the path's bend here (a 2.87 m
+    // wheelbase), times a steering ratio of 15, eased in as you would turn it (not snapped from one value to the next)
+    const bend = (carAt(run.s + 0.25).yaw - carAt(Math.max(0, run.s - 0.25)).yaw) / (run.s + 0.25 - Math.max(0, run.s - 0.25));
+    const want = run.s > 0.02 ? Math.atan(2.87 * bend) * 15 : 0;
+    steerAngle.current += (want - steerAngle.current) * Math.min(1, dt * 5);
+    car.steer(steerAngle.current);
+    if (import.meta.env.DEV) (window as unknown as { __steer?: unknown }).__steer = { s: run.s, want, at: steerAngle.current };
     // the car knows you, opens for you, starts
     const lit = lightsAt(local);
     car.lights(lit);

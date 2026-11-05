@@ -1,7 +1,7 @@
 import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
-import { BEAT, BLOCK, KO } from './beats';
+import { BEAT, BLOCK, KO, LETTER_FALL } from './beats';
 import { Floor, Gate, autoplay, floors, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 
 /**
@@ -26,7 +26,7 @@ import { Floor, Gate, autoplay, floors, gates, globalProgress, localProgress, pl
  */
 export type Outcome = 'blocked' | 'knockedOut' | null;
 
-export { BEAT, BLOCK, KO } from './beats';
+export { BEAT, BLOCK, KO, LETTER_FALL } from './beats';
 
 export const encounter = {
   /** The visitor's decision. Set once, at the gate. */
@@ -104,13 +104,14 @@ export function encounterAt(local: number): EncounterView {
  */
 export function cityTimeScale(local: number) {
   if (encounter.armed) return 0.1;
-  if (encounter.outcome && local >= BEAT.gate) return local >= BEAT.aftermath ? 0.35 : 0.1;
+  // (the hush comes on over the aftermath's first moments, not at once: a step in the street's pace showed as a jolt)
+  if (encounter.outcome && local >= BEAT.gate) return 0.1 + 0.25 * smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
   const s = smoothstep(clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1));
   return 1 - 0.9 * s;
 }
 
 // --- sound cues of the outcome, fired as the playback crosses them (never on a scrub backwards)
-interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
+interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] | 'letterFlutter' | 'letterLand' }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
     // the two blows, "ts, ts": each with its exhale, 0.28 s apart, the second the uppercut; then him landing
@@ -119,6 +120,9 @@ const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
     { at: BLOCK.hit2, kind: 'exhale2' },
     { at: BLOCK.hit2, kind: 'punch' },
     { at: BLOCK.land, kind: 'fall' },
+    // the letter out of his coat: its fall, and it landing on the pavement
+    { at: LETTER_FALL.from, kind: 'letterFlutter' },
+    { at: LETTER_FALL.from + LETTER_FALL.s, kind: 'letterLand' },
   ],
   knockedOut: [
     { at: 0, kind: 'exhale2' },
@@ -149,7 +153,12 @@ export function updateEncounter() {
   const t = sequenceTime(local);
   const prev = Math.max(lastT, -0.001);
   if (encounter.outcome && autoplay.active && t > prev && t - prev < 0.5) {
-    for (const c of CUES[encounter.outcome]) if (c.at > prev && c.at <= t) audio.fight(c.kind);
+    for (const c of CUES[encounter.outcome]) {
+      if (!(c.at > prev && c.at <= t)) continue;
+      if (c.kind === 'letterFlutter') audio.paper('flutter');
+      else if (c.kind === 'letterLand') audio.paper('drop');
+      else audio.fight(c.kind);
+    }
   }
   lastT = t;
 }

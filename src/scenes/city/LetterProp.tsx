@@ -5,7 +5,8 @@ import { mulberry32 } from '../../core/math';
 import { localProgress } from '../../core/timeline';
 import { input } from '../../player/input';
 import { LETTER, letter, letterThere, pickLetter } from './letter';
-import { BLOCK, encounterAt } from './encounter';
+import { encounterAt } from './encounter';
+import { LETTER_FALL } from './beats';
 
 /** Where the sheet lies: on the pavement between you and him, by his coat (the street's frame, metres). */
 export const LETTER_SPOT = { x: 6.42, y: 0.045, z: -35.15 };
@@ -13,7 +14,7 @@ export const LETTER_SPOT = { x: 6.42, y: 0.045, z: -35.15 };
  * Its fall out of his coat: from his chest where the uppercut lands (fight's clock, s), down onto the
  * pavement in a moment, as a thing dropped does (faster and faster).
  */
-const FALL = { from: BLOCK.hit2 + 0.06, s: 0.62, x: 6.5, y: 1.3, z: -35.2 };
+const FALL = { ...LETTER_FALL, x: 6.5, y: 1.3, z: -35.2 };
 
 /**
  * The crumpled letter on the pavement: a ball of paper (a subdivided

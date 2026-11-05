@@ -51,3 +51,10 @@ export const BLOCK = {
   land: 1.8,
   resolve: 3.0,
 } as const;
+
+/**
+ * The letter falling out of his coat as the uppercut lands (the fight's clock, s): from his chest onto the
+ * pavement in `s` seconds (scenes/city/LetterProp.tsx draws it; its sounds are cues of the fight).
+ */
+export const LETTER_FALL = { from: BLOCK.hit2 + 0.06, s: 0.62 };
+

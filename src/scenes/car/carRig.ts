@@ -1,4 +1,4 @@
-import { Color, DoubleSide, Group, Material, Matrix4, Mesh, MeshStandardMaterial, Quaternion, Vector3 } from 'three';
+import { Box3, CanvasTexture, CircleGeometry, Color, DoubleSide, Group, Material, Matrix4, Mesh, MeshStandardMaterial, Quaternion, SRGBColorSpace, Vector3 } from 'three';
 import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { buildCluster } from './carCluster';
 import { buildCarScreen } from './carScreen';
@@ -36,6 +36,8 @@ export interface CarRig {
   pedal(down: number): void;
   /** Rolls the wheels by a distance travelled (m). */
   roll(distance: number): void;
+  /** Turns the steering wheel (rad; positive to the left, as the driver turns it to go left). */
+  steer(angle: number): void;
   /** Frees this build's own materials and the cluster's canvas texture (the model's geometry is shared: kept). */
   dispose(): void;
   /** A point in the car's own frame (m, facing +z, driver on +x) to world space. */
@@ -170,6 +172,40 @@ export function buildCar(gltf: GLTF): CarRig {
   const gasRest = gas?.quaternion.clone();
   const qp = new Quaternion();
 
+  // the steering wheel: it turns about its own face's normal (its node's z), through the hub (the node's origin);
+  // the maker's star in its hub gives way to the story's own badge
+  const steerNode = node('w206_steer');
+  const steerRest = steerNode.quaternion.clone();
+  const Z = new Vector3(0, 0, 1);
+  const qs = new Quaternion();
+  let star: Mesh | null = null;
+  steerNode.traverse((o) => {
+    const mesh = o as Mesh;
+    if (mesh.isMesh && (mesh.userData.srcMats as string[] | undefined)?.[0] === 'w206_chrome') star = mesh;
+  });
+  let badgeTex: CanvasTexture | null = null;
+  let badgeMat: MeshStandardMaterial | null = null;
+  if (star) {
+    const s = star as Mesh;
+    s.visible = false;
+    s.geometry.computeBoundingBox();
+    const bb = s.geometry.boundingBox ?? new Box3();
+    const c = bb.getCenter(new Vector3());
+    const size = bb.getSize(new Vector3());
+    badgeTex = new CanvasTexture(drawBadge());
+    badgeTex.colorSpace = SRGBColorSpace;
+    badgeTex.anisotropy = 4;
+    badgeMat = new MeshStandardMaterial({ map: badgeTex, metalness: 0.55, roughness: 0.38, transparent: true });
+    const r = Math.max(size.x, size.y) * 0.5;
+    const badge = new Mesh(new CircleGeometry(r, 48), badgeMat);
+    // on the hub's face, a hair in front of where the star stood, facing the driver
+    badge.position.set(c.x, c.y, bb.max.z + r * 0.02);
+    // (the wheel's node has its y pointing down: turned round, the monogram stands upright)
+    badge.rotation.z = Math.PI;
+    badge.userData.ink = false;
+    s.parent?.add(badge);
+  }
+
   const toWorld = (local: Vector3, out = new Vector3()) => root.localToWorld(out.copy(local));
 
   return {
@@ -198,14 +234,62 @@ export function buildCar(gltf: GLTF): CarRig {
         if (!mesh.isMesh) return;
         (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).forEach((x) => mats.add(x));
       });
+      badgeTex?.dispose();
       mats.forEach((x) => {
         (x as MeshStandardMaterial & { map?: { dispose(): void } }).map?.dispose?.();
         x.dispose();
       });
+    },
+    steer(angle) {
+      steerNode.quaternion.copy(steerRest).multiply(qs.setFromAxisAngle(Z, angle));
     },
     roll(distance) {
       const a = distance / WHEEL_RADIUS;
       for (const w of wheels) w.o.quaternion.copy(qw.setFromAxisAngle(X, a)).multiply(w.rest);
     },
   };
+}
+
+/**
+ * The steering wheel's badge in place of the maker's star: a dark enamel roundel with a fine steel ring
+ * and the story's monogram, D and F leaning into each other, in the page's own slanted capitals.
+ */
+function drawBadge() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 256;
+  const x = c.getContext('2d')!;
+  x.translate(128, 128);
+  // the steel rim
+  const rim = x.createLinearGradient(-128, -128, 128, 128);
+  rim.addColorStop(0, '#d9d9d9');
+  rim.addColorStop(0.5, '#6d6d6d');
+  rim.addColorStop(1, '#bdbdbd');
+  x.fillStyle = rim;
+  x.beginPath();
+  x.arc(0, 0, 124, 0, Math.PI * 2);
+  x.fill();
+  // the enamel
+  x.fillStyle = '#121212';
+  x.beginPath();
+  x.arc(0, 0, 108, 0, Math.PI * 2);
+  x.fill();
+  // a fine inner line
+  x.strokeStyle = 'rgba(255,255,255,0.35)';
+  x.lineWidth = 3;
+  x.beginPath();
+  x.arc(0, 0, 96, 0, Math.PI * 2);
+  x.stroke();
+  // the monogram, slanted as the site's headlines are
+  x.save();
+  x.transform(1, 0, -0.22, 1, 0, 0);
+  x.fillStyle = '#e8e8e8';
+  x.font = '800 112px Archivo, "Arial Black", sans-serif';
+  x.textAlign = 'center';
+  x.textBaseline = 'middle';
+  x.fillText('DF', 6, 6);
+  x.restore();
+  // the page's red, a thin bar under it
+  x.fillStyle = '#cd1919';
+  x.fillRect(-46, 52, 92, 8);
+  return c;
 }

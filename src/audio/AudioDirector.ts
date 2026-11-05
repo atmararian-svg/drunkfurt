@@ -216,8 +216,26 @@ class AudioDirector {
    * gone out of view, hits the pavement: down there, by your feet, not by your ears, so muffled
    * (a low-pass) and quieter.
    */
-  paper(kind: 'unfold' | 'crumple' | 'land') {
+  paper(kind: 'unfold' | 'crumple' | 'land' | 'flutter' | 'drop') {
     const ctx = this.ctx;
+    if (kind === 'flutter') return this.paperFlutter();
+    if (kind === 'drop') {
+      // the letter out of his coat landing on the pavement: the paper's slap, close by and soft
+      const buf = this.buffers.get('paperToss');
+      const out = this.buses.get('body');
+      if (!ctx || !buf || !out) return;
+      const s = ctx.createBufferSource();
+      s.buffer = buf;
+      s.playbackRate.value = 1.12;
+      const g = ctx.createGain();
+      g.gain.value = 0.42;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 260;
+      s.connect(hp).connect(g).connect(out);
+      s.start();
+      return;
+    }
     const id = ({ unfold: 'paperUnfold', crumple: 'paperCrumple', land: 'paperToss' } as const)[kind];
     const buffer = this.buffers.get(id);
     const bus = this.buses.get('body');
@@ -234,6 +252,33 @@ class AudioDirector {
       src.connect(lp).connect(g).connect(bus);
     } else src.connect(g).connect(bus);
     src.start();
+  }
+
+  /** A sheet of paper falling: an airy rustle that flutters as it turns over (0.6 s), quiet. */
+  private paperFlutter() {
+    const ctx = this.ctx;
+    const out = this.buses.get('body');
+    if (!ctx || !out) return;
+    const t = ctx.currentTime;
+    const n = this.noiseSource();
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(2600, t);
+    bp.frequency.linearRampToValueAtTime(1500, t + 0.6);
+    bp.Q.value = 0.9;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    // the turns of the sheet: a few soft swells
+    const swells = [0.04, 0.17, 0.29, 0.4, 0.5];
+    swells.forEach((a, i) => {
+      const peak = 0.055 * (1 - i * 0.12);
+      g.gain.linearRampToValueAtTime(peak, t + a);
+      g.gain.linearRampToValueAtTime(peak * 0.25, t + a + 0.07);
+    });
+    g.gain.linearRampToValueAtTime(0, t + 0.62);
+    n.connect(bp).connect(g).connect(out);
+    n.start(t);
+    n.stop(t + 0.66);
   }
 
   /** Stops the line being said (a quick fade), if any. */

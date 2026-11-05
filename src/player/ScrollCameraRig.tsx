@@ -77,8 +77,8 @@ export function ScrollCameraRig() {
 
     // subtle look-around, eased back to the composed frame when the pointer leaves
     const p = input.pointer;
-    st.lookYaw = damp(st.lookYaw, p.active ? -p.x * LOOK_YAW : 0, 2.4, dt);
-    st.lookPitch = damp(st.lookPitch, p.active ? -p.y * LOOK_PITCH : 0, 2.4, dt);
+    st.lookYaw = damp(st.lookYaw, p.active ? -p.x * LOOK_YAW * input.gain : 0, 2.4, dt);
+    st.lookPitch = damp(st.lookPitch, p.active ? -p.y * LOOK_PITCH * input.gain : 0, 2.4, dt);
     // the head follows the eyes a little, a touch slower than the gaze
     st.leanX = damp(st.leanX, p.active ? p.x : 0, 1.8, dt);
     st.leanY = damp(st.leanY, p.active ? -p.y : 0, 1.8, dt);

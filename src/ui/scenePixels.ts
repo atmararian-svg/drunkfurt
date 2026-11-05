@@ -52,8 +52,15 @@ export function setScenePixels(next: number, blur = 0, shade = 0) {
     ctx = null;
     return;
   }
-  if (canvas) return;
+  // (the last of it dissolves into the live picture rather than being taken away: the copy is a frame behind
+  // and at its own density, so cutting from it to the 3D page was a visible jolt)
+  const fade = Math.min(1, Math.max((next - 1) / 2.5, blur / 0.3, shade / 0.15));
+  if (canvas) {
+    canvas.style.opacity = fade.toFixed(3);
+    return;
+  }
   canvas = document.createElement('canvas');
+  canvas.style.opacity = fade.toFixed(3);
   canvas.className = 'scene-pixels';
   canvas.setAttribute('aria-hidden', 'true');
   ctx = canvas.getContext('2d');
