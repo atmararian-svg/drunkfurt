@@ -17,7 +17,8 @@ import { TOUCH, isPhone } from './touch';
  *    faded top and bottom by the design's gradient (which stays put). Three
  *    chapter markers on it, 120° apart (both tick counts divide 120°): longer
  *    ticks, red for the chapter you are in. The neighbours' names (CH.2, CH.3)
- *    ride with their markers, tilted, at half strength, as in the design.
+ *    ride opposite their markers at half strength; the next one stands over
+ *    the title as its marker nears the frame, and takes the title on it.
  *  - Fixed and horizontal: the selection frame on the axis (59 × 58, r 5), the
  *    ◂ and the red dash in it, and to its left the current chapter's title
  *    (◂ CHAPTER ONE, decoding to CH.1 after two seconds, on every entry into a
@@ -58,8 +59,13 @@ const TITLE = { right: 44 };
 const PANEL = { x: 154, y: 190, w: 157, h: 50, inset: 4 };
 /** How much shows: compact (Selector-default), and open (Selector-1). */
 const SHOW = { compact: 124, open: 323 };
-/** The neighbours' names: on a circle round the centre at 0.3 of their marker's angle (36° at 120°), tilted with it. */
-const LABEL = { r: 272.5, squeeze: 36 / STEP, tilt: 23 / 36 };
+/**
+ * The other chapters' names: on a circle round the centre, each opposite its own long marker (the same
+ * angle), turned with it. Next to the title they come no closer than `near`° (one line above or below
+ * it): the next chapter's name stands over the current title until its marker is on the frame, and
+ * then the title rolls over to it (`aligned`: how close to the frame counts as on it, in chapters).
+ */
+const LABEL = { r: 272.5, near: 4, aligned: 0.02 };
 const NAMES = ['ONE', 'TWO', 'THREE'];
 const TABS = ['ARRIVAL', 'NO WELCOME', 'THE CAVE'];
 /** How long the full title stands before it decodes to CH.n (ms). */
@@ -338,7 +344,7 @@ export function mountChapterTuner(): () => void {
     window.clearTimeout(titleTimer);
     const full = `CHAPTER ${NAMES[n - 1]}`;
     if (shownLabel && shownLabel !== n) rollTo(full, Math.sign(n - shownLabel));
-    else {
+    else if (title.dataset.text !== full) {
       title.dataset.text = full;
       splitChars(title);
       fit(full);
@@ -549,21 +555,27 @@ export function mountChapterTuner(): () => void {
     // forward, the markings move down on the left: the next marker (above) comes to the axis
     scale.setAttribute('transform', `rotate(${(-(shownPos - 1) * STEP).toFixed(3)} ${C.x} ${C.y})`);
     const preview = drag || wheel ? Math.round(shownPos) : held ? held.pos : 0;
-    // turning it by hand: the marker that reaches the frame takes the title, rolling in; let go on the same chapter, it rolls back
-    const atFrame = drag || wheel ? preview : held ? held.pos : active;
+    // the marker on the frame takes the title, rolling in: turning it by hand (let go on the same chapter, it rolls
+    // back), or the scroll bringing the next chapter's marker onto the frame as this chapter ends (its full name,
+    // which the entry into it then decodes to CH.n)
+    const onFrame = Math.round(shownPos);
+    const scrolledOn = Math.abs(shownPos - onFrame) < LABEL.aligned ? onFrame : active;
+    const atFrame = drag || wheel ? preview : held ? held.pos : scrolledOn;
     if (entered && atFrame !== shownLabel) {
-      rollTo(`CH.${atFrame}`, Math.sign(atFrame - shownLabel));
+      const byScroll = !drag && !wheel && !held && atFrame !== active;
+      rollTo(byScroll ? `CHAPTER ${NAMES[atFrame - 1]}` : `CH.${atFrame}`, Math.sign(atFrame - shownLabel));
       shownLabel = atFrame;
     }
     for (let i = 0; i < 3; i++) {
       markers[i].classList.toggle('is-on', i + 1 === active);
-      // the other chapters' names ride with their markers: half strength at their place beside the axis, gone on it and behind
+      // the other chapters' names ride opposite their markers, at half strength; the one on the frame is the title
       const rel = wrap180((i + 1 - shownPos) * STEP);
       const a = Math.abs(rel);
-      const deg = rel * LABEL.squeeze;
+      const deg = Math.sign(rel || 1) * Math.max(LABEL.near, a);
       const [x, y] = at(LABEL.r, deg);
-      names[i].setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${(deg * LABEL.tilt).toFixed(2)})`);
-      const o = i + 1 === active ? 0 : a <= STEP ? 0.5 * clamp((a - 30) / 50, 0, 1) : 0.5 * clamp(1 - (a - STEP) / 60, 0, 1);
+      names[i].setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${deg.toFixed(2)})`);
+      // (gone only where it would leave the scale's visible arc: far round, behind)
+      const o = i + 1 === atFrame ? 0 : 0.5 * clamp(1 - (a - 100) / 30, 0, 1);
       // (a phone shows no names on its scale: its tabs, always out, name the chapters)
       names[i].style.opacity = (phone ? 0 : o).toFixed(3);
       names[i].classList.toggle('is-preview', !!preview && preview === i + 1 && preview !== active);

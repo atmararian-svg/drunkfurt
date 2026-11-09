@@ -54,7 +54,7 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   every tap, and the sound choice and the letter's close could not be tapped.
 - **Words for touch**: the prompts read [TAP] TO DEFEND and [TAP] TO REV (the red key says TAP;
   the panel is the button, and the rev is a press-and-hold on it, as the D was), the letter's
-  close TAP TO CLOSE, the hints "Tap it." and TAP THE SCREEN.
+  close TAP TO CLOSE, the hints "Tap it." and TAP THE BIG SCREEN TO EXPLORE MY WORK.
 - **Sound choice, upright**: on a page taller than wide the pieces are stacked on a 1080 × 1920
   frame (ENABLE above, SOUND in the middle, DISABLE below) and the page splits into a top and a
   bottom half; a tap on a half chooses it.
@@ -115,6 +115,10 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   used to stop it at once, leaving the car standing).
 - **The invitation is said as soon as the letter is read** (its caption holds from where the letter
   can be picked up), so the skip button and the words come together, no scroll needed.
+- **No shader error checks in production** (`gl.debug.checkShaderErrors`, on in development only):
+  three asked for every new program's log as it was first used, and each question made the page
+  wait for the graphics card to finish linking it, one after another (on a retina Mac ~270 ms each:
+  a 6.7 s freeze at the turn into chapter 2 when the next chapter had not been compiled ahead yet).
 - **No hitch after a scripted move**: after any (the fight's playback, the car going on) the page
   holds 300 ms, so the move's own late scroll events cannot set the story back a step (that put
   the fight's pixels back for a moment: a blink); once the invitation is said, the story goes on
@@ -264,6 +268,11 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     one below, the markings moving down past the frame. A chapter's turn is a cut in the
     progress, so the scale turns the rest of the way to the new chapter, eased, over a fraction
     of a second.
+  - **The other chapters' names** ride opposite their own long markers (the same angle, turned with
+    it), at half strength. As a chapter ends, the next chapter's marker comes down to the frame and
+    its name with it, to stand one line over the current title (no closer: 4°); when the marker is
+    on the frame the title rolls over to it, letter by letter (CHAPTER TWO, then CH.2 on entry), and
+    the chapter turns. Going back, the previous chapter is below. No name fades out on the way.
   - **Input** (all through `goToChapter`, the chapter transition; one source of truth, the
     scroll's chapter, read by the scale, the title and the tabs alike): drag up and down on it
     (0.8° per px: a chapter in about 150 px at full size); the wheel or trackpad over it (the page
@@ -859,7 +868,7 @@ you into the screen and out of the story, onto the real site.
   the room, right of the chair; 0.5 at its side; 0.5–0.66 turning in and lowering
   (1.65 → 1.155 m); 0.66–0.72 the settle (a 3.5 cm dip, then upright, eyes up to the screen).
   At 0.76 the story waits (a gate that never opens: the story ends here) with one caption,
-  "CLICK THE SCREEN." (the cave's captions are set in capitals). One of the wall's terminals, to the right of and
+  "CLICK THE BIG SCREEN TO EXPLORE MY WORK." (the cave's captions are set in capitals). One of the wall's terminals, to the right of and
   below the big screen (`screen_13`), shows a few lines about the author (`roomScreens.ts`
   `ABOUT_TEXT`) as console text in capitals, steady and readable from the chair, at twice the
   other screens' resolution.

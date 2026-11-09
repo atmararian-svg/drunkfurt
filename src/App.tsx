@@ -427,6 +427,11 @@ export function App() {
           onCreated={({ gl }) => {
             gl.toneMapping = NoToneMapping;
             gl.outputColorSpace = SRGBColorSpace;
+            // no shader error checks outside development: three asks for each program's log as it is first
+            // used, and that question makes the page wait for the graphics card to finish linking it, one by
+            // one (on a retina Mac, ~270 ms each: the 6.7 s freeze at the turn into chapter 2); unasked, the
+            // card links them side by side while the frame goes on
+            gl.debug.checkShaderErrors = import.meta.env.DEV;
             // (behind the phone's page, a lost context only takes the picture away)
             if (BACKDROP) gl.domElement.addEventListener('webglcontextlost', () => document.documentElement.classList.remove('backdrop-on'));
             else watchContextLoss(gl.domElement);
