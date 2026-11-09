@@ -288,7 +288,8 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
 - **The sound switch**: `[S] SOUND ON|OFF` (the label says what a click does) and a 30 px square
   with the sound's state (the speaker crossed out, or with waves), 2 px apart, sharp corners,
   JetBrains Mono Medium 12 −5 %. SOUND ON (while the sound is off) is white with near-black; SOUND
-  OFF (while it plays) is frosted, white 20 % with a blur, white text. On hover (as the buttons of
+  OFF (while it plays) is a smoky glass (grey 42 %, no backdrop blur: blurred layers over the
+  WebGL canvas crashed the tab on a retina Mac as the sound came on), white text. On hover (as the buttons of
   theperformancelab.ca, read from its code: 0.45 s, cubic-bezier(0.4, 0, 0.2, 1)) the label and the
   square slide right by the square's width and the gap, out of the clipped button, the square
   turning away about its top left corner while another turns in at the left about its bottom right;

@@ -403,20 +403,15 @@ body { cursor: pointer; }
   pointer-events: auto;
   cursor: pointer;
 }
-/* SOUND ON (the sound is off): the white face; SOUND OFF (it plays): frosted, white words */
-.snd-btn[aria-pressed='true'] { --face: rgba(255, 255, 255, 0.2); --ink: #fff; }
+/* SOUND ON (the sound is off): the white face; SOUND OFF (it plays): a smoky glass, white words.
+   (no backdrop blur: three blurred, moving layers over the WebGL canvas crashed the tab on a retina
+   Mac the moment the sound was switched on, as a large one hung it under the title cards before) */
+.snd-btn[aria-pressed='true'] { --face: rgba(120, 120, 124, 0.42); --ink: #fff; }
 .snd-label,
 .snd-face {
   background: var(--face);
   color: var(--ink);
   transition: transform var(--move), background-color 0.25s ease, color 0.25s ease;
-  will-change: transform;
-  backface-visibility: hidden;
-}
-.snd-btn[aria-pressed='true'] .snd-label,
-.snd-btn[aria-pressed='true'] .snd-face {
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
 }
 .snd-label {
   display: inline-flex;
@@ -434,7 +429,6 @@ body { cursor: pointer; }
   height: 30px;
   overflow: hidden;
   transition: transform var(--move);
-  will-change: transform;
 }
 .snd-sq--left { position: absolute; left: 0; top: 0; pointer-events: none; }
 .snd-face { position: absolute; inset: 0; display: grid; place-items: center; }
