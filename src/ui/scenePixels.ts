@@ -20,6 +20,8 @@ let ctx: CanvasRenderingContext2D | null = null;
 let stopWatching: (() => void) | null = null;
 const tiny = document.createElement('canvas');
 let block = 1;
+/** Below this block size (px) the layer fades out over the picture instead of its blocks shrinking further. */
+const FADE_BELOW = 4;
 let soft = 0;
 let dark = 0;
 
@@ -32,7 +34,10 @@ const draw = (src: HTMLCanvasElement) => {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
-  drawPixelated(ctx, tiny, src, block, w, h, soft);
+  // (the last of it is a fade, not blocks shrinking to one pixel: near 1 they shimmer, and then the
+  // layer going would be a visible cut back to the picture)
+  drawPixelated(ctx, tiny, src, Math.max(block, FADE_BELOW), w, h, soft);
+  canvas.style.opacity = block >= FADE_BELOW ? '1' : Math.max(0, (block - 1) / (FADE_BELOW - 1)).toFixed(3);
   if (dark > 0.005) {
     ctx.fillStyle = `rgba(5, 5, 6, ${Math.min(1, dark).toFixed(3)})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);

@@ -213,7 +213,10 @@ export function stepTimeline(dt: number) {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     window.scrollTo({ top: p * max, behavior: 'auto' });
     if (u >= 1) {
-      if (autoplay.locked) holdUntil = performance.now() + 1000;
+      // the page stays put a moment after any scripted move: the scroll events of the move's own last
+      // frames arrive late, and read then they would set the story back a little (a step back into the
+      // fight's pixels, a hitch), then on again
+      holdUntil = performance.now() + (autoplay.locked ? 1000 : 300);
       autoplay.active = autoplay.locked = false;
     }
     if (p !== prev) lastDirection = p > prev ? 1 : -1;

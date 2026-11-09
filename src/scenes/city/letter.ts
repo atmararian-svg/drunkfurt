@@ -1,6 +1,6 @@
 import { Camera, Mesh, Raycaster, Vector2, Vector3 } from 'three';
 import { story } from '../../core/store';
-import { Gate, gates, localProgress, readScroll } from '../../core/timeline';
+import { Gate, gates, globalProgress, jumpTo, localProgress, timeline } from '../../core/timeline';
 import { BEAT } from './beats';
 import { encounter } from './encounter';
 
@@ -68,8 +68,7 @@ export function invitationTyped() {
   holdTimer = window.setTimeout(() => {
     letter.invited = true;
     updateLetter();
-    // the page may already be scrolled past the wait: carry on from where it is, without another scroll
-    readScroll();
+    goOnFromGate();
   }, LETTER.hold);
 }
 
@@ -79,7 +78,16 @@ export function skipInvitation() {
   window.clearTimeout(holdTimer);
   letter.invited = true;
   updateLetter();
-  readScroll();
+  goOnFromGate();
+}
+
+/**
+ * The invitation said: the story goes on from where it waited, at the visitor's own scroll. The page is
+ * put back on the wait first: scrolled further meanwhile, the story would otherwise race ahead to
+ * catch up with it the moment the wait ends (a hitch).
+ */
+function goOnFromGate() {
+  jumpTo(Math.max(timeline.progress, globalProgress('city', LETTER.gate)));
 }
 
 export function resetLetter() {
