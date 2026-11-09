@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -p tsconfig.json && vite build",
+    "build:game": "tsc -p tsconfig.json && vite build --mode game --outDir dist-game",
+    "dev:game": "vite --mode game",
     "typecheck": "tsc -p tsconfig.json",
     "preview": "vite preview"
   },

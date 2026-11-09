@@ -9,6 +9,7 @@ import { diagNote } from './diag';
 import { story } from '../core/store';
 import { TOUCH } from './touch';
 import { ASPECT, LetterSheet } from './letterSheet';
+import { GAME } from '../game/mode';
 
 /**
  * Reading the letter, after Framer's "CrumpledPaper Reveal": the image starts
@@ -110,12 +111,12 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   stageEl.className = 'letter-stage';
   const label = document.createElement('div');
   label.className = 'letter-cursor';
-  label.textContent = TOUCH ? 'TAP TO CLOSE' : 'CLICK TO CLOSE';
+  label.textContent = TOUCH ? 'TAP TO CLOSE' : GAME ? 'E OR CLICK TO CLOSE' : 'CLICK TO CLOSE';
   label.setAttribute('aria-hidden', 'true');
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'letter-close';
-  button.textContent = TOUCH ? 'TAP TO CLOSE' : 'CLICK TO CLOSE';
+  button.textContent = TOUCH ? 'TAP TO CLOSE' : GAME ? '[E] CLOSE' : 'CLICK TO CLOSE';
   // (touch: a tap on the sheet zooms in to read it; said once, under the button)
   const hint = document.createElement('p');
   hint.className = 'letter-hint';
@@ -317,7 +318,8 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   root.addEventListener('pointermove', touchMove);
   root.addEventListener('pointerup', touchUp);
   const key = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
+    // (the game: E puts it away too, once it is open: not the press that opened it)
+    if (e.key === 'Escape' || (GAME && e.code === 'KeyE' && !e.repeat && performance.now() - opened > 350)) {
       e.preventDefault();
       close();
     }

@@ -7,6 +7,7 @@ import { DISPLAY, DISPLAY_NORMAL, HOME_BEAT, SEAT_EYE } from './layout';
 import { flyAt, monitor, resetMonitor } from './monitor';
 import { RoomScene } from './RoomScene';
 import { TOUCH } from '../../ui/touch';
+import { GAME } from '../../game/mode';
 
 /**
  * Episode 4 camera. The page opens on the way in, in the dark behind the
@@ -117,7 +118,7 @@ export const homeEpisode: EpisodeDef = {
   },
   captions: [
     { from: 0.16, to: 0.38, place: 'tl', kicker: 'CRASIGOSTRAẞE 24', text: 'EVERYTHING I HAVE BUILT IS ON THESE SCREENS. TIME TO SHOW IT.', voice: '20' },
-    { from: 0.74, to: 1, place: 'bl', tone: 'tip', text: TOUCH ? 'TAP THE BIG SCREEN TO EXPLORE MY WORK.' : 'CLICK THE BIG SCREEN TO EXPLORE MY WORK.', when: () => monitor.armed && !monitor.entering },
+    { from: 0.74, to: 1, place: 'bl', tone: 'tip', text: TOUCH ? 'TAP THE BIG SCREEN TO EXPLORE MY WORK.' : GAME ? 'CLICK THE BIG SCREEN, OR PRESS E, TO EXPLORE MY WORK.' : 'CLICK THE BIG SCREEN TO EXPLORE MY WORK.', when: () => monitor.armed && !monitor.entering },
   ],
   beats: [0, HOME_BEAT.opened, 0.32, HOME_BEAT.atChair, HOME_BEAT.gate],
 };

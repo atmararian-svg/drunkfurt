@@ -8,6 +8,9 @@ import { locate, stepTimeline, timeline } from '../core/timeline';
 import { EPISODES, builtEpisodes } from '../episodes';
 import { input } from './input';
 import { playerState } from './playerState';
+import { GAME } from '../game/mode';
+import { mountGameKeys } from '../game/keys';
+import { stepWalk } from '../game/walk';
 
 /** Time-driven shots can still take the camera for scripted beats (e.g. slow motion). */
 export const cameraDirector = new ShotPlayer();
@@ -51,10 +54,14 @@ export function ScrollCameraRig() {
 
   useEffect(() => {
     input.attach();
+    const unKeys = mountGameKeys();
     camera.rotation.order = 'YXZ';
     camera.near = 0.05;
     camera.far = 1300;
-    return () => input.detach();
+    return () => {
+      input.detach();
+      unKeys();
+    };
   }, [camera]);
 
   useFrame(({ clock }, rawDt) => {
@@ -74,9 +81,12 @@ export function ScrollCameraRig() {
       ep.track.sample(l, pose);
       ep.adjustPose?.(l, pose);
     }
+    // the game: your own eyes while you walk (game/walk.ts), eased to and from the rails
+    if (GAME) stepWalk(dt, pose);
 
     // subtle look-around, eased back to the composed frame when the pointer leaves
-    const p = input.pointer;
+    // (the game's mouse turns the look itself: no look-around on top)
+    const p = GAME ? { active: false, x: 0, y: 0 } : input.pointer;
     st.lookYaw = damp(st.lookYaw, p.active ? -p.x * LOOK_YAW * input.gain : 0, 2.4, dt);
     st.lookPitch = damp(st.lookPitch, p.active ? -p.y * LOOK_PITCH * input.gain : 0, 2.4, dt);
     // the head follows the eyes a little, a touch slower than the gaze

@@ -18,6 +18,8 @@ import { updateLetter } from './letter';
 import { LetterProp } from './LetterProp';
 import { Street } from './Street';
 import { StreetFurniture } from './StreetFurniture';
+import { GAME } from '../../game/mode';
+import { GamePath } from '../../game/GamePath';
 
 /** The city's clock: the encounter's slow motion, then, as you walk to the car (episode 3), back to normal. */
 const timeScale = () => {
@@ -104,6 +106,8 @@ export function CityScene({ active }: { active: boolean }) {
       {/* the lit station hall behind the visitor spills out through the portal */}
       <pointLight position={[PORTAL.x, 6, STATION_FACE_Z + 6]} intensity={60} distance={30} decay={2} color="#efeadb" />
       <Street />
+      {/* the game: the way to go, in red on the ground */}
+      {GAME && <GamePath />}
       <Buildings />
       <Skyline />
       <StreetFurniture active={active} />

@@ -17,6 +17,7 @@ import { goToChapter, installChapterTransitions } from './ui/chapterTransition';
 import { Overlay } from './ui/Overlay';
 import { watchContextLoss } from './ui/stub';
 import { Preloader } from './ui/Preloader';
+import { GAME } from './game/mode';
 import { DIAG, diagFrame, diagNote } from './ui/diag';
 import { sinceTitleCard, titleCardOn, titleCardPlayed } from './ui/titleCards';
 
@@ -363,6 +364,12 @@ export function App() {
     // keys are swallowed, so it ends exactly where it was going
     const scrollKeys = ['ArrowUp', 'ArrowDown', 'PageUp', 'PageDown', 'Home', 'End', 'Space'];
     const interrupt = (e: Event) => {
+      // (the game: nothing scrolls the page but the walk, and no key stops the rails)
+      if (GAME) {
+        if (e.type === 'wheel' && e.cancelable) e.preventDefault();
+        if (e instanceof KeyboardEvent && (e.code === 'Space' || e.code === 'PageUp' || e.code === 'PageDown' || e.code === 'Home' || e.code === 'End')) e.preventDefault();
+        return;
+      }
       if (e instanceof KeyboardEvent && !scrollKeys.includes(e.code)) return;
       if (scriptOwnsScroll()) {
         // (a touch's start is never swallowed: that would also swallow the tap, and with it every

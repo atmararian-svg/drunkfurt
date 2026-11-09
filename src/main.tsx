@@ -5,6 +5,10 @@ import './styles.css';
 import { mountDitherCursor } from './ui/ditherCursor';
 import { showStub, stubReason } from './ui/stub';
 import { mountDiag } from './ui/diag';
+import { GAME } from './game/mode';
+
+// the game build: the page does not scroll (the walk moves the story), the pointer is the look
+if (GAME) document.documentElement.classList.add('game');
 
 // (?diag: what makes the page wait, in a panel: ui/diag.ts)
 mountDiag();
@@ -26,6 +30,6 @@ else if (!reason)
         <App />
       </StrictMode>,
     );
-    // the dither trail under the pointer (not on touch)
-    mountDitherCursor();
+    // the dither trail under the pointer (not on touch; not in the game, where the pointer is the look)
+    if (!GAME) mountDitherCursor();
   });

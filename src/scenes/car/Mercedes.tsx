@@ -10,6 +10,7 @@ import { loadGlb } from '../../characters/inlineModel';
 import { ROAD_Y } from '../city/layout';
 import { buildCar } from './carRig';
 import { CAR_BEAT, SHIFT_TIMES, quietly, carAt, doorAt, getaway, ignitedAt, launchAt, leaveGetaway, lightsAt, setThrottle, updateGetaway } from './getaway';
+import { ACTION_CODE } from '../../game/mode';
 
 /** Headlamp positions in the car's frame (m): left and right, at the lamp units. */
 const LAMPS = [new Vector3(0.66, 0.67, 1.98), new Vector3(-0.66, 0.67, 1.98)];
@@ -43,14 +44,14 @@ export function Mercedes() {
   useEffect(() => {
     if (!active) return;
     const down = (e: KeyboardEvent) => {
-      if (e.code !== 'KeyD' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.code !== ACTION_CODE || e.ctrlKey || e.metaKey || e.altKey) return;
       if (getaway.armed) e.preventDefault();
       // a held key repeats keydown: only the first counts (the sequence starts once anyway)
       if (e.repeat) return;
       setThrottle(true);
     };
     const up = (e: KeyboardEvent) => {
-      if (e.code === 'KeyD') setThrottle(false);
+      if (e.code === ACTION_CODE) setThrottle(false);
     };
     const release = () => setThrottle(false);
     const hidden = () => document.visibilityState === 'hidden' && setThrottle(false);

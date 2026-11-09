@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { ARROW } from './fightArt';
 import { TOUCH } from './touch';
+import { ACTION_KEY } from '../game/mode';
 
 /**
  * One action prompt panel (combatPrompt.ts drives it): PRESS [D] on the first
@@ -34,7 +35,7 @@ export function PressPrompt({
         <span className="fx-press-d">
           {!TOUCH && <span className="fx-word" data-text="PRESS" />}
           <span className={TOUCH ? 'fx-key fx-key--tap' : 'fx-key'}>
-            <span className="fx-key-d" data-text={TOUCH ? 'TAP' : 'D'} />
+            <span className="fx-key-d" data-text={TOUCH ? 'TAP' : ACTION_KEY} />
           </span>
         </span>
       </span>

@@ -35,6 +35,8 @@ import { CHAPTERS } from '../../core/chapters';
 import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, overAbout, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 import { TOUCH } from '../../ui/touch';
+import { GAME } from '../../game/mode';
+import { anchors } from '../../game/talk';
 
 /**
  * The label at the pointer over the screen about the author (the letter's close cursor, the same
@@ -210,6 +212,13 @@ function buildRoom(gltf: GLTF) {
     clock?.dispose();
   };
   const about = screens.find((s) => s.name === ABOUT_SCREEN) ?? null;
+  // the game: the clock and the wall are things to look at (game/talk.ts)
+  if (GAME) {
+    for (const n of ['leds', 'screen_05']) {
+      const o = model.getObjectByName(n);
+      if (o) anchors.set(n, o);
+    }
+  }
   return { root, wall, dispose, about };
 }
 

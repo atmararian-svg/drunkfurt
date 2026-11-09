@@ -24,11 +24,48 @@ npm run dev        # http://localhost:5173
 npm run build      # typecheck + production build into dist/
 npm run preview    # serve the production build
 npm run typecheck
+npm run dev:game   # the game build (walk instead of scroll), dev server
+npm run build:game # the game build into dist-game/ (its own zip, its own domain)
 ```
 
 **Scroll** to move through the story (wheel, trackpad, touch, keyboard). **Click** or **Enter**
 jumps to the next composed beat. Moving the mouse lets you look around a few degrees; the
 camera always returns to the composed frame.
+
+## The game build (walk instead of scroll)
+
+`npm run build:game` builds the same story as a first-person game into `dist-game/` (Vite's mode
+`game`; `src/game/mode.ts` `GAME`, everything else stays as on the scroll page).
+
+- **Controls**: W A S D or the arrows to walk (← → turn when the mouse is not held), the mouse to
+  look (a click on the page, or a step, holds the pointer; Escape lets it go), Shift to hurry.
+  **E** for every action: defend, pick up and put away the letter, skip a line, get into the car,
+  rev, sit down at the desk, press on the big screen (the one under the crosshair), talk. **M**
+  switches the sound (the header's switch says `[M]`). The page itself never scrolls.
+- **Walking is the progress** (`game/walk.ts`): each chapter has legs you walk, a path taken from
+  its own camera track's keys (so a place on it is the same moment of the story as on the scroll
+  page) with a corridor either side as wide as the place allows: the platform between the train
+  and the far edge, the station's portal, the plaza, the crossing, the pavement on the right, the
+  way round the car's bonnet, the room's way to the chair. Posts, the vending machine and lamps
+  are walked round. Where you are along the path is written to the scroll position, so everything
+  else (the crowd, the stranger, the captions and voice, the chapter turns, the gates, the floors)
+  follows unchanged. You cannot leave the corridor, go back past a leg's start or past what has
+  happened, or on past a gate.
+- **Rails** between the legs: stepping off the train (on the first W), the stranger stopping you and
+  everything to the letter and the invitation, getting up after it, into the car (E at its door:
+  the door, the seat, the thoughts, the rev), sitting down (E at the chair). The camera eases from
+  your eyes onto the composed track and back (the field of view 58° while you walk).
+- **The way in red** (`game/GamePath.tsx`): dashes on the ground along the street's walk, from the
+  station's portal to where he stops you, and after the fight round the bonnet to the car's door,
+  each with a ring where it ends, shown while it is the way ahead.
+- **Talking** (`game/talk.ts`): a few people and things beside each walk (the platform: the
+  traveller at the board, the two talking, the smoker, the man on the phone, the vending machine;
+  the plaza: the woman with the suitcase, the kiosk's regulars, the guy at the tram stop; the room:
+  the clock, the screens). Near one and looking at it, `[E] TALK TO …` under the crosshair; E goes
+  through the lines in the thought box (the speaker as its kicker); walking away ends it. No voice.
+- **The marks** (`game/hud.ts`): a crosshair while you walk, what E does here under it, the
+  controls at the start until you have walked a few seconds, CLICK TO LOOK AROUND while the
+  pointer is free. The letter and the desk give the cursor back.
 
 ## Interaction model
 

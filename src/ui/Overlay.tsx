@@ -23,6 +23,11 @@ import { mountChapterTuner, tunerAway, tunerBackdrop, updateTuner } from './chap
 import { MONOLOGUE, skipThoughts, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
 import { MONOLOGUE_LINES } from '../audio/voices';
 import { PressPrompt } from './PressPrompt';
+import { ACTION_CODE, ACTION_KEY, GAME, SOUND_CODE, SOUND_KEY } from '../game/mode';
+import { holdPointer, releasePointer } from '../game/keys';
+import { walkAction } from '../game/walk';
+import { talkAction, talkLine } from '../game/talk';
+import { mountGameHud } from '../game/hud';
 
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
 const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
@@ -156,7 +161,7 @@ export function Overlay() {
       }
     };
     const skipKey = (e: KeyboardEvent) => {
-      if (e.code !== 'KeyD' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
+      if (e.code !== ACTION_CODE || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
       e.preventDefault();
       skip();
     };
@@ -191,7 +196,15 @@ export function Overlay() {
     hit.addEventListener('contextrestored', restored);
     window.addEventListener('resize', size);
 
+    // the game's crosshair, its hint and its controls (game/hud.ts)
+    const hud = GAME ? mountGameHud(el) : null;
+    let hudLast = performance.now();
     const loop = () => {
+      if (hud) {
+        const now = performance.now();
+        hud.update(Math.min(0.1, (now - hudLast) / 1000));
+        hudLast = now;
+      }
       const p = timeline.progress;
       const { id, local } = locate(p);
       captions.forEach((c, i) => {
@@ -241,8 +254,10 @@ export function Overlay() {
       const html = document.documentElement.classList;
       const busy =
         actionShown(id, local) || ask === 'defend' || ask === 'rev' || letter.open || chapterTurn.busy || monitor.entering || html.contains('is-preloading') || html.contains('site-handoff');
+      // (in the game, a talk takes the box while it lasts)
+      const talking = GAME ? talkLine() : null;
       boxes.update(
-        thought ? { key: thought.key, text: thought.c.text, kicker: thought.c.kicker } : null,
+        talking ?? (thought ? { key: thought.key, text: thought.c.text, kicker: thought.c.kicker } : null),
         tipDef ? { key: tipDef.key, text: tipDef.c.text, plain: tipDef.c.plain } : null,
         busy,
       );
@@ -332,6 +347,7 @@ export function Overlay() {
       if (!thoughts.done) thoughts.started = false;
       skipBtn.removeEventListener('click', skip);
       boxes.dispose();
+      hud?.dispose();
       window.removeEventListener('keydown', skipKey);
       unmountPrompts();
       setScenePixels(1);
@@ -391,16 +407,33 @@ export function Overlay() {
     };
     const onKey = (e: KeyboardEvent) => {
       unlock();
-      // S switches the sound (the header's switch says so: [S]), anywhere in the story
-      if (e.code === 'KeyS' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      // S (M in the game) switches the sound (the header's switch says so), anywhere in the story
+      if (e.code === SOUND_CODE && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
         e.preventDefault();
         toggleSoundRef.current();
         return;
       }
       // D defends (the one keyboard handler of the story; the car listens for its own D, only to rev)
-      if (e.code === 'KeyD' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && story.getState().prompt === 'defend') {
+      if (e.code === ACTION_CODE && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && story.getState().prompt === 'defend') {
         e.preventDefault();
         defend();
+        return;
+      }
+      // the game: E for whatever there is to do here (the letter, the screen, the car's door, the chair, a talk);
+      // the skip and the rev listen for it themselves
+      if (GAME) {
+        if (e.code !== ACTION_CODE || e.repeat || e.ctrlKey || e.metaKey || e.altKey || letter.open) return;
+        e.preventDefault();
+        const ask = story.getState().prompt;
+        if (ask === 'letter') {
+          releasePointer();
+          openLetter(() => (letter.read = true), letterSpot());
+        } else if (ask === 'monitor') {
+          const at = pick(window.innerWidth / 2, window.innerHeight / 2);
+          enterSite(at ? at.link : monitor.link);
+        } else if (!ask) {
+          if (!walkAction()) talkAction();
+        }
         return;
       }
       if (letter.open) return;
@@ -414,6 +447,11 @@ export function Overlay() {
     const onClick = (e: MouseEvent) => {
       unlock();
       if ((e.target as HTMLElement).closest('a,button,.fx-press,.whiteout,.preloader,.letter-layer')) return;
+      // the game: a click on the page holds the pointer for the look (at the desk the screen takes the click)
+      if (GAME && story.getState().prompt !== 'monitor') {
+        holdPointer();
+        return;
+      }
       next(e);
     };
     // while the story waits at a gate, drift the page back to it so the prompt stays in reach
@@ -521,7 +559,7 @@ export function Overlay() {
           'TAP TO SKIP'
         ) : (
           <>
-            <span className="skip-key">[D]</span> SKIP DIALOGUE
+            <span className="skip-key">[{ACTION_KEY}]</span> SKIP DIALOGUE
           </>
         )}
       </button>
@@ -554,7 +592,7 @@ export function Overlay() {
         >
           <span className="snd-label">
             <span className="snd-key" aria-hidden>
-              [S]
+              [{SOUND_KEY}]
             </span>
             <span ref={soundText} data-text={`SOUND ${sound ? 'OFF' : 'ON'}`} aria-hidden />
           </span>
