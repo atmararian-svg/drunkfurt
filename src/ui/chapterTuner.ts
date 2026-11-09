@@ -99,17 +99,23 @@ const safeToTurn = () =>
   story.getState().phase === 'ready' && !chapterTurn.busy && !scriptOwnsScroll() && !letter.open && !monitor.entering;
 
 /**
- * The scroll's chapter position: 1 … 3, a chapter's number at its opening
- * shot, rising linearly through it to the next number where its transition
- * begins (the last chapter stays at 3).
+ * The scroll's chapter position: 1 … 3. The chapter you are in is on the frame:
+ * its number at its opening shot, leaning on towards the next as you go
+ * through it, but only DRIFT of the way (about 30°), so the next chapter's
+ * marker never reaches the frame (nor slips under the current title) before
+ * that chapter has begun; the turn of a chapter turns the scale the rest of
+ * the way (eased, `update`). The last chapter stays at 3. Going on, the next
+ * chapter is above the frame and the last one below; the scale's three
+ * markers are 120° apart all round.
  */
+const DRIFT = 0.25;
 export function position(p = timeline.progress) {
   const starts = chapterStarts();
   const ends = chapterEnds();
   let n = 1;
   for (let i = 0; i < starts.length; i++) if (p >= starts[i] - 1e-6) n = i + 1;
   if (n >= CHAPTERS.length) return CHAPTERS.length;
-  return n + clamp((p - starts[n - 1]) / Math.max(1e-6, ends[n - 1] - starts[n - 1]), 0, 1);
+  return n + DRIFT * clamp((p - starts[n - 1]) / Math.max(1e-6, ends[n - 1] - starts[n - 1]), 0, 1);
 }
 
 interface Tuner {

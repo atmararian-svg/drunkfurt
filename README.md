@@ -250,11 +250,14 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     the selector: right → the strip slides left to show THE CAVE, left → back to ARRIVAL. Only
     the middle 70 % of the panel steers it: from its 15 % mark the strip is at one end, from its
     85 % mark at the other (so the ends need no reaching for), never further than its own ends. A click on a tab goes to that chapter.
-  - **The turn is the scroll's**: `position(p)` is 1 at chapter 1's opening shot, 2 at chapter 2's,
-    3 at chapter 3's, linear through a chapter up to where its transition begins; the scale group
-    turns 120° per unit round the centre, the markings moving down past the frame going forward
-    (the next chapter comes from above), up going back. A transition is a cut in the progress,
-    so the angle shown closes on it over a fraction of a second.
+  - **The turn is the scroll's**: the chapter you are in is on the frame. `position(p)` is 1 at
+    chapter 1's opening shot, 2 at chapter 2's, 3 at chapter 3's, and leans on through a chapter
+    only a quarter of the way to the next (about 30°): the next chapter's marker never reaches the
+    frame (or slips under the current title) before that chapter has begun. The scale group turns
+    120° per unit round the centre: going on, the next chapter is above the frame and the last
+    one below, the markings moving down past the frame. A chapter's turn is a cut in the
+    progress, so the scale turns the rest of the way to the new chapter, eased, over a fraction
+    of a second.
   - **Input** (all through `goToChapter`, the chapter transition; one source of truth, the
     scroll's chapter, read by the scale, the title and the tabs alike): drag up and down on it
     (0.8° per px: a chapter in about 150 px at full size); the wheel or trackpad over it (the page
