@@ -4,10 +4,17 @@ import { Color, IcosahedronGeometry, Mesh, MeshStandardMaterial } from 'three';
 import { mulberry32 } from '../../core/math';
 import { localProgress } from '../../core/timeline';
 import { input } from '../../player/input';
-import { letter, letterThere, pickLetter } from './letter';
+import { LETTER, letter, letterThere, pickLetter } from './letter';
+import { encounterAt } from './encounter';
+import { LETTER_FALL } from './beats';
 
 /** Where the sheet lies: on the pavement between you and him, by his coat (the street's frame, metres). */
 export const LETTER_SPOT = { x: 6.42, y: 0.045, z: -35.15 };
+/**
+ * Its fall out of his coat: from his chest where the uppercut lands (fight's clock, s), down onto the
+ * pavement in a moment, as a thing dropped does (faster and faster).
+ */
+const FALL = { ...LETTER_FALL, x: 6.5, y: 1.3, z: -35.2 };
 
 /**
  * The crumpled letter on the pavement: a ball of paper (a subdivided
@@ -55,8 +62,22 @@ export function LetterProp({ active }: { active: boolean }) {
   }, [mesh, camera]);
 
   useFrame(() => {
+    const local = localProgress('city');
+    // it falls out of his coat as the uppercut lands: tumbling down from chest height, where he was hit,
+    // onto the pavement between you (it is there to be found from the aftermath on, as before)
+    const v = encounterAt(local);
+    if (active && v.outcome === 'blocked' && v.t >= FALL.from && local < LETTER.from && !letter.read) {
+      const k = Math.min(1, (v.t - FALL.from) / FALL.s);
+      const g = k * k;
+      mesh.visible = true;
+      mesh.position.set(FALL.x + (LETTER_SPOT.x - FALL.x) * k, FALL.y + (LETTER_SPOT.y - FALL.y) * g, FALL.z + (LETTER_SPOT.z - FALL.z) * k);
+      mesh.rotation.set(0.4 + (1 - k) * 2.6, 1.1 + (1 - k) * 1.4, 0.2 + (1 - k) * 1.9);
+      return;
+    }
+    mesh.position.set(LETTER_SPOT.x, LETTER_SPOT.y, LETTER_SPOT.z);
+    mesh.rotation.set(0.4, 1.1, 0.2);
     // (read, it is gone for good: the reveal crumpled it and dropped it out of the page)
-    const show = active && letterThere(localProgress('city')) && !letter.open && !letter.read;
+    const show = active && letterThere(local) && !letter.open && !letter.read;
     mesh.visible = show;
     if (!show) {
       if (letter.over) {

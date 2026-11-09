@@ -41,6 +41,7 @@ export const chapterReadiness = {
   set(n: 1 | 2 | 3, r: Readiness) {
     if (state[n] === r || state[n] === true) return;
     state[n] = r;
+    if (new URLSearchParams(location.search).has('diag')) console.info(`[diag] chapter ${n} ${r}`), (window as unknown as { __diagNote?: (s: string) => void }).__diagNote?.(`chapter ${n} ready: ${r}`);
     listeners.forEach((l) => l());
   },
   subscribe(l: () => void) {

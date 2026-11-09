@@ -1,5 +1,7 @@
 import heroUrl from '../assets/hero.webp';
 import { decodeAll, splitChars } from './decode';
+import { diagNote } from './diag';
+import { mountHeroFx } from './heroFx';
 
 /**
  * The two text boxes of the page (Figma "Drunkfurt-text-boxes", frame
@@ -30,9 +32,11 @@ export interface BoxLine {
   key: string;
   text: string;
   kicker?: string;
+  /** Fades in and out only, no pixels (a tip). */
+  plain?: boolean;
 }
 
-const PIX = { in: 0.55, out: 0.4, block: 22 };
+const PIX = { in: 0.55, out: 0.55, block: 22 };
 /** The words decode from 80 % of the way in until this long after the box is sharp (s). */
 const DECODE_AFTER = 0.55;
 /** A tip's bar fills in this long (s), then the tip goes. */
@@ -43,7 +47,7 @@ const THOUGHT_GRACE = 0.9;
 const ease = (u: number) => u * u * (3 - 2 * u);
 
 /** A pixelating SVG filter for one element: `set(block)`, 1 for none. */
-function pixelFilter(defs: SVGDefsElement, id: string) {
+export function pixelFilter(defs: SVGDefsElement, id: string) {
   const NS = 'http://www.w3.org/2000/svg';
   const f = document.createElementNS(NS, 'filter');
   f.setAttribute('id', id);
@@ -88,7 +92,7 @@ function pixelFilter(defs: SVGDefsElement, id: string) {
 type Phase = 'hidden' | 'in' | 'shown' | 'out';
 
 /** One box's coming and going: pixels and opacity over time, the words decoding in on the way. */
-function presence(el: HTMLElement, pix: (el: HTMLElement, b: number) => void, delay = 0) {
+export function presence(el: HTMLElement, pix: (el: HTMLElement, b: number) => void, delay = 0) {
   let phase: Phase = 'hidden';
   let t0 = 0;
   let decoding: HTMLElement[] = [];
@@ -151,11 +155,10 @@ export function mountTextBoxes(host: HTMLElement) {
   svg.append(defs);
 
   // his thoughts: the face in the corner and the box beside it
-  const face = document.createElement('img');
+  // (a canvas: the portrait printed with its live halftone, heroFx.ts)
+  const face = document.createElement('canvas');
   face.className = 'hero-face';
-  face.src = heroUrl;
-  face.alt = '';
-  face.decoding = 'async';
+  face.setAttribute('aria-hidden', 'true');
   const box = document.createElement('div');
   box.className = 'hero-box';
   box.setAttribute('role', 'status');
@@ -184,9 +187,13 @@ export function mountTextBoxes(host: HTMLElement) {
   tip.append(row, bar);
 
   host.append(svg, face, box, tip);
+  const unFx = mountHeroFx(face, box, heroUrl);
   const faceP = presence(face, pixelFilter(defs, 'df-px-face'));
   const boxP = presence(box, pixelFilter(defs, 'df-px-thought'), 0.12);
-  const tipP = presence(tip, pixelFilter(defs, 'df-px-tip'));
+  // (a plain tip has no pixels: no filter at all on it, just its fade)
+  const tipPix = pixelFilter(defs, 'df-px-tip');
+  let tipPlain = false;
+  const tipP = presence(tip, (el, b) => tipPix(el, tipPlain ? 1 : b));
 
   let thoughtKey = '';
   let lastThought = 0;
@@ -231,6 +238,8 @@ export function mountTextBoxes(host: HTMLElement) {
     if (tipDone && tipWant?.key !== tipDone) tipDone = '';
     if (tipWant && tipWant.key !== tipKey && tipWant.key !== tipDone) {
       tipKey = tipWant.key;
+      tipPlain = !!tipWant.plain;
+      diagNote(`tip in: ${tipWant.text.slice(0, 40)}`);
       setLine(tipText, tipWant.text);
       splitChars(label);
       tipP.show(now, [label, tipText]);
@@ -255,6 +264,7 @@ export function mountTextBoxes(host: HTMLElement) {
     update,
     dispose() {
       svg.remove();
+      unFx();
       face.remove();
       box.remove();
       tip.remove();

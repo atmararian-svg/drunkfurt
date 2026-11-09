@@ -66,6 +66,11 @@ export interface ManRig {
    * (`k` 1, the pose `lie` sets), the arms flung out on the way.
    */
   fall(k: number): void;
+  /**
+   * A frame of the fight (scenes/city/fight.ts): the hips' place and the listed bones' rotations,
+   * both hands closed in fists, laid over the pose he is in now by `w` (0 … 1).
+   */
+  fight(row: ArrayLike<number>, names: readonly string[], w?: number): void;
   /** Where the blade's tip is (world). */
   tip(out: Vector3): Vector3;
   /** Frees what this build made (its materials, the knit textures, the beanie, scarf and knife copies). */
@@ -82,6 +87,8 @@ const STANCE_T = 0.8;
 /** Height he is scaled to (m). */
 export const MAN_HEIGHT = 1.8;
 const KNIFE_LENGTH = 0.28;
+/** How far each joint of the thumb folds across a fist (rad). */
+const FIST_THUMB = [0.45, 0.6, 0.55];
 
 const knit = (shade: number, rib: number) => {
   const c = document.createElement('canvas');
@@ -303,6 +310,12 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
   // fingers closing round the handle: each phalanx turns towards the palm about its own x axis
   const fingers = ['Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((i) => ({ b: bone(`RightHand${f}${i}`), a: [1.25, 1.45, 0.9][i - 1] })));
   const thumbs = [1, 2, 3].map((i) => ({ b: bone(`RightHandThumb${i}`), a: [0.35, 0.5, 0.6][i - 1] }));
+  const leftFingers = ['Index', 'Middle', 'Ring', 'Pinky'].flatMap((f) => [1, 2, 3].map((i) => ({ b: bone(`LeftHand${f}${i}`), a: [1.25, 1.45, 0.9][i - 1] })));
+  const leftThumbs = [1, 2, 3].map((i) => ({ b: bone(`LeftHandThumb${i}`), i: i - 1 }));
+  const fistThumbs = [1, 2, 3].map((i) => ({ b: bone(`RightHandThumb${i}`), i: i - 1 }));
+  const kept = list.map(() => new Quaternion());
+  const keptHips = new Vector3();
+  const keptModel = { p: new Vector3(), q: new Quaternion() };
   const QX = new Quaternion();
   const AX = new Vector3(1, 0, 0);
   const AZ = new Vector3(0, 0, 1);
@@ -400,6 +413,33 @@ export function buildMan(gltf: GLTF, knifeGltf: GLTF): ManRig {
       bone('Hips').position.lerp(restHips, e);
       model.rotation.set((-Math.PI / 2) * e, 0, 0);
       model.position.set(0, y0 + (0.11 - y0) * e, 0);
+      root.updateMatrixWorld(true);
+    },
+    fight(row, names, w = 1) {
+      const blend = w < 1;
+      if (blend) {
+        list.forEach((b, i) => kept[i].copy(b.quaternion));
+        keptHips.copy(bone('Hips').position);
+        keptModel.p.copy(model.position);
+        keptModel.q.copy(model.quaternion);
+      }
+      list.forEach((b, i) => b.quaternion.copy(rest[i]));
+      model.position.set(0, 0, 0);
+      model.rotation.set(0, 0, 0);
+      bone('Hips').position.set(row[0], row[1], row[2]);
+      names.forEach((n, i) => bone(n).quaternion.set(row[3 + i * 4], row[4 + i * 4], row[5 + i * 4], row[6 + i * 4]).normalize());
+      // fists: the fingers rolled into the palm, the thumb folded across them (both turn about their
+      // own x on either hand: checked on the model, the tips go into the palm)
+      for (const f of fingers) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, f.a));
+      for (const f of leftFingers) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, f.a));
+      for (const f of [...fistThumbs, ...leftThumbs]) f.b.quaternion.multiply(QX.setFromAxisAngle(AX, FIST_THUMB[f.i]));
+      if (blend) {
+        const k = Math.max(0, w);
+        list.forEach((b, i) => b.quaternion.copy(QA.copy(kept[i]).slerp(b.quaternion, k)));
+        bone('Hips').position.lerpVectors(keptHips, bone('Hips').position.clone(), k);
+        model.position.lerpVectors(keptModel.p, model.position.clone(), k);
+        model.quaternion.copy(QA.copy(keptModel.q).slerp(model.quaternion, k));
+      }
       root.updateMatrixWorld(true);
     },
     tip(out) {

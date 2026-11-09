@@ -1,8 +1,8 @@
 import { audio } from '../../audio/AudioDirector';
 import { clamp, smoothstep } from '../../core/math';
 import { story } from '../../core/store';
-import { BEAT, BLOCK, KO } from './beats';
-import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
+import { BEAT, BLOCK, KO, LETTER_FALL } from './beats';
+import { Floor, Gate, autoplay, floors, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 
 /**
  * The encounter. What you see is a function of the scroll progress and of one
@@ -17,7 +17,7 @@ import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, tim
  *   commit → gate           he holds it on you: "Your bag."; time slows to a tenth
  *   gate                    DEFEND: the story waits for your click
  *   gate → aftermath        the outcome, mapped onto progress: defended (black,
- *                           two hits, he is down) or knocked out (hit, fall, darkness)
+ *                           the fight under a blur, he is down) or knocked out (hit, fall, darkness)
  *   aftermath → 1           afterwards: he is on the pavement, or gone
  *
  * Once decided, the page plays the outcome by moving the progress itself
@@ -26,7 +26,7 @@ import { Gate, autoplay, gates, globalProgress, localProgress, playProgress, tim
  */
 export type Outcome = 'blocked' | 'knockedOut' | null;
 
-export { BEAT, BLOCK, KO } from './beats';
+export { BEAT, BLOCK, KO, LETTER_FALL } from './beats';
 
 export const encounter = {
   /** The visitor's decision. Set once, at the gate. */
@@ -45,6 +45,9 @@ export const encounter = {
 
 const gate: Gate = { episode: 'city', at: BEAT.gate, open: false };
 gates.push(gate);
+/** Once fought, the fight is behind you: the scroll cannot be taken back into it (only the chapter selector goes back). */
+const fought: Floor = { episode: 'city', at: BEAT.aftermath + 0.045, on: false };
+floors.push(fought);
 
 /**
  * Whether he strikes when you do not act: off for now. He stands and threatens,
@@ -88,6 +91,10 @@ export function encounterAt(local: number): EncounterView {
   if (t >= 0) punch = local < BEAT.aftermath ? encounter.punchAtDecision : 0;
   let shake = 0;
   if (t >= 0 && o === 'knockedOut') shake = pulse(t, 0.03, 1.4);
+  // defended: each of the two blows jolts your view, the uppercut more
+  if (t >= 0 && o === 'blocked' && local < BEAT.aftermath) {
+    shake = Math.max(pulse(t, BLOCK.hit1, 0.6), pulse(t, BLOCK.hit2, 1.1));
+  }
   return { outcome: o, t, punch, shake };
 }
 
@@ -97,20 +104,25 @@ export function encounterAt(local: number): EncounterView {
  */
 export function cityTimeScale(local: number) {
   if (encounter.armed) return 0.1;
-  if (encounter.outcome && local >= BEAT.gate) return local >= BEAT.aftermath ? 0.35 : 0.1;
+  // (the hush comes on over the aftermath's first moments, not at once: a step in the street's pace showed as a jolt)
+  if (encounter.outcome && local >= BEAT.gate) return 0.1 + 0.25 * smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
   const s = smoothstep(clamp((local - BEAT.commit) / (BEAT.gate - BEAT.commit), 0, 1));
   return 1 - 0.9 * s;
 }
 
 // --- sound cues of the outcome, fired as the playback crosses them (never on a scrub backwards)
-interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] }
+interface Cue { at: number; kind: Parameters<typeof audio.fight>[0] | 'letterFlutter' | 'letterLand' }
 const CUES: Record<'blocked' | 'knockedOut', Cue[]> = {
   blocked: [
-    // each exhale lands with its hit, layered on it
+    // the two blows, "ts, ts": each with its exhale, 0.28 s apart, the second the uppercut; then him landing
     { at: BLOCK.hit1, kind: 'exhale1' },
     { at: BLOCK.hit1, kind: 'block' },
     { at: BLOCK.hit2, kind: 'exhale2' },
     { at: BLOCK.hit2, kind: 'punch' },
+    { at: BLOCK.land, kind: 'fall' },
+    // the letter out of his coat: its fall, and it landing on the pavement
+    { at: LETTER_FALL.from, kind: 'letterFlutter' },
+    { at: LETTER_FALL.from + LETTER_FALL.s, kind: 'letterLand' },
   ],
   knockedOut: [
     { at: 0, kind: 'exhale2' },
@@ -135,11 +147,18 @@ export function updateEncounter() {
     }
     if (STRIKES && encounter.armed && encounterAt(local).punch >= 1) decide('knockedOut');
   }
+  // the fight played to its end: from here on there is no going back into it
+  if (encounter.outcome && local >= fought.at - 0.0005) fought.on = true;
   // sound follows the playback forwards only, and only while the page plays it
   const t = sequenceTime(local);
   const prev = Math.max(lastT, -0.001);
   if (encounter.outcome && autoplay.active && t > prev && t - prev < 0.5) {
-    for (const c of CUES[encounter.outcome]) if (c.at > prev && c.at <= t) audio.fight(c.kind);
+    for (const c of CUES[encounter.outcome]) {
+      if (!(c.at > prev && c.at <= t)) continue;
+      if (c.kind === 'letterFlutter') audio.paper('flutter');
+      else if (c.kind === 'letterLand') audio.paper('drop');
+      else audio.fight(c.kind);
+    }
   }
   lastT = t;
 }
@@ -158,6 +177,7 @@ export function resetEncounter() {
   encounter.armed = false;
   encounter.armedAt = 0;
   gate.open = false;
+  fought.on = false;
   lastT = -1;
   if (story.getState().prompt === 'defend') story.setState({ prompt: null });
 }
@@ -181,6 +201,7 @@ function decide(o: 'blocked' | 'knockedOut') {
   const to = BEAT.aftermath + 0.045;
   const seconds = sequenceSeconds(o) * ((to - from) / (BEAT.aftermath - from));
   lastT = -1;
-  playProgress(globalProgress('city', from), globalProgress('city', to), seconds);
+  // (locked: played through as it comes, not rewound by a hand on the scroll)
+  playProgress(globalProgress('city', from), globalProgress('city', to), seconds, true);
   timeline.target = timeline.progress = globalProgress('city', from);
 }

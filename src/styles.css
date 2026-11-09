@@ -585,11 +585,12 @@ body { cursor: pointer; }
   min-height: calc(836 * var(--u));
   transform-origin: calc(600 * var(--u)) 0;
   transform: rotate(6deg);
-  background-color: rgba(240, 240, 240, 0.1);
-  background-image: var(--halftone-paper), var(--grain);
-  background-size: 5px 5px, 180px 180px;
-  -webkit-backdrop-filter: blur(20px) saturate(1.15) brightness(0.92);
-  backdrop-filter: blur(20px) saturate(1.15) brightness(0.92);
+  /* frosted glass without blurring the 3D page under it (a backdrop blur this large over the WebGL
+     canvas, redone every frame, hung the page on a retina Mac as the story began): a smoky tint, a
+     sheen, and the page's halftone and grain */
+  background-color: rgba(52, 52, 54, 0.62);
+  background-image: linear-gradient(105deg, rgba(255, 255, 255, 0.1) 0%, rgba(255, 255, 255, 0.02) 38%, rgba(255, 255, 255, 0.06) 62%, rgba(255, 255, 255, 0) 100%), var(--halftone-paper), var(--grain);
+  background-size: auto, 5px 5px, 180px 180px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), inset 1px 0 0 rgba(255, 255, 255, 0.12), 0 calc(4 * var(--u)) calc(41 * var(--u)) rgba(0, 0, 0, 0.25);
   color: #fff;
 }
@@ -925,7 +926,7 @@ body { cursor: pointer; }
   place-items: center;
   pointer-events: none;
 }
-.letter-canvas { position: absolute; inset: 0; width: 100%; height: 100%; filter: drop-shadow(0 24px 30px rgba(0, 0, 0, 0.55)); }
+.letter-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .letter-img { box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55); transform-origin: 50% 60%; opacity: 0; }
 /* the cursor: the label follows the pointer (a real pointer only) */
 .letter-cursor {
@@ -1234,3 +1235,106 @@ body { cursor: pointer; }
 .tip-text { flex: 1; }
 .tip-bar { height: 18px; margin-top: 17px; }
 .tip-bar i { display: block; height: 100%; background: #000; transform-origin: 0 50%; transform: scaleX(0); }
+
+/* --- the phone's page (ui/stub.ts showPhoneStub; Figma "Drunkfurt-mobile", frame Mobile 375 × 812):
+   chapter 3's room behind it (App's backdrop), dimmed, under the page's halftone and grain */
+.stage--backdrop {
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 1.6s var(--ease);
+}
+.backdrop-on .stage--backdrop { opacity: 1; }
+.mstub {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: max(28px, env(safe-area-inset-top, 0px)) 16px max(16px, env(safe-area-inset-bottom, 0px));
+  overflow: hidden;
+  color: #fff;
+  font: 400 12px/16px var(--label);
+  text-transform: uppercase;
+  cursor: default;
+  -webkit-tap-highlight-color: transparent;
+  /* the design's black (#111) until the room has come up behind, then the room through it */
+  background-color: #111;
+  transition: background-color 1.6s var(--ease);
+}
+.backdrop-on .mstub { background-color: rgba(17, 17, 17, 0.5); }
+.mstub::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(180deg, rgba(17, 17, 17, 0.7) 0%, rgba(17, 17, 17, 0) 22%, rgba(17, 17, 17, 0) 62%, rgba(17, 17, 17, 0.85) 100%),
+    var(--halftone-paper),
+    var(--grain);
+  background-size: auto, 5px 5px, 180px 180px;
+}
+.mstub-time {
+  margin: 0;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+}
+.mstub-logo {
+  margin: auto 0;
+  width: min(100%, 520px);
+  line-height: 0;
+}
+.mstub-logo svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45)); }
+.mstub-panel {
+  width: min(100%, 520px);
+  padding: 10px 4px 4px;
+  background: #fff;
+  color: #000;
+}
+.mstub-row { display: grid; grid-template-columns: 56px 1fr; padding: 0 6px 0 10px; min-height: 48px; }
+.mstub-sorry { font-weight: 500; }
+.mstub-msg { margin: 0; }
+.mstub-msg::after {
+  content: '';
+  display: inline-block;
+  width: 0.6em;
+  height: 12px;
+  margin-left: 4px;
+  vertical-align: -1px;
+  background: var(--red);
+  animation: stub-blink 1s steps(1) infinite;
+}
+.mstub-btns { display: grid; gap: 4px; margin-top: 17px; }
+.mstub-btn {
+  display: grid;
+  grid-template-columns: 56px auto 1fr;
+  align-items: center;
+  height: 30px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 0;
+  font: 500 12px/1 var(--label);
+  text-align: left;
+  text-decoration: none;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 0.2s var(--ease), color 0.2s var(--ease);
+}
+.mstub-hint { justify-self: end; white-space: nowrap; }
+.mstub-btn--a { background: #111; color: #fff; }
+.mstub-btn--a .mstub-hint { color: #4b4b4b; }
+.mstub-btn--b { background: #d9d9d9; color: #111; }
+.mstub-btn--b .mstub-hint { color: #949494; }
+.mstub-btn:active,
+.mstub-btn:focus-visible,
+.mstub-btn--a.is-done { background: var(--red); color: #fff; outline: none; }
+.mstub-btn:active .mstub-hint,
+.mstub-btn:focus-visible .mstub-hint,
+.mstub-btn--a.is-done .mstub-hint { color: rgba(255, 255, 255, 0.75); }
+@media (prefers-reduced-motion: reduce) { .mstub-msg::after { animation: none; } .stage--backdrop { transition: none; } }
+/* the thought box's live halftone (ui/heroFx.ts), under its words */
+.hero-box-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.hero-box > :not(.hero-box-fx) { position: relative; }
+.mstub-tilt { margin: 6px 0 0; color: rgba(255, 255, 255, 0.55); font-size: 10px; line-height: 14px; letter-spacing: 0.02em; }

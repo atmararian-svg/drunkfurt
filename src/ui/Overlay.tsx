@@ -21,18 +21,22 @@ import { letter, letterSpot, pickLetter, skipInvitation } from '../scenes/city/l
 import { closeLetterNow, openLetter } from './letterReveal';
 import { mountChapterTuner, tunerAway, tunerBackdrop, updateTuner } from './chapterTuner';
 import { MONOLOGUE, skipThoughts, thoughts, thoughtsTyped, updateThoughts } from '../scenes/car/thoughts';
+import { MONOLOGUE_LINES } from '../audio/voices';
 import { PressPrompt } from './PressPrompt';
 
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
 const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
+/** Defended: the fight under it still reads, as shapes moving behind frosted glass. */
+const VEIL = { block: 9, blur: 0.6, dark: 0.3 };
 
 /**
  * How the street looks around the fight: block size (CSS px; 1 = not
  * pixelated), blur and darkness, as pure functions of the progress and the
  * encounter, so a scrub, a revisit or a reset can never leave it stuck.
  * Nothing happens while he only approaches or threatens: it starts when you
- * press D. Over the fight's first moments (to BLOCK.dark, before the first
- * hit) the blocks grow coarse, blur and darken, hiding the fight; on the
+ * press D. Defended, once ACTION has gone (BLOCK.veil) the street breaks into
+ * pixels and blurs, by BLOCK.blurred, before the first blow: the fight goes on
+ * under it, seen through it (VEIL); a knockout goes dark (HIDE). On the
  * aftermath all of it resolves, back to the plain picture before the letter.
  */
 function combatLook(id: string, local: number) {
@@ -40,12 +44,11 @@ function combatLook(id: string, local: number) {
   if (id !== 'city' || local < BEAT.gate) return none;
   const v = encounterAt(local);
   if (!v.outcome) return none;
-  // defended: the pixels begin once ACTION has gone (BLOCK.veil), and are complete by BLOCK.dark, before the first hit
-  const [from, black] = v.outcome === 'blocked' ? [BLOCK.veil, BLOCK.dark] : [0, KO.dark];
-  const hide = local < BEAT.aftermath ? smoothstep(clamp((v.t - from) / (black - from), 0, 1)) : 1;
+  const [from, full, look] = v.outcome === 'blocked' ? [BLOCK.veil, BLOCK.blurred, VEIL] : [0, KO.dark, HIDE];
+  const hide = local < BEAT.aftermath ? smoothstep(clamp((v.t - from) / (full - from), 0, 1)) : 1;
   const out = local < BEAT.aftermath ? 1 : 1 - smoothstep(clamp((local - BEAT.aftermath) / 0.045, 0, 1));
   const k = hide * out;
-  return { block: 1 + (HIDE.block - 1) * k, blur: HIDE.blur * k, dark: HIDE.dark * k };
+  return { block: 1 + (look.block - 1) * k, blur: look.blur * k, dark: look.dark * k };
 }
 
 /** ACTION is up from the moment he raises the knife until you act: it leaves first, before the pixels and the hits. */
@@ -90,7 +93,6 @@ export function Overlay() {
     const capDefs = allDefs.filter((d) => d.c.tone === 'speech').map((d) => d.c);
     const boxDefs = allDefs.filter((d) => d.c.tone !== 'speech');
     const boxes = mountTextBoxes(el);
-    const cue = el.querySelector<HTMLElement>('.cue')!;
     const outro = el.querySelector<HTMLElement>('.outro')!;
     // balloons are typed in (the supplied typewriter); the thoughts in the car as well, line by line
     const typed = new Map<HTMLElement, { tw: Typewriter; on: boolean }>();
@@ -102,9 +104,35 @@ export function Overlay() {
     // (the last two words of each line are held together, so a narrower page never leaves one word alone on a line)
     const spoken = (text: string) => text.replace(/ß/g, 'ẞ').replace(/ (\S+)$/gm, '\u00a0$1');
     const thoughtEl = el.querySelector<HTMLElement>('.thoughts-text')!;
-    const thoughtTw = createTypewriter(thoughtEl, { content: 'lines', stableHeight: false, startDelay: 500, pauseAfterType: (t) => 900 + 24 * t.length });
+    // typed as he says it: each line typed quickly enough to keep up with his voice (the longest, 97
+    // characters, in the 4 s he takes over it), wiped at once, and the next begun as his voice reaches it
+    // (MONOLOGUE_LINES); the last stands until he has said it. Without the voice, the old reading pace.
+    const MONO = { type: 36, del: 8, afterDelete: 60 };
+    const thoughtTw = createTypewriter(thoughtEl, {
+      content: 'lines',
+      stableHeight: false,
+      startDelay: 500,
+      typeSpeed: MONO.type,
+      deleteSpeed: MONO.del,
+      pauseAfterDelete: MONO.afterDelete,
+      pauseAfterType: (t) => {
+        const i = monologueLines.indexOf(t);
+        if (!monologueAt || i < 0) return 900 + 24 * t.length;
+        const elapsed = performance.now() - monologueAt;
+        if (i + 1 >= MONOLOGUE_LINES.length) return Math.max(250, audio.sayingLeft() + 300);
+        // the wipe and the pause after it come before the next line: the next starts on the voice's cue
+        const wipe = t.length * MONO.del + MONO.afterDelete;
+        return Math.max(120, MONOLOGUE_LINES[i + 1] * 1000 - elapsed - wipe);
+      },
+    });
     const thoughtBox = el.querySelector<HTMLElement>('.thoughts')!;
     let thoughtsOn = false;
+    /** The thought last shown fresh (for saying its line as it comes up), and those already said this pass. */
+    let lastThought: string | null = null;
+    const said = new Set<string>();
+    /** When the car's thoughts were last started being said (for the typing to keep pace with the voice). */
+    let monologueAt = 0;
+    const monologueLines = MONOLOGUE.split('\n');
     // SKIP DIALOGUE (bottom right, or S): while the invitation is said, or the thoughts in the car are typed
     const skipBtn = el.querySelector<HTMLButtonElement>('.skip')!;
     const skippable = () => {
@@ -113,6 +141,8 @@ export function Overlay() {
     };
     const skip = () => {
       if (!skippable()) return;
+      // (skipped: his voice stops with the words)
+      audio.hush();
       if (story.getState().prompt === 'thought') {
         thoughtTw.stop();
         skipThoughts();
@@ -166,13 +196,21 @@ export function Overlay() {
       const { id, local } = locate(p);
       captions.forEach((c, i) => {
         const when = capDefs[i].when;
-        const on = c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to) && (!when || when());
+        // (while a chapter turns, the captions leave before the page is copied: chapterTransition.ts)
+        const on = !chapterTurn.busy && c.dataset.ep === id && local >= Number(c.dataset.from) && local <= Number(c.dataset.to) && (!when || when());
         c.classList.toggle('is-on', on);
         const t = typed.get(c);
         if (t && t.on !== on) {
           t.on = on;
-          if (on) void t.tw.play(spoken(c.dataset.text ?? '')).then(() => capDefs[i].onTyped?.());
-          else t.tw.stop();
+          const voice = capDefs[i].voice;
+          if (on) {
+            // his recorded line with it, started as the typing starts (after its start delay)
+            if (voice) window.setTimeout(() => t.on && audio.speak(voice), 250);
+            void t.tw.play(spoken(c.dataset.text ?? '')).then(() => capDefs[i].onTyped?.());
+          } else {
+            t.tw.stop();
+            if (voice && audio.saying() === voice) audio.hush();
+          }
         }
       });
       // the fight: ACTION and PRESS D TO DEFEND, and the street breaking into coarse pixels (blurred and dark once you defend)
@@ -181,14 +219,31 @@ export function Overlay() {
       // his thoughts and the system's tips: the first that holds here of each; both keep out of the way while the
       // page asks you to act, the letter is open, a chapter turns, or the page is handed over to the site
       const holds = (d: (typeof boxDefs)[number]) => d.ep === id && local >= d.c.from && local <= d.c.to && (!d.c.when || d.c.when());
-      const thought = boxDefs.find((d) => d.c.tone !== 'tip' && holds(d));
+      // (a thought whose recorded line is still being said stays up until it is said, unless another comes)
+      const fresh = boxDefs.find((d) => d.c.tone !== 'tip' && holds(d));
+      const saying = audio.saying();
+      const thought = fresh ?? boxDefs.find((d) => d.ep === id && !!d.c.voice && d.c.voice === saying);
+      // his line, said as his thought comes up (each time it comes up afresh)
+      const thoughtKey = fresh?.key ?? null;
+      // (once per pass through a chapter: scrolling back and forth shows the thought again, but it is not said
+      // again; a chapter turn starts a fresh pass)
+      if (chapterTurn.busy) said.clear();
+      if (thoughtKey !== lastThought) {
+        lastThought = thoughtKey;
+        if (fresh?.c.voice && !chapterTurn.busy && !said.has(fresh.key)) {
+          said.add(fresh.key);
+          audio.speak(fresh.c.voice);
+        }
+      }
+      // a line from a chapter no longer on screen (a turn, a jump back) is not said on into another
+      if (saying && saying !== '15' && saying !== 'letter' && !allDefs.some((d) => d.ep === id && d.c.voice === saying)) audio.hush();
       const tipDef = boxDefs.find((d) => d.c.tone === 'tip' && holds(d));
       const html = document.documentElement.classList;
       const busy =
         actionShown(id, local) || ask === 'defend' || ask === 'rev' || letter.open || chapterTurn.busy || monitor.entering || html.contains('is-preloading') || html.contains('site-handoff');
       boxes.update(
         thought ? { key: thought.key, text: thought.c.text, kicker: thought.c.kicker } : null,
-        tipDef ? { key: tipDef.key, text: tipDef.c.text } : null,
+        tipDef ? { key: tipDef.key, text: tipDef.c.text, plain: tipDef.c.plain } : null,
         busy,
       );
       updateCombatPrompts(actionShown(id, local) || ask === 'rev', ask === 'defend' ? 'defend' : ask === 'rev' ? 'rev' : null);
@@ -209,14 +264,23 @@ export function Overlay() {
         if (!think) {
           thoughtTw.stop();
           if (!thoughts.done) thoughts.started = false;
+          if (audio.saying() === '15') audio.hush();
         }
       }
       if (think && !thoughts.started) {
         thoughts.started = true;
         if (thoughts.done) thoughtTw.show(MONOLOGUE);
-        else void thoughtTw.play(MONOLOGUE).then(() => thoughtsTyped(() => thoughtTw.erase()));
+        else {
+          // said as typed: the voice starts with the first line (after the typing's start delay)
+          monologueAt = 0;
+          window.setTimeout(() => {
+            if (!thoughtsOn || thoughts.done) return;
+            audio.speak('15');
+            monologueAt = performance.now();
+          }, 500);
+          void thoughtTw.play(MONOLOGUE).then(() => thoughtsTyped(() => thoughtTw.erase()));
+        }
       }
-      cue.classList.toggle('is-on', p < 0.004);
       const canSkip = skippable();
       if (skipBtn.classList.contains('is-on') !== canSkip) {
         skipBtn.classList.toggle('is-on', canSkip);
@@ -235,15 +299,18 @@ export function Overlay() {
       // defended, the page goes black and the two hits are printed into the dark;
       // knocked out, a flash, then the lights go out as you fall
       const v = id === 'city' ? encounterAt(local) : null;
-      const hitT = !v || v.t < 0 || local >= BEAT.aftermath ? -1 : v.t;
+      // (BAM and POW leave as the blur clears, over the aftermath's first frames: back into blocks, fading)
+      const HIT_LEAVE = 0.03;
+      const hitLeave = v?.outcome === 'blocked' ? clamp((local - BEAT.aftermath) / HIT_LEAVE, 0, 1) : 0;
+      const hitT = !v || v.t < 0 || (local >= BEAT.aftermath && (v.outcome !== 'blocked' || hitLeave >= 1)) ? -1 : v.t;
       // episode 3: the rush at the end of the launch, in speed lines
       const run = id === 'car' ? launchAt(local) : null;
       const rush = run && run.rpm >= 0 ? run.rush : 0;
-      const hitKey = hitT >= 0 ? `${v!.outcome}${hitT.toFixed(3)}${hit.width}` : rush > 0 ? `rush${rush.toFixed(2)}${Math.floor(run!.t * 24)}${hit.width}` : '';
+      const hitKey = hitT >= 0 ? `${v!.outcome}${hitT.toFixed(3)}${hitLeave.toFixed(3)}${hit.width}` : rush > 0 ? `rush${rush.toFixed(2)}${Math.floor(run!.t * 24)}${hit.width}` : '';
       if (hitKey !== lastHit) {
         hctx.clearRect(0, 0, hit.width, hit.height);
         if (hitT >= 0 && v!.outcome === 'knockedOut') drawKnockout(hctx, hit.width, hit.height, hitT, KO.dark);
-        else if (hitT >= 0) drawHits(hctx, hit.width, hit.height, hitT, BLOCK);
+        else if (hitT >= 0) drawHits(hctx, hit.width, hit.height, hitT, BLOCK, hitLeave);
         else if (rush > 0) drawSpeedLines(hctx, hit.width, hit.height, rush, run!.t);
         lastHit = hitKey;
         // nothing to show: the layer is taken off the page as well as cleared, so no earlier picture on it can stay up
@@ -454,11 +521,6 @@ export function Overlay() {
           </>
         )}
       </button>
-
-      <div className="cue">
-        <span>Scroll</span>
-        <i />
-      </div>
 
       {/* the chapter tuner (chapterTuner.ts) is its own element on the page, so the dimming of the page behind it leaves it alone */}
 

@@ -160,9 +160,12 @@ drawn at the design's own size. Captions say which box they belong to (`tone`, `
   in, ACTION (Medium) and the tip, and under them a black bar 18 px high filling from nothing in
   5 s; then the tip goes, until it holds again.
 - Both come in through pixels (an SVG filter per box, 22 px blocks resolving in 0.55 s) and go out
-  the same way (0.4 s); the words start decoding when the box is 80 % of the way sharp and settle
+  the same way (0.55 s); the words start decoding when the box is 80 % of the way sharp and settle
   0.55 s after it is. Both keep out of the way while the page asks you to act (ACTION, defend,
   rev), the letter is open, a chapter turns, during the preloader and the hand-over to the site.
+- At a chapter turn they (and the captions) leave first: the turn waits until they are off the
+  page (at most 1.5 s, `printedGone` in `chapterTransition.ts`) before it copies the frame and
+  the scene goes through its own pixels, so nothing printed is cut off by the copy.
 - Speech (ATTACKER:, ME:) is still typed in at the bottom of the page, and the thoughts in the car
   (the monologue) are still typed line by line at the bottom centre.
 
@@ -534,19 +537,35 @@ built from.
   - **The pixels** (`ui/scenePixels.ts`): the scene-transition effect reused at a steady block
     size: one canvas over the 3D picture, under everything printed, redrawn from the 3D canvas
     after every frame. Its look is a pure function of the scroll and the encounter
-    (`combatLook` in `Overlay.tsx`): nothing while he walks up and threatens; only once you
-    have pressed D, and ACTION has gone (`BLOCK.veil`, 0.18 s), do the blocks grow coarse
-    (to 26 px), blur (the same blocks drawn up smoothed over them) and darken (a dark layer to
-    80%), complete at `BLOCK.dark` (0.75 s, before the first hit), which is what hides the fight;
-    over the first 0.045 of the aftermath all of it resolves to the plain picture. At rest the
-    canvas and its frame watcher are removed. Nothing can leave it stuck: a scrub, a revisit or
-    a reset recomputes it. (The earlier spreading "Ignite" dark is gone.)
-  - **Defended** (you press D in time): the fight is not shown. The street blurs and darkens in
-    its own pixels before anyone moves, and the two hits are printed over it (`drawHits` in `ui/brush.ts`):
-    the design's BAM (top left, with the first hit, at 1.0 s) and POW (bottom right, with the
-    second, at 1.55 s), each fading up a touch large and settling (no hard snap), with its sound (the existing recordings: no new hit sounds came with the
-    design). When the picture clears again he is on his back on the pavement, the knife beside his
-    hand, and your bag is still with you.
+    (`combatLook` in `Overlay.tsx`): nothing while he walks up and threatens; once you have
+    pressed D and ACTION has gone (`BLOCK.veil`, 0.18 s), the blocks grow (to 9 px), blur and
+    darken a little (30%), complete at `BLOCK.blurred` (0.6 s): the fight goes on under it, its
+    shapes moving behind frosted glass. Over the first 0.045 of the aftermath it all resolves to
+    the plain picture. (A knockout still goes dark: 26 px blocks, 80%.) At rest the canvas and its
+    frame watcher are removed.
+  - **Defended** (you press D): you stay in your own eyes, and the fight is played under the blur
+    (`scenes/city/fight.ts`, timings in `BLOCK`, `beats.ts`): his knife hold eases into a guard,
+    then only the last two blows of the supplied "rapid punching" animation: the clip starts a
+    moment before its second-to-last blow (2.15 s), and the swing from that blow into the
+    uppercut is quickened (`clipAt`) so the two land 0.28 s apart, as far apart as the two
+    recorded exhales. The first knocks the knife out of his hand (it lies where he stood); the
+    uppercut throws him onto his back, about 1.7 m behind where he stood. Your arms throw the
+    blows in front of you (`Fists` in `Stranger.tsx`: your side of the animation on a second copy
+    of the man, of which only the arms are drawn, the jacket's sleeves dark, both hands in fists;
+    he is placed so that his head is where your eyes are). Each blow jolts your view, the uppercut
+    more, and is heard as the recordings have it, "ts, ts": an exhale with each hit, the second
+    on the uppercut; then him landing. BAM is printed with the first, POW with the uppercut. The
+    camera's hold on him eases off towards the aftermath, so it arrives there without a jump:
+    where you stood, a little lower, looking down at him and the letter. Episode 3 starts from
+    exactly that frame (`carTrack`), so going on after the invitation does not move you.
+    - **The animation** (`tools/bakeFight.mjs` → `scenes/city/fightClip.json`, 141 KB): the source
+      is a two-man AdvancedSkeleton rig (FBX); its deform joints are retargeted onto the walking
+      man's Mixamo skeleton (each joint's world rotation moved from the source's bind pose onto the
+      man's rest pose, then swung so each bone points where the source's bone points), 30 fps, for
+      both men, each in his own frame (he starts over its origin, facing the other man 1.55 m
+      ahead). The thrown man's travel is shortened (55%) so he lands on the sidewalk. `fightRow`
+      samples it between frames; `ManRig.fight` lays a frame over the pose (both hands in fists),
+      and can blend it in from the pose he is in.
   - **Knocked out** is switched off for now (`STRIKES` in `encounter.ts`): he never strikes, and
     the story waits at the gate until you defend. Its sequence is kept: with `STRIKES` on, the
     blade reaches you 3.7 s after the prompt, a blow lands, the eyelids close in ragged ink, the
@@ -1026,6 +1045,104 @@ wipe opens.
 - **Placeholders**: the buildings and road bridge beyond the open end are blocks. Train interiors are a painted texture, not geometry (except
   the open vestibule). Shopfront names are generic.
 - Train numbers, times and destinations on the displays are fictional.
+
+## Performance
+
+Measured in a headless browser, at 1280 × 720 (video memory for textures, programs, lights):
+
+| | before | now |
+| --- | --- | --- |
+| station | 83 MB, 61 programs, 13 spots, 3 shadows | 78 MB, 56 programs, 8 spots, 2 shadows |
+| city | 159 MB, 123 programs, 14 spots | 112 MB, 69 programs, 9 spots |
+| cave | 166 MB, 118 programs | 80 MB, 28 programs |
+
+- **Worlds left behind are unmounted** (only the one you are in and the next stay, plus the one an
+  episode plays in) and `FreeOnUnmount` frees their geometries, materials and textures on the
+  graphics card. Going back builds a world again from the loaded models.
+- **Fewer lights**: every light is paid for by every lit pixel. The station's masts behind the
+  door (29 m and more behind where you start, never looked at) only glow; the street's pair of
+  lamps at z -63 only glow; the moving cars' headlights are their drawn beam on the road, not
+  lights. Two shadow-casting lights in each world, not three.
+- **Pixel density** at most 1.25 (it was 1.5 on a desktop: a retina screen's frame buffers alone
+  took some 300 MB).
+- **When the graphics card gives out** (the browser takes WebGL away and does not hand it back),
+  the page reloads itself and comes back to the chapter the visitor was in, from its beginning,
+  with their sound setting and without the sound choice (`ui/resume.ts`); a second loss within
+  45 s shows the stub instead of reloading again.
+
+- Every frame is drawn about four times (the picture, and the ink's normal and depth buffer in
+  three layers), so pixel density is what costs most. It starts at the screen's own density, at
+  most 1.5 on a desktop and 1.25 on touch screens, and `AdaptiveDpr` (`App.tsx`) lowers it in
+  steps of 0.25 (not below 1) when frames average over 22 ms for 2 s.
+- The composer multisamples (2×) only below 1.25× density; above it the ink lines already cover
+  the edges.
+- Shadows are drawn every other frame (`ShadowCadence`).
+- No light ever comes or goes: a light that does changes the number of lights, and every material
+  in the scene is compiled again (a hitch of a good part of a second). Lights are dimmed to 0
+  instead: the moving cars' headlights (a car off the street hides its body only), the Mercedes'
+  headlights, the key light on the stranger, the laundry window's light on him after the fight.
+- `Prewarm` (`App.tsx`) compiles the next world's shaders while the current one plays, so a
+  chapter turn does not stall on them. A shader depends on the lights it is drawn with: under the
+  loading veil every mounted world draws at once, all their lights together, so those shaders fit
+  no single world and were all compiled again at the turn (the long stall going from chapter 1 to
+  2). The world is compiled on its own (its lights, its fog, both colour spaces a frame draws in,
+  after the print treatment has patched it), with KHR_parallel_shader_compile off the main thread.
+  Checked in a headless browser: before, the turn into the city made 45 to 60 new programs; now
+  it makes none for the city.
+- The ink buffer is one pass over the scene (it was three: occluders, ink, silhouettes): each
+  mesh sets its own line weight on the buffer's material as it is drawn (`inkWeight`).
+- Pixel density only ever goes down (each change resizes every buffer); multisampling is decided
+  once, as the page starts.
+
+## His voice
+
+His lines are said in his own recorded voice (`src/assets/audio/voice/`, `audio/voices.ts`; made by the
+owner with ElevenLabs, trimmed of silence, levelled to -18 LUFS, mono 64 kbit/s, 700 KB in all). Each
+thought is said as it comes up in the box by his face, and the box stays up until it is said (unless
+another thought comes); the invitation ("Hey, man…", `ME:`) is said as it is typed and the story waits
+for it to be said; the thoughts in the car are typed in step with the recording (each line stands
+until the voice reaches the next, `MONOLOGUE_LINES`) and the story waits for the last word. The voice
+goes straight to the master, past the world's muffling filter, and the ambience ducks under it. With
+the sound off nothing is said (and nothing waits on it); SKIP DIALOGUE stops it; a line from a chapter
+no longer on screen is stopped. Where the recording says more than the page did, the page now says
+what he says. Line 19 ("Time to get out of Drunkfurt.") has no recording yet.
+
+## The letter, read out
+
+- Opened, the letter is read out (a storyteller's voice, ElevenLabs, `voice-letter.mp3`) and its
+  body's words fill in as they are said, like a karaoke line: they wait faint (`letter-light.webp`,
+  the supplied letter with the body's ink faded to a fifth, the paper untouched; the heading and the
+  signature as they are) and go to full ink up to where the voice is, line by line, each word
+  filling from left to right as it is said, with a soft edge. It is all in the sheet's shader (two
+  textures and two numbers a frame, `uLine`, `uX`), so the ink lies exactly on the printed words; the
+  words' places come from the image itself and their times from the recording
+  (`scenes/city/letterWords.json`, 135 words). Without the sound the letter is shown as it is.
+- Its paper sounds (freesound): unfolding as it opens, crumpling as it is closed (the voice stops),
+  and, once the ball has dropped out of view, it landing on the pavement, muffled (down by your
+  feet, not by your ears).
+
+## Small things
+
+- **The rack's clock** in the cave (the model's `leds`, modelled reading 14:47) shows the time the
+  story comes in, chapter 3's 00:32 (`storyClock` in `RoomScene.tsx`): the modelled digits are
+  hidden and a plane on the digits' own face carries the same yellow, slanted segments.
+- **Sound away from the page**: leaving it (another tab, the window minimised, another app on a
+  phone) fades the sound out and stops the audio; coming back brings it back as it was
+  (`AudioDirector.setAway`). The visitor's own sound setting is untouched.
+- **Going ahead with the chapter selector** passes the waits on the way for good (`Gate.passed`):
+  a chapter skipped that way cannot pull the page back to its fight or its letter (an episode off
+  screen cannot open its own waits), and whatever the page was asking for is cleared at the turn.
+  Playing a chapter again from its beginning makes its waits count again.
+- **The pointer's trail**: fine 7 px glyphs in pure white (the difference blend makes them an exact
+  negative), a little smaller and sparser than before; none on the preloader or the sound choice.
+- **The chapter selector** closes by itself once it has taken you to a chapter, and stays closed
+  under a pointer still resting on it until the pointer leaves (or a new touch, or focus).
+
+## Single-file build
+
+`node tools/singlefile.mjs` builds the whole site into `dist-single/drunkfurt.html` (code, models,
+textures and sounds inlined; the type from Google Fonts), for hosts that serve one HTML file.
+`--dev` keeps the inspection hooks below.
 
 ## Dev inspection hook
 

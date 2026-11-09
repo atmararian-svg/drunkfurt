@@ -17,7 +17,7 @@ import { TOUCH } from './touch';
  *  - only the cells near the trail are worked out, in a grid; nothing is
  *    drawn when the pointer rests and the trail has gone.
  *
- * Grey glyphs drawn with `mix-blend-mode: difference`: a negative of the page
+ * White glyphs drawn with `mix-blend-mode: difference`: an exact negative of the page
  * under them (light over the dark night, dark over the white screens).
  * Not on touch screens, not with reduced motion.
  *
@@ -26,9 +26,10 @@ import { TOUCH } from './touch';
  * is there fades), and a pointer at rest (REST_S) leaves none either, so
  * nothing sits on what you are looking at.
  */
-const CELL = 11;
+/** Size of a glyph's cell (CSS px): small, so the trail reads as a fine texture, not as tiles. */
+const CELL = 7;
 /** Radius of the stroke at the pointer (CSS px); it narrows to TAPER of that at the end of the tail. */
-const RADIUS = 78;
+const RADIUS = 62;
 const TAPER = 0.35;
 /** How long a point of the trail lasts (s). */
 const TAIL_S = 0.85;
@@ -36,7 +37,7 @@ const TAIL_S = 0.85;
 const STEP = 5;
 /** How quickly the head follows the pointer (1/s): high is tight, low is loose and liquid. */
 const FOLLOW = 22;
-const STRENGTH = 0.85;
+const STRENGTH = 0.72;
 const MAX_POINTS = 600;
 /** A pointer still for this long (s) stops laying the trail; what is there melts away. */
 const REST_S = 0.25;
@@ -54,7 +55,8 @@ const overShown = (x: number, y: number) =>
     const r = el.getBoundingClientRect();
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
   });
-const GREY = '150, 150, 150';
+/** Pure white: with the difference blend it is an exact negative of the page under it. */
+const INK = '255, 255, 255';
 /** Glyphs from empty to full (the brief's Floyd–Steinberg set, inverted). */
 const GLYPHS = [' ', '▩', '▨', '▧', '▦', '▥', '▤', '▣'];
 const BAYER = [
@@ -121,7 +123,8 @@ export function mountDitherCursor() {
     const t = now / 1000;
     // the head eases after the pointer; the trail is laid along the way it went, every STEP px
     // (over a control or the portfolio screen, or at rest: no new trail, the head follows quietly)
-    const quiet = target.off || monitor.over || now - target.moved > REST_S * 1000;
+    // (and none on the preloader, the sound choice included: its own dots answer the pointer there)
+    const quiet = target.off || monitor.over || now - target.moved > REST_S * 1000 || document.documentElement.classList.contains('is-preloading');
     if (target.on) {
       const k = 1 - Math.exp(-FOLLOW * dt);
       head.x += (target.x - head.x) * k;
@@ -196,7 +199,7 @@ export function mountDitherCursor() {
     for (let l = 0; l < LEVELS; l++) {
       const list = byLevel[l];
       if (!list.length) continue;
-      ctx.fillStyle = `rgba(${GREY}, ${((l + 1) / LEVELS).toFixed(3)})`;
+      ctx.fillStyle = `rgba(${INK}, ${((l + 1) / LEVELS).toFixed(3)})`;
       for (let j = 0; j < list.length; j += 2) {
         const i = list[j];
         const col = i % cols;

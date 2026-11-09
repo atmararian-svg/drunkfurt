@@ -1,5 +1,10 @@
 import { SITE } from '../scenes/home/monitor';
 import { TOUCH } from './touch';
+import { saveResume } from './resume';
+import { decodeAll, splitChars } from './decode';
+import { pixelFilter, presence } from './textBoxes';
+import logoSvg from '../assets/drunkfurt-logo.svg?raw';
+import { onTiltOn, requestTilt, tiltNeedsTap, tryTilt } from '../player/input';
 
 /**
  * The page in place of the story where it cannot run as it should: a browser
@@ -63,6 +68,7 @@ const COPY: Record<StubKind, { meta: string; title: string[]; lines: string[] }>
 export function showStub(kind: StubKind) {
   document.documentElement.classList.remove('is-preloading');
   document.getElementById('df-stub')?.remove();
+  if (kind === 'desktop') return showPhoneStub();
   const c = COPY[kind];
   const root = document.createElement('main');
   root.id = 'df-stub';
@@ -94,27 +100,7 @@ export function showStub(kind: StubKind) {
     acts.append(a);
     return a;
   };
-  if (kind === 'desktop') {
-    const copy = tab('COPY LINK', true, async () => {
-      try {
-        if (navigator.share) await navigator.share({ title: 'DRUNKFURT', url: location.origin + location.pathname });
-        else await navigator.clipboard.writeText(location.origin + location.pathname);
-        copy.textContent = 'LINK COPIED';
-      } catch {
-        // (the share sheet dismissed, or no clipboard: nothing to say)
-      }
-    });
-    tab('TRY ANYWAY', false, () => {
-      try {
-        sessionStorage.setItem(ANYWAY_KEY, '1');
-      } catch {
-        // (no storage: the reload below asks for it in the address instead)
-      }
-      const u = new URL(location.href);
-      u.searchParams.set('anyway', '');
-      location.replace(u.toString());
-    });
-  } else if (kind === 'lost') {
+  if (kind === 'lost') {
     tab('RELOAD', true, () => location.reload());
   }
   tab('ARIANATMAR.COM', kind === 'webgl', () => undefined, SITE);
@@ -132,7 +118,158 @@ export function watchContextLoss(canvas: HTMLCanvasElement) {
   let timer = 0;
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
-    timer = window.setTimeout(() => showStub('lost'), 2500);
+    // not handed back in a moment: reload and come back to this chapter (ui/resume.ts);
+    // a second loss soon after a reload shows the stub instead
+    timer = window.setTimeout(() => (saveResume() ? location.reload() : showStub('lost')), 1200);
   });
   canvas.addEventListener('webglcontextrestored', () => window.clearTimeout(timer));
+}
+
+/** The page's own address, to open on a computer (without the ?anyway). */
+const pageUrl = () => location.origin + location.pathname;
+
+async function copyText(text: string) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    // (no clipboard access: the old way, through a selected field)
+    const f = document.createElement('textarea');
+    f.value = text;
+    f.setAttribute('readonly', '');
+    f.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+    document.body.append(f);
+    f.select();
+    f.setSelectionRange(0, text.length);
+    let ok = false;
+    try {
+      ok = document.execCommand('copy');
+    } catch {
+      ok = false;
+    }
+    f.remove();
+    return ok;
+  }
+}
+
+/**
+ * The phone's page (Figma "Drunkfurt-mobile", frame Mobile 375 × 812): the place and the hour at the
+ * top, the DRUNKFURT mark, and at the bottom a white panel: SORRY and why, [A] COPY LINK, [B] VISIT
+ * PORTFOLIO. Behind it chapter 3's room (App's backdrop), dimmed; each part comes in the page's way,
+ * through pixels with its words decoding, one after another.
+ */
+function showPhoneStub() {
+  const root = document.createElement('main');
+  root.id = 'df-stub';
+  root.className = 'mstub';
+  root.innerHTML = `
+    <p class="mstub-time" data-text="FRANKFURT AM MAIN / 23:47"></p>
+    <h1 class="mstub-logo" aria-label="DRUNKFURT">${logoSvg}</h1>
+    <section class="mstub-panel">
+      <div class="mstub-row">
+        <span class="mstub-sorry" data-text="SORRY"></span>
+        <p class="mstub-msg" data-text="THIS EXPERIENCE IS DESIGNED FOR DESKTOP ONLY. OPEN THIS LINK ON YOUR COMPUTER."></p>
+      </div>
+      <div class="mstub-btns">
+        <button type="button" class="mstub-btn mstub-btn--a">
+          <span class="mstub-key" data-text="[A]"></span><span class="mstub-label" data-text="COPY LINK"></span><span class="mstub-hint" data-text="AND PASTE ON DESKTOP"></span>
+        </button>
+        <a class="mstub-btn mstub-btn--b" href="${SITE}" target="_blank" rel="noopener">
+          <span class="mstub-key" data-text="[B]"></span><span class="mstub-label" data-text="VISIT PORTFOLIO"></span><span class="mstub-hint" data-text="EXPLORE MY WORK"></span>
+        </a>
+      </div>
+    </section>`;
+  root.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+  const texts = [...root.querySelectorAll<HTMLElement>('[data-text]')];
+  for (const t of texts) {
+    t.textContent = t.dataset.text ?? '';
+    splitChars(t);
+  }
+  document.body.append(root);
+
+  // the pixels the parts come in through (the story's boxes' own)
+  const NS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(NS, 'svg');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('width', '0');
+  svg.setAttribute('height', '0');
+  svg.style.position = 'absolute';
+  const defs = document.createElementNS(NS, 'defs');
+  svg.append(defs);
+  root.append(svg);
+  const q = (sel: string) => root.querySelector<HTMLElement>(sel)!;
+  const parts = [
+    { el: q('.mstub-time'), at: 150 },
+    { el: q('.mstub-logo'), at: 450 },
+    { el: q('.mstub-panel'), at: 900 },
+  ].map((p, i) => ({ ...p, pres: presence(p.el, pixelFilter(defs, `df-px-mstub-${i}`)), words: [...p.el.querySelectorAll<HTMLElement>('[data-text]')].concat(p.el.dataset.text ? [p.el] : []) }));
+  const t0 = performance.now();
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+  const frame = (now: number) => {
+    let busy = false;
+    for (const p of parts) {
+      if (reduced) {
+        p.el.style.opacity = '1';
+        p.el.style.visibility = 'visible';
+        p.el.style.filter = '';
+        continue;
+      }
+      if (now - t0 >= p.at && p.pres.phase === 'hidden') p.pres.show(now, p.words);
+      p.pres.frame(now);
+      if (p.pres.phase !== 'shown') busy = true;
+    }
+    if (busy) requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+
+  // the room behind turns with the phone's tilt: at once where no permission is asked; on iOS the permission
+  // can only be asked from a tap (a touchend or a click: Safari does not count a pointerdown), so the page
+  // says so under the hour until it is on
+  if (!tryTilt() && tiltNeedsTap()) {
+    const hint = document.createElement('p');
+    hint.className = 'mstub-tilt';
+    hint.textContent = 'TAP, THEN TILT YOUR PHONE TO LOOK AROUND';
+    root.querySelector('.mstub-time')?.after(hint);
+    const ask = () => requestTilt();
+    document.addEventListener('touchend', ask);
+    document.addEventListener('click', ask);
+    onTiltOn(() => {
+      document.removeEventListener('touchend', ask);
+      document.removeEventListener('click', ask);
+      hint.remove();
+    });
+  }
+
+  // [A]: the address to the clipboard (or, where there is none, the phone's share sheet), said on the button
+  const a = q('.mstub-btn--a');
+  const hint = a.querySelector<HTMLElement>('.mstub-hint')!;
+  const say = (el: HTMLElement, text: string) => {
+    el.dataset.text = text;
+    el.textContent = text;
+    splitChars(el);
+    void decodeAll(el, 420);
+  };
+  let reset = 0;
+  a.addEventListener('click', async () => {
+    const url = pageUrl();
+    let ok = await copyText(url);
+    if (!ok && navigator.share) {
+      try {
+        await navigator.share({ title: 'DRUNKFURT', url });
+        ok = true;
+      } catch {
+        ok = false;
+      }
+    }
+    say(hint, ok ? 'COPIED. PASTE ON DESKTOP' : 'COPY FAILED');
+    a.classList.toggle('is-done', ok);
+    window.clearTimeout(reset);
+    reset = window.setTimeout(() => {
+      a.classList.remove('is-done');
+      say(hint, 'AND PASTE ON DESKTOP');
+    }, 2600);
+  });
+  // [B]: its words decode as it is tapped, on the way out to the site
+  const b = q('.mstub-btn--b');
+  b.addEventListener('pointerdown', () => b.querySelectorAll<HTMLElement>('[data-text]').forEach((t) => void decodeAll(t, 320)));
 }

@@ -6,6 +6,10 @@ import exhalesUrl from '../assets/audio/exhales.mp3?url';
 import hitsUrl from '../assets/audio/hits.mp3?url';
 import gearShiftUrl from '../assets/audio/gear-shift.mp3?url';
 import wheelsUrl from '../assets/audio/wheels.mp3?url';
+import { VOICES, VoiceId } from './voices';
+import paperUnfoldUrl from '../assets/audio/paper-unfold.mp3?url';
+import paperCrumpleUrl from '../assets/audio/paper-crumple.mp3?url';
+import paperTossUrl from '../assets/audio/paper-toss.mp3?url';
 
 /**
  * Audio foundation. Recorded cues are declared with `src: null` and silently
@@ -56,6 +60,11 @@ export const cues = {
   carDoorOpen: { src: doorOpenUrl, bus: 'sfx', gain: 0.85 },
   engineStart: { src: engineStartUrl, bus: 'body', gain: 0.85 },
   engineIdle: { src: engineDefaultUrl, bus: 'body', gain: 0.75 },
+  // the letter (supplied recordings, freesound): unfolding it as it is lifted and opened, crumpling it up,
+  // and the ball landing on the pavement once it has dropped out of view (`paper`)
+  paperUnfold: { src: paperUnfoldUrl, bus: 'body', gain: 0.9 },
+  paperCrumple: { src: paperCrumpleUrl, bus: 'body', gain: 0.9 },
+  paperToss: { src: paperTossUrl, bus: 'body', gain: 0.55 },
   // still synthesised until a recording is set here: carUnlock (central locking, two clacks),
   // carDoorClose (a heavy, damped shut), and engineLoop: a seamless loop of the engine recorded at
   // ENGINE_LOOP_RPM under load, pitched by rpm (playbackRate = rpm / ENGINE_LOOP_RPM).
@@ -128,7 +137,7 @@ class AudioDirector {
     const ctx = new Ctx();
     this.ctx = ctx;
     this.master = ctx.createGain();
-    this.master.gain.value = this.enabled ? 1 : 0;
+    this.master.gain.value = this.enabled && !this.away ? 1 : 0;
     this.master.connect(ctx.destination);
     this.worldFilter = ctx.createBiquadFilter();
     this.worldFilter.type = 'lowpass';
@@ -143,6 +152,170 @@ class AudioDirector {
     body.connect(this.master);
     this.buses.set('body', body);
     void this.preload();
+    void this.preloadVoices();
+  }
+
+  // -------------------------------------------------------------------------
+  // his voice: the narrator's recorded lines (audio/voices.ts), one at a time
+
+  private voiceBuffers = new Map<VoiceId, AudioBuffer>();
+  private speaking: { id: VoiceId; src: AudioBufferSourceNode; gain: GainNode; ends: number; starts: number } | null = null;
+  /** A line asked for before its recording was decoded: played as soon as it is. */
+  private pendingVoice: VoiceId | null = null;
+
+  private async preloadVoices() {
+    const ctx = this.ctx;
+    if (!ctx) return;
+    for (const id of Object.keys(VOICES) as VoiceId[]) {
+      try {
+        this.voiceBuffers.set(id, await ctx.decodeAudioData(await bytesOf(VOICES[id].src)));
+        if (this.pendingVoice === id) {
+          this.pendingVoice = null;
+          this.speak(id);
+        }
+      } catch (err) {
+        console.warn(`[audio] could not load voice "${id}"`, err);
+      }
+    }
+  }
+
+  /**
+   * Says a line (stopping one still being said). Straight to the master, past the world's muffling
+   * filter; the ambience ducks under it while it lasts.
+   */
+  speak(id: VoiceId) {
+    const ctx = this.ctx;
+    // (with the sound off his lines are not said at all: nothing then waits on a silent one)
+    if (!ctx || !this.master || !this.enabled) return;
+    if (this.speaking?.id === id) return;
+    this.hush();
+    const buffer = this.voiceBuffers.get(id);
+    if (!buffer) {
+      this.pendingVoice = id;
+      return;
+    }
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const gain = ctx.createGain();
+    gain.gain.value = (VOICES[id] as { gain?: number }).gain ?? 1;
+    src.connect(gain).connect(this.master);
+    const t = ctx.currentTime + 0.02;
+    src.start(t);
+    const mine = { id, src, gain, starts: performance.now() + 20, ends: performance.now() + (buffer.duration + 0.02) * 1000 };
+    this.speaking = mine;
+    this.duck(true);
+    src.onended = () => {
+      if (this.speaking !== mine) return;
+      this.speaking = null;
+      this.duck(false);
+    };
+  }
+
+  /**
+   * The letter's paper: 'unfold' as it is opened, 'crumple' as it is closed, 'land' when the ball,
+   * gone out of view, hits the pavement: down there, by your feet, not by your ears, so muffled
+   * (a low-pass) and quieter.
+   */
+  paper(kind: 'unfold' | 'crumple' | 'land' | 'flutter' | 'drop') {
+    const ctx = this.ctx;
+    if (kind === 'flutter') return this.paperFlutter();
+    if (kind === 'drop') {
+      // the letter out of his coat landing on the pavement: the paper's slap, close by and soft
+      const buf = this.buffers.get('paperToss');
+      const out = this.buses.get('body');
+      if (!ctx || !buf || !out) return;
+      const s = ctx.createBufferSource();
+      s.buffer = buf;
+      s.playbackRate.value = 1.12;
+      const g = ctx.createGain();
+      g.gain.value = 0.42;
+      const hp = ctx.createBiquadFilter();
+      hp.type = 'highpass';
+      hp.frequency.value = 260;
+      s.connect(hp).connect(g).connect(out);
+      s.start();
+      return;
+    }
+    const id = ({ unfold: 'paperUnfold', crumple: 'paperCrumple', land: 'paperToss' } as const)[kind];
+    const buffer = this.buffers.get(id);
+    const bus = this.buses.get('body');
+    if (!ctx || !buffer || !bus) return;
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const g = ctx.createGain();
+    g.gain.value = (cues[id] as CueDef).gain ?? 1;
+    if (kind === 'land') {
+      const lp = ctx.createBiquadFilter();
+      lp.type = 'lowpass';
+      lp.frequency.value = 1100;
+      lp.Q.value = 0.5;
+      src.connect(lp).connect(g).connect(bus);
+    } else src.connect(g).connect(bus);
+    src.start();
+  }
+
+  /** A sheet of paper falling: an airy rustle that flutters as it turns over (0.6 s), quiet. */
+  private paperFlutter() {
+    const ctx = this.ctx;
+    const out = this.buses.get('body');
+    if (!ctx || !out) return;
+    const t = ctx.currentTime;
+    const n = this.noiseSource();
+    const bp = ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(2600, t);
+    bp.frequency.linearRampToValueAtTime(1500, t + 0.6);
+    bp.Q.value = 0.9;
+    const g = ctx.createGain();
+    g.gain.setValueAtTime(0, t);
+    // the turns of the sheet: a few soft swells
+    const swells = [0.04, 0.17, 0.29, 0.4, 0.5];
+    swells.forEach((a, i) => {
+      const peak = 0.055 * (1 - i * 0.12);
+      g.gain.linearRampToValueAtTime(peak, t + a);
+      g.gain.linearRampToValueAtTime(peak * 0.25, t + a + 0.07);
+    });
+    g.gain.linearRampToValueAtTime(0, t + 0.62);
+    n.connect(bp).connect(g).connect(out);
+    n.start(t);
+    n.stop(t + 0.66);
+  }
+
+  /** Stops the line being said (a quick fade), if any. */
+  hush(fade = 0.12) {
+    this.pendingVoice = null;
+    const s = this.speaking;
+    if (!s || !this.ctx) return;
+    this.speaking = null;
+    const t = this.ctx.currentTime;
+    s.gain.gain.setTargetAtTime(0, t, fade / 3);
+    try {
+      s.src.stop(t + fade);
+    } catch {
+      // already stopped
+    }
+    this.duck(false);
+  }
+
+  /** The line being said now (or about to be, once decoded), if any. */
+  saying(): VoiceId | null {
+    return this.speaking?.id ?? this.pendingVoice;
+  }
+
+  /** How far into the line being said its voice is (s); 0 when none (or not yet begun, still decoding). */
+  sayingTime() {
+    return this.speaking ? Math.max(0, (performance.now() - this.speaking.starts) / 1000) : 0;
+  }
+
+  /** How long the line being said has still to go (ms); 0 when none. */
+  sayingLeft() {
+    return this.speaking ? Math.max(0, this.speaking.ends - performance.now()) : 0;
+  }
+
+  private duck(on: boolean) {
+    const amb = this.buses.get('ambience');
+    if (!amb || !this.ctx) return;
+    amb.gain.setTargetAtTime(on ? 0.45 : 1, this.ctx.currentTime, on ? 0.12 : 0.6);
   }
 
   private async preload() {
@@ -180,8 +353,37 @@ class AudioDirector {
   /** Mutes or unmutes everything (the visitor's sound preference). */
   setEnabled(on: boolean) {
     this.enabled = on;
+    if (!on) this.hush();
+    this.level();
+  }
+
+  /**
+   * The visitor left the page (another tab, the window minimised, the phone's app switched) or
+   * came back: the sound fades out and the audio stops running while they are away, and comes
+   * back as it was (only if they had it on). Their own sound preference is untouched.
+   */
+  setAway(away: boolean) {
+    if (away === this.away) return;
+    this.away = away;
+    window.clearTimeout(this.sleep);
+    const ctx = this.ctx;
+    if (!ctx) return;
+    if (away) {
+      this.level(0.04);
+      // once faded, the audio stops altogether (nothing runs or plays in the background)
+      this.sleep = window.setTimeout(() => this.away && void ctx.suspend().catch(() => undefined), 250);
+    } else {
+      void ctx.resume().catch(() => undefined);
+      this.level(0.2);
+    }
+  }
+
+  private away = false;
+  private sleep = 0;
+
+  private level(tau = 0.15) {
     if (!this.ctx || !this.master) return;
-    this.master.gain.setTargetAtTime(on ? 1 : 0, this.ctx.currentTime, 0.15);
+    this.master.gain.setTargetAtTime(this.enabled && !this.away ? 1 : 0, this.ctx.currentTime, tau);
   }
 
   get running() {
@@ -1083,3 +1285,10 @@ class AudioDirector {
 }
 
 export const audio = new AudioDirector();
+
+// no sound while the visitor is not on the page: leaving it (another tab, the window minimised,
+// another app on a phone) mutes it, coming back brings it back as it was
+const away = () => audio.setAway(document.visibilityState === 'hidden');
+document.addEventListener('visibilitychange', away);
+window.addEventListener('pagehide', () => audio.setAway(true));
+window.addEventListener('pageshow', away);

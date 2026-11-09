@@ -1,4 +1,5 @@
 import { decodeIn } from './decode';
+import { diagNote } from './diag';
 
 /**
  * The chapter title cards (Figma "Drunkfurt", Example-chapter-1…3): a frosted
@@ -14,8 +15,13 @@ const EXIT = { duration: 800, easing: 'cubic-bezier(0.7, 0, 0.84, 0)' };
 
 let current: { el: HTMLElement; anim: Animation | null; timer: number } | null = null;
 
+/** When the last card went (performance.now()). */
+let endedAt = 0;
+export const sinceTitleCard = () => (current ? 0 : performance.now() - endedAt);
+
 function stop() {
   if (!current) return;
+  endedAt = performance.now();
   window.clearTimeout(current.timer);
   current.anim?.cancel();
   current.el.classList.remove('is-on');
@@ -25,6 +31,8 @@ function stop() {
 /** Slides chapter `n`'s card in, holds it, slides it out. */
 export function showTitleCard(n: number) {
   stop();
+  played = true;
+  diagNote(`title card ${n} in`);
   const el = document.querySelector<HTMLElement>(`.tcard[data-chapter="${n}"]`);
   const slide = el?.querySelector<HTMLElement>('.tcard-slide');
   if (!el || !slide) return;
@@ -53,6 +61,12 @@ export function showTitleCard(n: number) {
   if (entry.anim) entry.anim.finished.then(arrived, () => undefined);
   else arrived();
 }
+
+/** Whether a card is on the page (coming, holding or going). */
+export const titleCardOn = () => current !== null;
+/** Whether a card has been shown and has gone again (the page has been handed over and has settled). */
+let played = false;
+export const titleCardPlayed = () => played && current === null;
 
 /** Takes any card away at once (a chapter is being left). */
 export function hideTitleCard() {

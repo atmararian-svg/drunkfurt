@@ -8,6 +8,12 @@ import { CONCOURSE, DOOR_Z, HALL_CX, MAST_X, MAST_Z, TRACKS } from './layout';
 import { FLICKER_MAST, SHADOW_MASTS } from './lighting-config';
 
 const MAST_INTENSITY = 150;
+/**
+ * The masts that carry a real light: those ahead of where you start (the platform runs on behind
+ * the door, 29 m and more, where the camera never looks). Every light is paid for by every lit
+ * pixel of the frame, so the ones behind you are only their glowing lamps (Furniture).
+ */
+const LIT_Z = MAST_Z.filter((z) => z < 20);
 
 /**
  * Night lighting for the hall. Real light sources do the work: one spotlight per
@@ -21,7 +27,7 @@ export function Lighting({ active = true }: { active?: boolean }) {
   const flickerColor = useMemo(() => materials().lampLensFlicker.color.clone(), []);
 
   // Spot targets must live in the scene graph for their matrices to update.
-  const targets = useMemo(() => MAST_Z.map((z) => {
+  const targets = useMemo(() => LIT_Z.map((z) => {
     const o = new Object3D();
     o.position.set(MAST_X, 0, z);
     return o;
@@ -63,7 +69,7 @@ export function Lighting({ active = true }: { active?: boolean }) {
       {targets.map((t, i) => (
         <primitive key={`t${i}`} object={t} />
       ))}
-      {MAST_Z.map((z, i) => {
+      {LIT_Z.map((z, i) => {
         const shadow = SHADOW_MASTS.includes(i);
         return (
           <spotLight

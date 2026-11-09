@@ -128,10 +128,11 @@ export function drawBrushWipe(ctx: CanvasRenderingContext2D, W: number, H: numbe
  * it), each popping in as it lands. `t` in seconds of the fight; `beats` gives
  * when the black is complete and when each hit lands.
  */
-export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, beats: { dark: number; hit1: number; hit2: number }) {
+/** `leave` (0 … 1): the words going, as the blur clears: they break up into coarse blocks again and fade. */
+export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t: number, beats: { hit1: number; hit2: number }, leave = 0) {
   ctx.clearRect(0, 0, W, H);
   if (t < 0) return;
-  // (the dark itself is the street's own pixels, blurred and shaded, under this)
+  // (the blur itself is the street's own pixels, under this)
   // the design's own words (Figma "fight-scene"), placed as there on a 1920 × 1080 frame scaled to fit:
   // BAM from the top left with the first hit, POW from the bottom right with the second
   const k = Math.min(W / FRAME.w, H / FRAME.h);
@@ -151,7 +152,8 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
     const { w, h, sharp, out, tiny } = wordCanvas(art, k);
     const x = (anchor === 'tl' ? art.x * k : W - (FRAME.w - art.x) * k) + w / 2 + side * reach + shake;
     const y = (anchor === 'tl' ? art.y * k : H - (FRAME.h - art.y) * k) + h / 2 + side * reach * 0.3 - shake * 0.5;
-    const block = 1 + 27 * (1 - sharpen);
+    const gone = Math.min(1, Math.max(0, leave));
+    const block = 1 + 27 * Math.max(1 - sharpen, gone);
     let img: HTMLCanvasElement = sharp;
     if (block > 1.05) {
       drawPixelated(out.getContext('2d')!, tiny, sharp, block, w, h);
@@ -162,7 +164,7 @@ export function drawHits(ctx: CanvasRenderingContext2D, W: number, H: number, t:
     ctx.rotate(((side * -9 * (1 - travel)) * Math.PI) / 180);
     const sc = 1.22 - 0.22 * sharpen;
     ctx.scale(sc, sc);
-    ctx.globalAlpha = Math.min(1, u / 0.3);
+    ctx.globalAlpha = Math.min(1, u / 0.3) * (1 - gone * gone);
     ctx.drawImage(img, -w / 2, -h / 2, w, h);
     ctx.restore();
   };

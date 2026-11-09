@@ -1,3 +1,4 @@
+import type { VoiceId } from '../audio/voices';
 import type { ComponentType } from 'react';
 import type { CameraTrack } from '../core/cameraTrack';
 import type { CameraPose } from '../core/sequence';
@@ -19,10 +20,14 @@ export interface Caption {
    * only places a speech caption.
    */
   tone?: 'yellow' | 'paper' | 'speech' | 'tip';
+  /** A tip that comes and goes by fading only, without the pixels (the first one, while the page is still settling). */
+  plain?: boolean;
   /** Only shown when this holds (e.g. one caption per outcome of an interaction). */
   when?: () => boolean;
   /** A balloon's text is typed in (ui/typewriter.ts); called each time it has been typed in full. */
   onTyped?: () => void;
+  /** His recorded line (audio/voices.ts), said as the words come up; his thought stays up until it is said. */
+  voice?: VoiceId;
 }
 
 export interface EpisodeDef {

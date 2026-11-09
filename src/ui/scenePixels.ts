@@ -20,8 +20,6 @@ let ctx: CanvasRenderingContext2D | null = null;
 let stopWatching: (() => void) | null = null;
 const tiny = document.createElement('canvas');
 let block = 1;
-/** Below this block size (px) the layer fades out over the picture instead of its blocks shrinking further. */
-const FADE_BELOW = 4;
 let soft = 0;
 let dark = 0;
 
@@ -34,10 +32,7 @@ const draw = (src: HTMLCanvasElement) => {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);
   }
-  // (the last of it is a fade, not blocks shrinking to one pixel: near 1 they shimmer, and then the
-  // layer going would be a visible cut back to the picture)
-  drawPixelated(ctx, tiny, src, Math.max(block, FADE_BELOW), w, h, soft);
-  canvas.style.opacity = block >= FADE_BELOW ? '1' : Math.max(0, (block - 1) / (FADE_BELOW - 1)).toFixed(3);
+  drawPixelated(ctx, tiny, src, block, w, h, soft);
   if (dark > 0.005) {
     ctx.fillStyle = `rgba(5, 5, 6, ${Math.min(1, dark).toFixed(3)})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -57,8 +52,15 @@ export function setScenePixels(next: number, blur = 0, shade = 0) {
     ctx = null;
     return;
   }
-  if (canvas) return;
+  // (the last of it dissolves into the live picture rather than being taken away: the copy is a frame behind
+  // and at its own density, so cutting from it to the 3D page was a visible jolt)
+  const fade = Math.min(1, Math.max((next - 1) / 2.5, blur / 0.3, shade / 0.15));
+  if (canvas) {
+    canvas.style.opacity = fade.toFixed(3);
+    return;
+  }
   canvas = document.createElement('canvas');
+  canvas.style.opacity = fade.toFixed(3);
   canvas.className = 'scene-pixels';
   canvas.setAttribute('aria-hidden', 'true');
   ctx = canvas.getContext('2d');

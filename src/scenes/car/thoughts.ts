@@ -1,3 +1,4 @@
+import { audio } from '../../audio/AudioDirector';
 import { story } from '../../core/store';
 import { Gate, gates, globalProgress, localProgress, playProgress, timeline } from '../../core/timeline';
 import { CAR_BEAT } from './getaway';
@@ -45,7 +46,9 @@ export const thoughtsShown = (local = localProgress('car')) => local >= THOUGHTS
 /** Called every frame by the overlay while the car episode is on. Returns whether they should be playing. */
 export function updateThoughts() {
   const local = localProgress('car');
-  if (local < THOUGHTS.from - 0.01 && (thoughts.started || thoughts.done)) resetThoughts();
+  // scrolled back out of the seat before they were all said: they start again next time; once said, they are
+  // not said again (only the chapter played from its beginning plays them again)
+  if (local < THOUGHTS.from - 0.01 && thoughts.started && !thoughts.done) resetThoughts();
   gate.open = thoughts.done;
   const waiting = !gate.open && local >= THOUGHTS.gate - 0.003;
   const now = story.getState().prompt;
@@ -65,6 +68,7 @@ let round = 0;
 export function thoughtsTyped(erase: () => Promise<void>) {
   window.clearTimeout(holdTimer);
   const mine = ++round;
+  // (it stands at least until his voice has said it all)
   holdTimer = window.setTimeout(async () => {
     await erase();
     if (mine !== round || thoughts.done) return;
@@ -73,7 +77,7 @@ export function thoughtsTyped(erase: () => Promise<void>) {
     // from wherever the page is, on to the rev point (no further): the gate there holds it for D
     const to = globalProgress('car', CAR_BEAT.rev);
     if (timeline.progress < to) playProgress(timeline.progress, to, 1.1);
-  }, THOUGHTS.hold);
+  }, Math.max(THOUGHTS.hold, audio.sayingLeft() + 300));
 }
 
 /** SKIP DIALOGUE: the thoughts are over at once (the overlay clears them), and the story goes on to the rev point. */

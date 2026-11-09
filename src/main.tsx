@@ -4,12 +4,22 @@ import './fonts.css';
 import './styles.css';
 import { mountDitherCursor } from './ui/ditherCursor';
 import { showStub, stubReason } from './ui/stub';
+import { mountDiag } from './ui/diag';
+
+// (?diag: what makes the page wait, in a panel: ui/diag.ts)
+mountDiag();
 
 // where the story cannot run as it should (no WebGL; a phone or tablet), a page of its own in its
-// place, and none of the 3D is loaded
+// place (with no WebGL, none of the 3D is loaded)
 const reason = stubReason();
 if (reason) showStub(reason);
-else
+// on a phone, chapter 3's room behind its page: only to be looked at (App's backdrop)
+if (reason === 'desktop')
+  void import('./App').then(({ App, setBackdrop }) => {
+    setBackdrop(true);
+    createRoot(document.getElementById('root')!).render(<App />);
+  });
+else if (!reason)
   void import('./App').then(({ App }) => {
     createRoot(document.getElementById('root')!).render(
       <StrictMode>

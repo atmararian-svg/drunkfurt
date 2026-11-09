@@ -4,7 +4,7 @@ const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
 import type { CameraPose } from '../../core/sequence';
 import type { EpisodeDef } from '../../episodes/types';
 import { CityScene } from './CityScene';
-import { BEAT, BLOCK, KO, encounter, encounterAt, resetEncounter } from './encounter';
+import { BEAT, KO, encounter, encounterAt, resetEncounter } from './encounter';
 import { INVITATION, LETTER, invitationTyped, letter, resetLetter } from './letter';
 import { strangerGroundAt } from './strangerRoute';
 import { cityTrack } from './track';
@@ -54,9 +54,20 @@ function encounterCamera(local: number, pose: CameraPose) {
     pose.position.y += Math.sin(performance.now() / 900) * 0.004 * smoothstep(clamp(t - KO.fallTo, 0, 1));
     return;
   }
-  if (local < BEAT.noticed - 0.02 || local > BEAT.cut) return;
-  if (v.outcome === 'blocked' && v.t >= BLOCK.dark) return; // the page is black; he is down
-  const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1));
+  firstPerson(local, pose, v);
+}
+
+/**
+ * Your own eyes through the approach, the stand-off and (once you defend) the fight under the
+ * blur: kept on him, leaning back from the knife, jolted by every blow. Defended, the hold on him
+ * eases off towards the aftermath, so the camera arrives on the aftermath's frame without a jump.
+ */
+function firstPerson(local: number, pose: CameraPose, v: ReturnType<typeof encounterAt>) {
+  const fight = v.outcome === 'blocked' && v.t >= 0;
+  const end = fight ? BEAT.aftermath : BEAT.cut;
+  if (local < BEAT.noticed - 0.02 || local > end) return;
+  const release = fight ? 1 - smoothstep(clamp((local - BEAT.cut) / (BEAT.aftermath - BEAT.cut), 0, 1)) : 1;
+  const w = 0.75 * smoothstep(clamp((local - (BEAT.noticed - 0.02)) / 0.1, 0, 1)) * release;
   const him = strangerGroundAt(local);
   const dx = him.x - pose.position.x;
   const dz = him.z - pose.position.z;
@@ -69,10 +80,10 @@ function encounterCamera(local: number, pose: CameraPose) {
     pose.pitch += smoothstep(clamp((4 - dist) / 2.5, 0, 1)) * 0.05;
   }
   // lean back from the incoming fist
-  const lean = 0.07 * Math.pow(v.punch, 1.5);
+  const lean = 0.07 * Math.pow(v.punch, 1.5) * release;
   pose.position.x -= Math.sin(pose.yaw) * -lean;
   pose.position.z += Math.cos(pose.yaw) * lean;
-  pose.pitch -= 0.03 * v.punch;
+  pose.pitch -= 0.03 * v.punch * release;
   // impact jolt: a few centimetres and a fraction of a degree, decaying fast (a function of the fight's own clock)
   const k = v.shake * v.shake;
   if (k > 0) {
@@ -105,18 +116,18 @@ export const cityEpisode: EpisodeDef = {
   },
   beats: [0, 0.12, 0.22, 0.31, 0.4, 0.5, 0.62, BEAT.stop, BEAT.cock, BEAT.gate, 0.94, LETTER.gate, 1],
   captions: [
-    { from: 0.14, to: 0.27, place: 'tl', kicker: 'Midnight, give or take', text: 'Outside, the city was awake. Not in a good way.' },
-    { from: 0.3, to: 0.41, place: 'br', text: 'Banks at the end of the street. Everyone else down here.' },
-    { from: 0.46, to: 0.58, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet.' },
-    { from: 0.63, to: 0.72, place: 'bl', tone: 'yellow', text: 'Some people walk somewhere. He was walking at me.' },
+    { from: 0.14, to: 0.27, place: 'tl', kicker: 'Midnight, give or take', text: 'Outside, the city was awake. Not in a good way.', voice: '06' },
+    { from: 0.3, to: 0.41, place: 'br', text: 'Banks at the end of the street. Everyone else down here.', voice: '07' },
+    { from: 0.46, to: 0.58, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet. Wow.', voice: '08' },
+    { from: 0.63, to: 0.72, place: 'bl', tone: 'yellow', text: 'Speak of the devil. Some people walk somewhere. He was walking at me. Damn.', voice: '09' },
     // he says it with the knife on you, and keeps saying it while the story waits for you
-    { from: 0.79, to: 0.9, place: 'tr', tone: 'speech', kicker: 'ATTACKER:', text: 'Your bag. Give it to me. Now.', when: () => !encounter.outcome },
-    { from: 0.92, to: 0.955, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', when: () => encounter.outcome === 'blocked' },
+    { from: 0.79, to: 0.9, place: 'tr', tone: 'speech', kicker: 'ATTACKER:', text: 'Your bag. Give it to me. Now.', voice: 'attacker', when: () => !encounter.outcome },
+    { from: 0.92, to: 0.955, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', voice: '10', when: () => encounter.outcome === 'blocked' && !letter.open && !letter.read },
     // the letter he dropped: the story waits until it has been read (letter.ts), then you tell him where to find you
     // (from where the fight's own playback ends: the letter can be picked up from there, see letter.ts)
     { from: LETTER.from + 0.04, to: 1, place: 'bl', tone: 'tip', text: `Something fell out of his coat. A letter. ${TOUCH ? 'Tap' : 'Click'} it.`, when: () => encounter.outcome === 'blocked' && !letter.read },
     // (said as soon as the letter is read: from where it can be picked up, no scroll needed)
-    { from: LETTER.from + 0.04, to: 1, place: 'tr', tone: 'speech', kicker: 'ME:', text: INVITATION, when: () => letter.read, onTyped: invitationTyped },
+    { from: LETTER.from + 0.04, to: 1, place: 'tr', tone: 'speech', kicker: 'ME:', text: INVITATION, voice: '11', when: () => letter.read && !letter.saidAndGone, onTyped: invitationTyped },
     { from: 0.935, to: 0.978, place: 'br', tone: 'yellow', text: 'When I came to, he was gone. He did not even take the bag.', when: () => encounter.outcome === 'knockedOut' },
   ],
 };

@@ -31,16 +31,30 @@ export const KO = {
 } as const;
 
 /**
- * You defended: ACTION goes first, then (from `veil`) the street breaks into
- * pixels and darkens until `dark`; only in that dark do the two hits land
- * (printed as BAM and POW), with room between them, and it opens on him lying
- * there. Seconds of the fight's own clock after the press (spread over
- * gate → aftermath). Unhurried on purpose: one thing after the other.
+ * You defended: you stay in your own eyes. ACTION goes first, then (from `veil`) the street
+ * breaks into pixels and blurs (complete by `blurred`); under the blur two blows land (fight.ts:
+ * the last two of the animation, 0.28 s apart, each with its exhale), the second the uppercut
+ * that throws him onto his back. The blur clears on the aftermath. Seconds of the fight's own
+ * clock after the press (spread over gate → aftermath).
  */
 export const BLOCK = {
   veil: 0.18,
-  dark: 0.75,
-  hit1: 1.0,
-  hit2: 1.55,
+  /** The blur is complete. */
+  blurred: 0.55,
+  /** The fight's clip starts (his knife hold eases into his guard before it). */
+  fight: 0.45,
+  /** BAM: the second-to-last blow (fight.ts: clip 2.40). */
+  hit1: 0.7,
+  /** POW: the uppercut, 0.28 s later (clip 3.00). */
+  hit2: 0.98,
+  /** He is on the pavement (clip 3.82). */
+  land: 1.8,
   resolve: 3.0,
 } as const;
+
+/**
+ * The letter falling out of his coat as the uppercut lands (the fight's clock, s): from his chest onto the
+ * pavement in `s` seconds (scenes/city/LetterProp.tsx draws it; its sounds are cues of the fight).
+ */
+export const LETTER_FALL = { from: BLOCK.hit2 + 0.06, s: 0.62 };
+

@@ -1,19 +1,14 @@
-import {
-  DoubleSide,
-  Mesh,
-  PerspectiveCamera,
-  PlaneGeometry,
-  SRGBColorSpace,
-  Scene,
-  ShaderMaterial,
-  Texture,
-  Vector2,
-  WebGLRenderer,
-} from 'three';
+import { Vector2 } from 'three';
 import letterUrl from '../assets/letter.webp';
+import letterLightUrl from '../assets/letter-light.webp';
+import words from '../scenes/city/letterWords.json';
+import { audio } from '../audio/AudioDirector';
 import { letter } from '../scenes/city/letter';
 import { pinScroll } from '../core/timeline';
+import { diagNote } from './diag';
+import { story } from '../core/store';
 import { TOUCH } from './touch';
+import { ASPECT, LetterSheet } from './letterSheet';
 
 /**
  * Reading the letter, after Framer's "CrumpledPaper Reveal": the image starts
@@ -51,75 +46,44 @@ export const LETTER_REVEAL = {
   crumple: 0.55,
   hold: undefined as number | undefined,
 };
-/** The sheet's aspect (width / height): the supplied image's, 1592 × 2000. */
-const ASPECT = 1592 / 2000;
 /** The reading zoom on a touch screen (a tap on the sheet). */
 const ZOOM = 2.4;
-
-const vertex = /* glsl */ `
-uniform float uUnfold;
-uniform float uTime;
-varying vec2 vUv;
-varying vec3 vPos;
-float h(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
-float n2(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.0-2.0*f);
-  return mix(mix(h(i),h(i+vec2(1,0)),f.x), mix(h(i+vec2(0,1)),h(i+vec2(1,1)),f.x), f.y); }
-float ridge(vec2 p){ float r=0.0, a=0.5; for(int i=0;i<4;i++){ r += a*(1.0-abs(n2(p)*2.0-1.0)); p*=2.03; a*=0.5; } return r; }
-void main(){
-  vUv = uv;
-  vec3 flat3 = position;
-  // creases that stay after unfolding, and a curl at the corners
-  flat3.z += (ridge(uv*vec2(5.0,6.0)) - 0.5) * 0.018;
-  float corner = smoothstep(0.55, 1.0, max(abs(uv.x-0.5), abs(uv.y-0.5)) * 2.0);
-  flat3.z += corner * corner * 0.035;
-  // the ball: each point pulled onto a lumpy sphere, by its direction from the middle of the sheet
-  vec2 c = position.xy;
-  vec3 dir = normalize(vec3(c.x * 1.7, c.y * 1.4, (n2(uv*7.0) - 0.5) * 1.6 + 0.001));
-  float lump = 0.8 + 0.45 * n2(uv*9.0 + 3.0) + 0.25 * ridge(uv*13.0);
-  vec3 ball = dir * 0.16 * lump;
-  // the middle opens first, the edges last
-  float r = length((uv - 0.5) * vec2(1.0, 1.25));
-  float u = clamp((uUnfold * 1.45 - r * 0.55), 0.0, 1.0);
-  u = u * u * (3.0 - 2.0 * u);
-  vec3 p = mix(ball, flat3, u);
-  vPos = p;
-  gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-}`;
-
-const fragment = /* glsl */ `
-uniform sampler2D uMap;
-uniform vec2 uLight;
-uniform float uUnfold;
-varying vec2 vUv;
-varying vec3 vPos;
-void main(){
-  vec3 n = normalize(cross(dFdx(vPos), dFdy(vPos)));
-  if (!gl_FrontFacing) n = -n;
-  vec3 l = normalize(vec3(uLight * 0.8, 1.0));
-  float d = clamp(dot(n, l), 0.0, 1.0);
-  // crumpled, the facets are strongly shaded; flat, only the creases show
-  float shade = mix(0.55 + 0.6 * d, 0.86 + 0.18 * d, smoothstep(0.6, 1.0, uUnfold));
-  vec3 paper = vec3(0.925, 0.905, 0.86);
-  vec3 col = gl_FrontFacing ? texture2D(uMap, vUv).rgb : paper;
-  gl_FragColor = vec4(col * shade, 1.0);
-  #include <colorspace_fragment>
-}`;
 
 interface Open {
   root: HTMLDivElement;
   close: () => void;
 }
 let current: Open | null = null;
-let picture: Promise<HTMLImageElement> | null = null;
-const image = () =>
-  (picture ??= new Promise((resolve, reject) => {
-    const img = new Image();
-    img.decoding = 'async';
-    img.onload = () => resolve(img);
-    img.onerror = reject;
-    img.src = letterUrl;
-  }));
+const pictures = new Map<string, Promise<HTMLImageElement>>();
+const image = (url = letterUrl) => {
+  let p = pictures.get(url);
+  if (!p) {
+    p = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.decoding = 'async';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+    pictures.set(url, p);
+  }
+  return p;
+};
 
+/**
+ * Where the voice is in the letter at `t` s of its recording (letterWords.json: each word's line, its
+ * x from/to on the sheet, and when it is said): the line, and how far along it the ink has come (the
+ * word being said fills in as it is said; between words it rests at the end of the last).
+ */
+function readAt(t: number) {
+  const ws = words.words as [number, number, number, number, number][];
+  if (t < ws[0][3]) return { line: ws[0][0], x: ws[0][1] };
+  let i = 0;
+  while (i + 1 < ws.length && ws[i + 1][3] <= t) i++;
+  const [line, x0, x1, t0, t1] = ws[i];
+  const k = Math.min(1, Math.max(0, (t - t0) / Math.max(0.05, t1 - t0)));
+  return { line, x: x0 + (x1 - x0) * k };
+}
 const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 /**
@@ -127,6 +91,9 @@ const ease = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 
  * the page (its centre and its size, CSS px), so it is lifted from there;
  * `onClosed` runs when it has crumpled up and left the page.
  */
+/** One sheet for every reading (a plain 2D canvas: no WebGL context of its own, see letterSheet.ts). */
+let shared: LetterSheet | null = null;
+
 export function openLetter(onClosed: () => void, spot?: { x: number; y: number; size: number }) {
   if (current) return;
   letter.open = true;
@@ -186,62 +153,26 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   const pan = new Vector2();
   const target = new Vector2(0.3, 0.4);
 
-  // --- WebGL, or the CSS fallback
-  let renderer: WebGLRenderer | null = null;
-  let mat: ShaderMaterial | null = null;
-  let tex: Texture | null = null;
-  let geo: PlaneGeometry | null = null;
-  let scene: Scene | null = null;
-  let cam: PerspectiveCamera | null = null;
-  let sheet: Mesh | null = null;
-  let fallback: HTMLImageElement | null = null;
-  try {
-    renderer = new WebGLRenderer({ alpha: true, antialias: true, powerPreference: 'high-performance' });
-    renderer.outputColorSpace = SRGBColorSpace;
-    renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-    renderer.setClearColor(0x000000, 0);
-    renderer.domElement.className = 'letter-canvas';
-    stageEl.appendChild(renderer.domElement);
-    scene = new Scene();
-    cam = new PerspectiveCamera(30, 1, 0.01, 20);
-    geo = new PlaneGeometry(ASPECT, 1, 70, 88);
-    tex = new Texture();
-    tex.colorSpace = SRGBColorSpace;
-    tex.anisotropy = 8;
-    mat = new ShaderMaterial({
-      vertexShader: vertex,
-      fragmentShader: fragment,
-      side: DoubleSide,
-      uniforms: { uMap: { value: tex }, uUnfold: { value: 0 }, uTime: { value: 0 }, uLight: { value: light } },
-    });
-    sheet = new Mesh(geo, mat);
-    scene.add(sheet);
-  } catch (err) {
-    console.warn('[letter] no WebGL, unfolding the image in CSS', err);
-    renderer = null;
-  }
-  if (!renderer) {
-    fallback = document.createElement('img');
-    fallback.className = 'letter-img';
-    fallback.alt = '';
-    fallback.src = letterUrl;
-    stageEl.appendChild(fallback);
-  }
+  // the reading: 'wait' until it is open, then read out ('reading', the words filling in) or, without the
+  // voice (the sound off), shown in full ink at once ('done')
+  let reading: 'wait' | 'reading' | 'done' = 'wait';
+  let readFrom = 0;
+  // how far it is read: the line, and along it (99: all of it in ink; -1: none yet)
+  let line = 99;
+  let lineX = 0;
+  let voicedSheet = false;
+  const sheet = (shared ??= new LetterSheet());
+  stageEl.appendChild(sheet.canvas);
+  let dist = 1;
+  let unitPx = 1;
 
   const size = () => {
     const { w, h } = fit();
-    if (renderer && cam) {
-      // the canvas covers the page; the camera stands where the flat sheet is exactly w × h px
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      cam.aspect = window.innerWidth / window.innerHeight;
-      cam.position.set(0, 0, 1 / (2 * Math.tan((cam.fov * Math.PI) / 360)) * (window.innerHeight / h));
-      cam.lookAt(0, 0, 0);
-      cam.updateProjectionMatrix();
-    }
-    if (fallback) {
-      fallback.style.width = `${w}px`;
-      fallback.style.height = `${h}px`;
-    }
+    // the canvas covers the page; the camera stands where the flat sheet is exactly w × h px
+    sheet.resize(window.innerWidth, window.innerHeight);
+    unitPx = h;
+    dist = (1 / (2 * Math.tan((30 * Math.PI) / 360))) * (window.innerHeight / h);
+    void w;
   };
   size();
   window.addEventListener('resize', size);
@@ -262,38 +193,58 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     unfold = closing ? from * (1 - ease(Math.min(1, u / C))) : from + (to - from) * ease(u);
     const drop = closing ? Math.pow(Math.max(0, (u - (C - 0.1)) / (1.1 - C)), 2) : 0;
     light.lerp(target, 0.08);
-    if (renderer && mat && sheet && scene && cam) {
-      mat.uniforms.uUnfold.value = unfold;
+    // open: the voice reads it out, the words filling in as they are said
+    if (!closing && reading === 'wait' && u >= 1) {
+      audio.speak('letter');
+      reading = audio.saying() === 'letter' ? 'reading' : 'done';
+      readFrom = now;
+    }
+    {
+      if (reading === 'reading') {
+        if (audio.saying() === 'letter') {
+          const r = readAt(audio.sayingTime());
+          line = r.line;
+          lineX = r.x;
+        } else if (audio.sayingLeft() === 0 && now - readFrom > 500) {
+          // said to the end (or stopped): all of it in ink
+          reading = 'done';
+        }
+      }
+      if (reading === 'done') line = 99;
+      else if (reading === 'wait') line = voicedSheet ? -1 : 99;
+    }
+    {
       // lifted from where it lay, rising and unfolding on one curve, so it is fully open as it arrives in the middle
       const k = 1 - unfold;
-      const { h } = fit();
+      const h = unitPx;
+      let px = 0;
+      let py = 0;
       if (closing) {
         // from the middle, down and out: the page's half height, plus the ball's size, below the middle
-        const out = (window.innerHeight / 2 / h) + ground.scale * 0.5;
-        sheet.position.set(0, -out * drop, 0);
+        const out = window.innerHeight / 2 / h + ground.scale * 0.5;
+        py = -out * drop;
       } else {
-        const gx = ((ground.x - window.innerWidth / 2) / h) * k;
-        const gy = (-(ground.y - window.innerHeight / 2) / h) * k;
+        px = ((ground.x - window.innerWidth / 2) / h) * k;
         // a lift: it rises off the pavement first, then comes forward to the reader
-        sheet.position.set(gx, gy + Math.sin(Math.PI * Math.min(1, unfold * 1.15)) * 0.12 * k, 0);
+        py = (-(ground.y - window.innerHeight / 2) / h) * k + Math.sin(Math.PI * Math.min(1, unfold * 1.15)) * 0.12 * k;
       }
-      // lying on the ground (tipped away), turning to face you as it opens; a slight drift in the hand once open
-      sheet.rotation.set(-1.15 * k * k + Math.sin(now / 2100) * 0.012 * unfold, 0.35 * k + Math.sin(now / 2700) * 0.015 * unfold, 0.6 * k);
-      sheet.scale.setScalar(ground.scale + (1 - ground.scale) * unfold);
       // (touch) the reading zoom: the camera closes in on the point tapped, and pans with a drag
       zoom += (zoomTo - zoom) * (reduced ? 1 : 0.18);
       if (Math.abs(zoomTo - zoom) < 0.002) zoom = zoomTo;
-      const f = (zoom - 1) / (ZOOM - 1);
-      cam.zoom = zoom;
-      cam.position.x = pan.x * f;
-      cam.position.y = pan.y * f;
-      cam.updateProjectionMatrix();
-      renderer.render(scene, cam);
-    } else if (fallback) {
-      const k = 1 - unfold;
-      const [fx, fy] = closing ? [0, (window.innerHeight / 2 + 200) * drop] : [(ground.x - window.innerWidth / 2) * k, (ground.y - window.innerHeight / 2) * k];
-      fallback.style.transform = `translate(${fx}px, ${fy}px) rotate(${-25 * k}deg) scale(${ground.scale + (1 - ground.scale) * unfold}, ${0.12 + 0.88 * unfold})`;
-      fallback.style.opacity = String(Math.min(1, unfold * 2));
+      sheet.render({
+        unfold,
+        light,
+        line,
+        x: lineX,
+        pos: { x: px, y: py },
+        // lying on the ground (tipped away), turning to face you as it opens; a slight drift in the hand once open
+        rot: { x: -1.15 * k * k + Math.sin(now / 2100) * 0.012 * unfold, y: 0.35 * k + Math.sin(now / 2700) * 0.015 * unfold, z: 0.6 * k },
+        scale: ground.scale + (1 - ground.scale) * unfold,
+        zoom,
+        pan,
+        h,
+        dist,
+      });
     }
     // the page darkens as soon as the sheet is picked up (on the clock, not the unfolding), and back as it is put down
     const shade = closing ? 1 - u : Math.min(1, u * 2.2);
@@ -340,7 +291,7 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   const touchUp = (e: PointerEvent) => {
     if (!touch || e.pointerType !== 'touch') return;
     lastTouch = performance.now();
-    if (!touch.moved && performance.now() - opened > 350 && renderer) {
+    if (!touch.moved && performance.now() - opened > 350) {
       if (zoomTo > 1) zoomTo = 1;
       else {
         // in on the point tapped (in sheet units: the sheet is 1 high)
@@ -382,6 +333,9 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   function close() {
     if (closing) return;
     closing = true;
+    // the voice stops; the sheet is crumpled up
+    if (audio.saying() === 'letter') audio.hush(0.3);
+    audio.paper('crumple');
     zoomTo = 1;
     from = unfold;
     to = 0;
@@ -392,15 +346,15 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   function finish() {
     if (closed) return;
     closed = true;
+    // the ball has dropped out of view: it lands on the pavement, by your feet
+    if (closing) audio.paper('land');
     cancelAnimationFrame(raf);
     window.removeEventListener('resize', size);
     window.removeEventListener('keydown', key);
-    renderer?.dispose();
-    renderer?.forceContextLoss();
-    geo?.dispose();
-    mat?.dispose();
-    tex?.dispose();
+    diagNote('letter closed');
     root.remove();
+    // the sheet keeps no picture between readings
+    sheet.empty();
     document.documentElement.classList.remove('is-reading');
     current = null;
     letter.open = false;
@@ -409,13 +363,15 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
   }
 
   current = { root, close };
-  image()
-    .then((img) => {
+  // the faint sheet only when it will be read out (with the sound on); without it, the letter as it is
+  const voiced = story.getState().sound && audio.running;
+  Promise.all([image(), voiced ? image(letterLightUrl).catch(() => null) : Promise.resolve(null)])
+    .then(([img, faintImg]) => {
       if (closed) return;
-      if (tex) {
-        tex.image = img;
-        tex.needsUpdate = true;
-      }
+      sheet.setImages(img, faintImg ?? img);
+      voicedSheet = !!faintImg;
+      if (!faintImg) reading = 'done';
+      audio.paper('unfold');
       t0 = performance.now();
       raf = requestAnimationFrame(draw);
       button.focus({ preventScroll: true });
