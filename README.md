@@ -77,7 +77,6 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
     sends them away;
   - while they are out, the subtitles, thoughts, captions and SCROLL cue stand above them and
     come down with them (`--tuner-room`);
-  - the sound switch sits **top centre**.
 - **Lighter**: the 3D page's pixel density is capped at 1.25 on touch devices (1.75 elsewhere).
 - `viewport-fit=cover` (the safe areas are already kept clear), no double-tap zoom, no tap flash.
 
@@ -97,8 +96,10 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   weight; every monospace on the page, set tight as in the design), Archivo (variable weight
   and width; the headlines), Anton (the posters). Latin and Latin Extended subsets, SIL OFL
   (licences alongside). No request goes to Google.
-- **Icons and sharing**: `public/favicon.svg` (the selector's frame: the white ◂ and the red
-  dash), `apple-touch-icon.png` (180 px), `site.webmanifest`, `og.jpg` (1200 × 630, the station);
+- **Icons and sharing** (Figma "Drunkfurt-header": Favicon, Social-sharing-preview_OpenGraph and
+  _Square): `public/favicon.svg` (the logo across a dark square), `apple-touch-icon.png` (180 px),
+  `site.webmanifest`, `og.jpg` (1200 × 630) and `og-square.jpg` (1200 × 1200): ONCE UPON A TIME
+  IN..., the logo, BY ARIAN ATMAR (the design's ABC Diatype Mono set in JetBrains Mono);
   Open Graph and Twitter tags in `index.html` use `VITE_SITE_URL` (set in `.env`; change it to
   the real address, or set it in Netlify's build environment). `robots.txt` allows everything.
 
@@ -107,9 +108,17 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
 - **The fight**: he goes down instead of cutting to him lying: the first hit knocks the knife
   away and him back a step, the second takes him off his feet backwards onto the pavement over
   0.75 s, gathering speed (`manRig.fall`, `Stranger.tsx`), under the pixels.
-- **SKIP DIALOGUE** (bottom right, the key S; TAP TO SKIP on touch) while the invitation is said
+- **SKIP DIALOGUE** (bottom right, the key Space; TAP TO SKIP on touch) while the invitation is said
   after the letter and while the thoughts in the car are typed: the invitation is taken as said;
   the thoughts end and the car goes on to the rev point.
+- **The invitation is said as soon as the letter is read** (its caption holds from where the letter
+  can be picked up), so the skip button and the words come together, no scroll needed.
+- **No hitch after a scripted move**: after any (the fight's playback, the car going on) the page
+  holds 300 ms, so the move's own late scroll events cannot set the story back a step (that put
+  the fight's pixels back for a moment: a blink); once the invitation is said, the story goes on
+  from the wait (the page is put back on it) rather than racing ahead to where the page was
+  scrolled meanwhile; and the fight's pixels end in a fade over the picture (below 4 px blocks)
+  instead of shrinking to one pixel and the layer being cut away.
 - **The Mercedes**: its star and lettering (and the steering wheel's star) are dark trim, not
   chrome. The centre screen right of the wheel, which only glowed grey, is a console that types
   itself in with the ignition (`car/carScreen.ts`): the route to Crasigostraße 24 from the
@@ -262,12 +271,21 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     curve (in over 0.8 s, out over 0.5 s): the scene's pixel layer grows its blocks, and the SVG
     pixel filter over the printed matter steps up from 2 to 7 px, only after the dimming has
     begun. It stays open while a drag or a wheel gesture runs.
-- **The sound switch** (top right, `Overlay.tsx`): its label says what a click does, and its look
-  goes with the label: SOUND ON (while the sound is off) is the white tab with near-black text;
-  SOUND OFF (while it plays) is the secondary action and steps back: frosted glass, white 14 %,
-  a 12 % white edge, background blur, white text; the same size and place, no red. The pointer coming on (and going off) decodes the whole
-  word at once (`decodeAll`, decode.ts: every character scrambles together and settles at its
-  own scattered moment), and changes nothing else; a click switches the sound.
+- **The header** (Figma "Drunkfurt-header", `Overlay.tsx`, at the design's own size): on the left
+  THEY NEED A HERO, / AND I'M HERE TO SAVE THEM. (JetBrains Mono 12), the DRUNKFURT logo in the
+  middle (`ui/headerArt.ts`, the design's vectors), the sound switch on the right.
+- **The sound switch**: `[S] SOUND ON|OFF` (the label says what a click does) and a 30 px square
+  with the sound's state (the speaker crossed out, or with waves), 2 px apart, sharp corners,
+  JetBrains Mono Medium 12 −5 %. SOUND ON (while the sound is off) is white with near-black; SOUND
+  OFF (while it plays) is frosted, white 20 % with a blur, white text. On hover (as the buttons of
+  theperformancelab.ca, read from its code: 0.45 s, cubic-bezier(0.4, 0, 0.2, 1)) the label and the
+  square slide right by the square's width and the gap, out of the clipped button, the square
+  turning away about its top left corner while another turns in at the left about its bottom right;
+  the label decodes. A click, or the key S, switches the sound: the face, the words (decoding) and
+  the icon change, and it stays in its hover state until the pointer leaves.
+- **The same button face** (sharp corners, Medium 12, 30 px, white) for `[SPACE] SKIP DIALOGUE`
+  (the skip key is Space: S is the sound), the letter's and the cave screen's cursor labels, the
+  stub pages' tabs and the 404's.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
   station no longer waits for the street's models) and a marker after it that reports when
   everything in it has loaded and drawn twice; a world that fails is caught by its own error
