@@ -41,7 +41,19 @@ const MAX_POINTS = 600;
 /** A pointer still for this long (s) stops laying the trail; what is there melts away. */
 const REST_S = 0.25;
 /** What the trail keeps off (the selector, the page's controls). */
-const OFF = '.tuner, a, button, [role="button"], .sound, .skip, .fx-press, .letter-layer, .stub';
+const OFF = '.tuner, a, button, [role="button"], .snd-btn, .skip, .fx-press, .letter-layer, .stub';
+/**
+ * …and what shows over the page without taking the pointer (so it is not under it to find): his face
+ * and his thoughts, the system's tip; while they are out, the pointer over them lays no trail either.
+ */
+const OFF_SHOWN = ['.hero-face', '.hero-box', '.tip'];
+const overShown = (x: number, y: number) =>
+  OFF_SHOWN.some((q) => {
+    const el = document.querySelector<HTMLElement>(q);
+    if (!el || el.style.visibility === 'hidden' || el.style.opacity === '0') return false;
+    const r = el.getBoundingClientRect();
+    return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
+  });
 const GREY = '150, 150, 150';
 /** Glyphs from empty to full (the brief's Floyd–Steinberg set, inverted). */
 const GLYPHS = [' ', '▩', '▨', '▧', '▦', '▥', '▤', '▣'];
@@ -94,7 +106,7 @@ export function mountDitherCursor() {
     target.y = e.clientY;
     target.on = true;
     target.moved = performance.now();
-    target.off = !!(e.target as Element | null)?.closest?.(OFF);
+    target.off = !!(e.target as Element | null)?.closest?.(OFF) || overShown(e.clientX, e.clientY);
     if (idle) {
       idle = false;
       last = performance.now();

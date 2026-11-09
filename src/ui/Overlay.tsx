@@ -13,6 +13,7 @@ import { aboutClick, enterSite, monitor, pick } from '../scenes/home/monitor';
 import { RevPrompt } from './RevPrompt';
 import { mountCombatPrompts, updateCombatPrompts } from './combatPrompt';
 import { setScenePixels } from './scenePixels';
+import { ICON_MUTED, ICON_SOUND, LOGO_SVG } from './headerArt';
 import { mountTextBoxes } from './textBoxes';
 import { TOUCH } from './touch';
 import { createTypewriter, Typewriter } from './typewriter';
@@ -125,7 +126,7 @@ export function Overlay() {
       }
     };
     const skipKey = (e: KeyboardEvent) => {
-      if (e.code !== 'KeyS' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
+      if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
       e.preventDefault();
       skip();
     };
@@ -320,6 +321,12 @@ export function Overlay() {
     };
     const onKey = (e: KeyboardEvent) => {
       unlock();
+      // S switches the sound (the header's switch says so: [S]), anywhere in the story
+      if (e.code === 'KeyS' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault();
+        toggleSoundRef.current();
+        return;
+      }
       // D defends (the one keyboard handler of the story; the car listens for its own D, only to rev)
       if (e.code === 'KeyD' && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && story.getState().prompt === 'defend') {
         e.preventDefault();
@@ -363,6 +370,7 @@ export function Overlay() {
 
   // the switch's label, split for decoding; a new label decodes in
   const soundShown = useRef('');
+  const toggleSoundRef = useRef(() => undefined as void);
   useEffect(() => {
     const el = soundText.current!;
     // (the label says what a click does: SOUND OFF while it plays, SOUND ON while it is off)
@@ -378,6 +386,7 @@ export function Overlay() {
     audio.unlock();
     audio.setEnabled(on);
   };
+  toggleSoundRef.current = toggleSound;
 
   return (
     <div className="overlay" ref={root}>
@@ -441,7 +450,7 @@ export function Overlay() {
           'TAP TO SKIP'
         ) : (
           <>
-            <span className="skip-key">S</span> SKIP DIALOGUE
+            <span className="skip-key">[SPACE]</span> SKIP DIALOGUE
           </>
         )}
       </button>
@@ -453,23 +462,44 @@ export function Overlay() {
 
       {/* the chapter tuner (chapterTuner.ts) is its own element on the page, so the dimming of the page behind it leaves it alone */}
 
-      {/* the pointer coming onto it decodes its text (decode.ts), nothing else; a click switches the sound */}
-      <button
-        type="button"
-        className="sound"
-        onClick={toggleSound}
-        onPointerEnter={(e) => {
-          // the whole word decodes at once, coming on and going off
-          if (e.pointerType !== 'touch') void decodeAll(soundText.current!, 420);
-        }}
-        onPointerLeave={(e) => {
-          if (e.pointerType !== 'touch') void decodeAll(soundText.current!, 260);
-        }}
-        aria-pressed={sound}
-        aria-label={`Sound ${sound ? 'on' : 'off'}`}
-      >
-        <span ref={soundText} data-text={`SOUND ${sound ? 'OFF' : 'ON'}`} aria-hidden />
-      </button>
+      {/* the header (Figma "Drunkfurt-header"): a line on the left, the logo in the middle, the sound switch on the right */}
+      <header className="site-head">
+        <p className="head-line">
+          They need a hero,
+          <br />
+          and I’m here to save them.
+        </p>
+        <span className="head-logo" role="img" aria-label="DRUNKFURT" dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
+        {/*
+          the sound switch: [S] and what a click does, and a square with the sound's state; the pointer on it
+          slides the label right and the square round to the left (theperformancelab.ca's buttons), the label
+          decoding; a click (or S) switches the sound and the label decodes into the other word
+        */}
+        <button
+          type="button"
+          className="snd-btn"
+          onClick={toggleSound}
+          onPointerEnter={(e) => {
+            if (e.pointerType !== 'touch') void decodeAll(soundText.current!, 420);
+          }}
+          aria-pressed={sound}
+          aria-label={`Sound ${sound ? 'on' : 'off'}`}
+          aria-keyshortcuts="S"
+        >
+          <span className="snd-label">
+            <span className="snd-key" aria-hidden>
+              [S]
+            </span>
+            <span ref={soundText} data-text={`SOUND ${sound ? 'OFF' : 'ON'}`} aria-hidden />
+          </span>
+          <span className="snd-sq snd-sq--right" aria-hidden>
+            <span className="snd-face" dangerouslySetInnerHTML={{ __html: sound ? ICON_SOUND : ICON_MUTED }} />
+          </span>
+          <span className="snd-sq snd-sq--left" aria-hidden>
+            <span className="snd-face" dangerouslySetInnerHTML={{ __html: sound ? ICON_SOUND : ICON_MUTED }} />
+          </span>
+        </button>
+      </header>
 
 
       <section className="outro">

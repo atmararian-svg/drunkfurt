@@ -341,33 +341,110 @@ body { cursor: pointer; }
 .outro.is-on { opacity: 1; }
 .outro .title-name { font-size: clamp(48px, 8vw, 120px); }
 
-.sound {
-  /* in the manner of the letter's close control (Figma "cursor-button"): a white tab, JetBrains Mono Bold */
+/* --- the header (Figma "Drunkfurt-header", 1920 × 1080, at the design's own size): a line on the left,
+   the logo in the middle, the sound switch on the right --- */
+.site-head {
+  position: absolute;
+  inset: 0 0 auto;
+  height: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+.head-line {
+  position: absolute;
+  top: max(30px, env(safe-area-inset-top, 0px));
+  left: max(20px, env(safe-area-inset-left, 0px));
+  margin: 0;
+  color: #fff;
+  font: 400 12px/16px var(--label);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+.head-logo {
   position: absolute;
   top: max(20px, env(safe-area-inset-top, 0px));
-  right: max(22px, env(safe-area-inset-right, 0px));
-  padding: 10px;
+  left: 50%;
+  width: 165px;
+  height: 52px;
+  transform: translateX(-50%);
+  color: #fff;
+}
+.head-logo svg { display: block; width: 100%; height: 100%; }
+
+/* the new button (the sound switch; the same face for the page's other buttons and cursor labels):
+   sharp corners, JetBrains Mono Medium 12 px, -5 %, 30 px high. A label and a 30 px square 2 px apart:
+   on hover the label and the square slide right by the square's width and the gap (out of the button,
+   clipped), the square turning away about its top left corner while another turns in at the left about
+   its bottom right (theperformancelab.ca's buttons: 0.45 s, cubic-bezier(0.4, 0, 0.2, 1)) */
+.snd-btn {
+  --face: #fff;
+  --ink: #111;
+  --move: 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+  position: absolute;
+  top: max(31px, env(safe-area-inset-top, 0px));
+  right: max(34px, env(safe-area-inset-right, 0px));
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 30px;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
   border: 0;
-  border-radius: 3px;
-  background: #fff;
-  color: #111;
-  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font: 500 12px/10px var(--label);
   letter-spacing: -0.05em;
+  text-transform: uppercase;
   pointer-events: auto;
   cursor: pointer;
-  transition: background-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
 }
-/* (hovering only decodes its text, the whole word at once: no colour of its own) */
-/* the label is the action: SOUND ON (the sound is off) is the white tab; SOUND OFF (it plays) is the
-   secondary one, a step back: frosted glass and white text, same size and place */
-.sound[aria-pressed='true'] {
-  background: rgba(255, 255, 255, 0.14);
-  color: #fff;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+/* SOUND ON (the sound is off): the white face; SOUND OFF (it plays): frosted, white words */
+.snd-btn[aria-pressed='true'] { --face: rgba(255, 255, 255, 0.2); --ink: #fff; }
+.snd-label,
+.snd-face {
+  background: var(--face);
+  color: var(--ink);
+  transition: transform var(--move), background-color 0.25s ease, color 0.25s ease;
+  will-change: transform;
+  backface-visibility: hidden;
+}
+.snd-btn[aria-pressed='true'] .snd-label,
+.snd-btn[aria-pressed='true'] .snd-face {
   -webkit-backdrop-filter: blur(12px);
   backdrop-filter: blur(12px);
 }
-.sound:focus-visible { outline: 2px dashed var(--red); outline-offset: 3px; }
+.snd-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: 105px;
+  box-sizing: border-box;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+.snd-sq {
+  position: relative;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  overflow: hidden;
+  transition: transform var(--move);
+  will-change: transform;
+}
+.snd-sq--left { position: absolute; left: 0; top: 0; pointer-events: none; }
+.snd-face { position: absolute; inset: 0; display: grid; place-items: center; }
+.snd-face svg { display: block; }
+.snd-sq--right .snd-face { transform: rotate(0deg); transform-origin: 0 0; }
+.snd-sq--left .snd-face { transform: rotate(-90deg); transform-origin: 100% 100%; }
+@media (hover: hover) {
+  .snd-btn:hover .snd-label,
+  .snd-btn:hover .snd-sq--right { transform: translate3d(32px, 0, 0); }
+  .snd-btn:hover .snd-sq--right .snd-face { transform: rotate(-90deg); }
+  .snd-btn:hover .snd-sq--left .snd-face { transform: rotate(0deg); }
+}
+.snd-btn:focus-visible { outline: 2px dashed var(--red); outline-offset: 3px; }
 
 @media (max-width: 640px) {
   .caption--tr, .caption--br { right: 20px; }
@@ -386,7 +463,7 @@ body { cursor: pointer; }
 .site-handoff .caption,
 .site-handoff .ring,
 .site-handoff .ring-label,
-.site-handoff .sound { opacity: 0 !important; transition: opacity 0.35s var(--ease); }
+.site-handoff .site-head { opacity: 0 !important; transition: opacity 0.35s var(--ease); }
 
 /* the page's colour, laid over everything once the screen fills the view (siteHandoff.ts holdColour) */
 .whiteout {
@@ -791,15 +868,10 @@ body { cursor: pointer; }
   will-change: auto;
 }
 .tuner--phone .tuner-tab { scroll-snap-align: center; }
-/* the sound switch: top centre */
-/* (the captions at the top start under it) */
+/* (the captions at the top start under the header) */
 .is-phone .caption--tl,
 .is-phone .caption--tr { top: calc(max(20px, env(safe-area-inset-top, 0px)) + 30px + 16px); }
-.is-phone .sound {
-  left: 50%;
-  right: auto;
-  transform: translateX(-50%);
-}
+.is-phone .head-line { display: none; }
 /* what sits at the bottom of the page stands above the tabs while they are out (the room they take),
    and comes down with them when they go */
 .is-phone { --tuner-room: calc(50px * var(--tuner-s, 1) + max(12px, env(safe-area-inset-bottom, 0px))); }
@@ -857,16 +929,17 @@ body { cursor: pointer; }
 .letter-img { box-shadow: 0 24px 50px rgba(0, 0, 0, 0.55); transform-origin: 50% 60%; opacity: 0; }
 /* the cursor: the label follows the pointer (a real pointer only) */
 .letter-cursor {
-  /* Figma "cursor-button": a white tab, 3 px corners, JetBrains Mono Bold 14 px in near-black, 10 px padding */
+  /* the new button's face (Figma "Drunkfurt-header"): a white tab, sharp corners, JetBrains Mono Medium
+     12 px in near-black, 10 px padding */
   position: fixed;
   left: 0;
   top: 0;
   z-index: 2;
   padding: 10px;
-  border-radius: 3px;
+  border-radius: 0;
   background: #fff;
   color: #111;
-  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  font: 500 12px/10px 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: -0.05em;
   white-space: nowrap;
   pointer-events: none;
@@ -898,10 +971,10 @@ body { cursor: pointer; }
   transform: translateX(-50%);
   padding: 10px;
   border: 0;
-  border-radius: 3px;
+  border-radius: 0;
   background: #fff;
   color: #111;
-  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  font: 500 12px/10px 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: -0.05em;
   cursor: none;
   opacity: 0;
@@ -1018,10 +1091,10 @@ body { cursor: pointer; }
 .stub-tab {
   padding: 10px;
   border: 0;
-  border-radius: 3px;
+  border-radius: 0;
   background: #fff;
   color: #111;
-  font: 700 14px/10px var(--label);
+  font: 500 12px/10px var(--label);
   letter-spacing: -0.05em;
   text-decoration: none;
   cursor: pointer;
@@ -1035,8 +1108,8 @@ body { cursor: pointer; }
 .stub-tab:focus-visible { background: var(--red); color: #fff; outline: none; }
 @media (prefers-reduced-motion: reduce) { .stub-caret { animation: none; } }
 
-/* --- SKIP DIALOGUE (Overlay.tsx): bottom right while the invitation is said or the thoughts are typed;
-   the sound switch's frosted tab, JetBrains Mono Bold, the key in the page's red */
+/* --- [SPACE] SKIP DIALOGUE (Overlay.tsx): bottom right while the invitation is said or the thoughts are
+   typed; the new button's face (sharp corners, JetBrains Mono Medium 12, white), red under the pointer */
 .skip {
   position: fixed;
   right: max(22px, env(safe-area-inset-right, 0px));
@@ -1044,16 +1117,14 @@ body { cursor: pointer; }
   z-index: 4;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px 8px 8px;
+  gap: 4px;
+  height: 30px;
+  padding: 0 10px;
   border: 0;
-  border-radius: 3px;
-  background: rgba(255, 255, 255, 0.14);
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
-  -webkit-backdrop-filter: blur(12px);
-  backdrop-filter: blur(12px);
-  color: #fff;
-  font: 700 14px/1 var(--label);
+  border-radius: 0;
+  background: #fff;
+  color: #111;
+  font: 500 12px/10px var(--label);
   letter-spacing: -0.05em;
   opacity: 0;
   transform: translateY(8px);
@@ -1063,16 +1134,7 @@ body { cursor: pointer; }
 }
 .skip.is-on { opacity: 1; transform: none; pointer-events: auto; transition-delay: 0.6s, 0.6s, 0s; }
 .skip:hover,
-.skip:focus-visible { background: rgba(255, 255, 255, 0.24); outline: none; }
-.skip-key {
-  display: grid;
-  place-items: center;
-  width: 20px;
-  height: 20px;
-  border-radius: 3px;
-  background: var(--red);
-  letter-spacing: 0;
-}
+.skip:focus-visible { background: var(--red); color: #fff; outline: none; }
 
 /* the label at the pointer over the screen about the author in the cave (RoomScene.tsx readCursor):
    the letter's close cursor, the same white tab */
@@ -1082,10 +1144,10 @@ body { cursor: pointer; }
   top: 0;
   z-index: 6;
   padding: 10px;
-  border-radius: 3px;
+  border-radius: 0;
   background: #fff;
   color: #111;
-  font: 700 14px/10px 'JetBrains Mono', ui-monospace, monospace;
+  font: 500 12px/10px 'JetBrains Mono', ui-monospace, monospace;
   letter-spacing: -0.05em;
   white-space: nowrap;
   pointer-events: none;
