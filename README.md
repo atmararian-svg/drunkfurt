@@ -108,9 +108,11 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
 - **The fight**: he goes down instead of cutting to him lying: the first hit knocks the knife
   away and him back a step, the second takes him off his feet backwards onto the pavement over
   0.75 s, gathering speed (`manRig.fall`, `Stranger.tsx`), under the pixels.
-- **SKIP DIALOGUE** (bottom right, the key Space; TAP TO SKIP on touch) while the invitation is said
+- **SKIP DIALOGUE** (bottom right, the key D; TAP TO SKIP on touch) while the invitation is said
   after the letter and while the thoughts in the car are typed: the invitation is taken as said;
-  the thoughts end and the car goes on to the rev point.
+  the thoughts end and the car goes on to the rev point by itself, as when they end on their own
+  (a locked move: neither the key nor a stray scroll stops it on the way; Space, a scroll key,
+  used to stop it at once, leaving the car standing).
 - **The invitation is said as soon as the letter is read** (its caption holds from where the letter
   can be picked up), so the skip button and the words come together, no scroll needed.
 - **No hitch after a scripted move**: after any (the fight's playback, the car going on) the page
@@ -253,10 +255,11 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     the selector: right → the strip slides left to show THE CAVE, left → back to ARRIVAL. Only
     the middle 70 % of the panel steers it: from its 15 % mark the strip is at one end, from its
     85 % mark at the other (so the ends need no reaching for), never further than its own ends. A click on a tab goes to that chapter.
-  - **The turn is the scroll's**: the chapter you are in is on the frame. `position(p)` is 1 at
-    chapter 1's opening shot, 2 at chapter 2's, 3 at chapter 3's, and leans on through a chapter
-    only a quarter of the way to the next (about 30°): the next chapter's marker never reaches the
-    frame (or slips under the current title) before that chapter has begun. The scale group turns
+  - **The turn is the scroll's**: the chapter you are in is on the frame at its opening shot. `position(p)`
+    is 1 at chapter 1's opening shot, 2 at chapter 2's, 3 at chapter 3's, and linear through a
+    chapter: the next chapter's marker comes down towards the frame the whole way through it and
+    reaches it as the chapter ends (where the turn to it begins); its name fades as it nears the
+    frame, so it never sits over the current title. The scale group turns
     120° per unit round the centre: going on, the next chapter is above the frame and the last
     one below, the markings moving down past the frame. A chapter's turn is a cut in the
     progress, so the scale turns the rest of the way to the new chapter, eased, over a fraction
@@ -279,7 +282,9 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
     begun. It stays open while a drag or a wheel gesture runs.
 - **The header** (Figma "Drunkfurt-header", `Overlay.tsx`, at the design's own size): on the left
   THEY NEED A HERO, / AND I'M HERE TO SAVE THEM. (JetBrains Mono 12), the DRUNKFURT logo in the
-  middle (`ui/headerArt.ts`, the design's vectors), the sound switch on the right.
+  middle (`ui/headerArt.ts`, the design's vectors), the sound switch on the right. While the
+  story asks you to act and the fight plays (ACTION, PRESS D TO DEFEND, the pixelated hits, PRESS
+  D TO REV) the line and the logo fade out (`.site-head.is-away`); the sound switch stays.
 - **The sound switch**: `[S] SOUND ON|OFF` (the label says what a click does) and a 30 px square
   with the sound's state (the speaker crossed out, or with waves), 2 px apart, sharp corners,
   JetBrains Mono Medium 12 −5 %. SOUND ON (while the sound is off) is white with near-black; SOUND
@@ -289,8 +294,8 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   turning away about its top left corner while another turns in at the left about its bottom right;
   the label decodes. A click, or the key S, switches the sound: the face, the words (decoding) and
   the icon change, and it stays in its hover state until the pointer leaves.
-- **The same button face** (sharp corners, Medium 12, 30 px, white) for `[SPACE] SKIP DIALOGUE`
-  (the skip key is Space: S is the sound), the letter's and the cave screen's cursor labels, the
+- **The same button face** (sharp corners, Medium 12, 30 px, white) for `[D] SKIP DIALOGUE`
+  (the skip key is D, as the story's other actions: S is the sound), the letter's and the cave screen's cursor labels, the
   stub pages' tabs and the 404's.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
   station no longer waits for the street's models) and a marker after it that reports when

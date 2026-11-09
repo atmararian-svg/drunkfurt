@@ -370,6 +370,9 @@ body { cursor: pointer; }
   color: #fff;
 }
 .head-logo svg { display: block; width: 100%; height: 100%; }
+/* the fight (ACTION, the defence, the hits, the rev prompt): the words and the mark make way; the sound switch stays */
+.head-line, .head-logo { transition: opacity 0.35s var(--ease), visibility 0s linear 0s; }
+.site-head.is-away .head-line, .site-head.is-away .head-logo { opacity: 0; visibility: hidden; transition: opacity 0.35s var(--ease), visibility 0s linear 0.35s; }
 
 /* the new button (the sound switch; the same face for the page's other buttons and cursor labels):
    sharp corners, JetBrains Mono Medium 12 px, -5 %, 30 px high. A label and a 30 px square 2 px apart:

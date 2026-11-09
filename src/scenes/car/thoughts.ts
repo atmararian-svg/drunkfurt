@@ -76,7 +76,7 @@ export function thoughtsTyped(erase: () => Promise<void>) {
     gate.open = true;
     // from wherever the page is, on to the rev point (no further): the gate there holds it for D
     const to = globalProgress('car', CAR_BEAT.rev);
-    if (timeline.progress < to) playProgress(timeline.progress, to, 1.1);
+    if (timeline.progress < to) playProgress(timeline.progress, to, 1.1, true);
   }, Math.max(THOUGHTS.hold, audio.sayingLeft() + 300));
 }
 
@@ -87,8 +87,9 @@ export function skipThoughts() {
   round++;
   thoughts.done = true;
   gate.open = true;
+  // (locked: the press that skipped, or a stray scroll just after, must not stop the car on the way)
   const to = globalProgress('car', CAR_BEAT.rev);
-  if (timeline.progress < to) playProgress(timeline.progress, to, 1.1);
+  if (timeline.progress < to) playProgress(timeline.progress, to, 1.1, true);
 }
 
 export function resetThoughts() {

@@ -133,7 +133,7 @@ export function Overlay() {
     /** When the car's thoughts were last started being said (for the typing to keep pace with the voice). */
     let monologueAt = 0;
     const monologueLines = MONOLOGUE.split('\n');
-    // SKIP DIALOGUE (bottom right, or S): while the invitation is said, or the thoughts in the car are typed
+    // SKIP DIALOGUE (bottom right, or D): while the invitation is said, or the thoughts in the car are typed
     const skipBtn = el.querySelector<HTMLButtonElement>('.skip')!;
     const skippable = () => {
       const ask = story.getState().prompt;
@@ -156,7 +156,7 @@ export function Overlay() {
       }
     };
     const skipKey = (e: KeyboardEvent) => {
-      if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
+      if (e.code !== 'KeyD' || e.repeat || e.ctrlKey || e.metaKey || e.altKey || !skippable()) return;
       e.preventDefault();
       skip();
     };
@@ -248,6 +248,9 @@ export function Overlay() {
       );
       updateCombatPrompts(actionShown(id, local) || ask === 'rev', ask === 'defend' ? 'defend' : ask === 'rev' ? 'rev' : null);
       const look = combatLook(id, local);
+      // the header's words and mark make way while the story asks you to act and the fight plays (the sound switch stays)
+      const fighting = actionShown(id, local) || ask === 'defend' || ask === 'rev' || look.block > 1.01;
+      if (headRef.current && headRef.current.classList.contains('is-away') !== fighting) headRef.current.classList.toggle('is-away', fighting);
       // the chapter tuner open: the page behind it dims and breaks into pixels (the scene, and the printed matter over it)
       // (on a phone the selector slides away down while the story asks you to act: ACTION, a tap, the letter, the screen)
       tunerAway(actionShown(id, local) || ask === 'defend' || ask === 'rev' || ask === 'letter' || ask === 'monitor' || letter.open);
@@ -438,6 +441,7 @@ export function Overlay() {
   // the switch's label, split for decoding; a new label decodes in
   const soundShown = useRef('');
   const toggleSoundRef = useRef(() => undefined as void);
+  const headRef = useRef<HTMLElement>(null);
   useEffect(() => {
     const el = soundText.current!;
     // (the label says what a click does: SOUND OFF while it plays, SOUND ON while it is off)
@@ -517,7 +521,7 @@ export function Overlay() {
           'TAP TO SKIP'
         ) : (
           <>
-            <span className="skip-key">[SPACE]</span> SKIP DIALOGUE
+            <span className="skip-key">[D]</span> SKIP DIALOGUE
           </>
         )}
       </button>
@@ -525,7 +529,7 @@ export function Overlay() {
       {/* the chapter tuner (chapterTuner.ts) is its own element on the page, so the dimming of the page behind it leaves it alone */}
 
       {/* the header (Figma "Drunkfurt-header"): a line on the left, the logo in the middle, the sound switch on the right */}
-      <header className="site-head">
+      <header className="site-head" ref={headRef}>
         <p className="head-line">
           They need a hero,
           <br />
