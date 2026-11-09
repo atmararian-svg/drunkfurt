@@ -251,10 +251,12 @@ export function Preloader() {
         }
         if (!alive) return;
         // the choice is the page's sound setting (the click is also the gesture audio needs to start)
+        diagNote(`sound chosen: ${on ? 'on' : 'off'}`);
         story.setState({ sound: on });
         audio.unlock();
         audio.setEnabled(on);
         // hand over to chapter 1: the station comes in, in blocks, over the sound choice, then sharp
+        diagNote('hand-over to chapter 1 begins');
         await pixelReveal('up', {
           onCovered: () => {
             // hidden at once (React removes it a moment later), so the fade to the sharp page shows the stage

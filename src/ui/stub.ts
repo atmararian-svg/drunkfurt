@@ -3,6 +3,7 @@ import { TOUCH } from './touch';
 import { saveResume } from './resume';
 import { decodeAll, splitChars } from './decode';
 import { pixelFilter, presence } from './textBoxes';
+import { diagNote } from './diag';
 import logoSvg from '../assets/drunkfurt-logo.svg?raw';
 import { onTiltOn, requestTilt, tiltNeedsTap, tryTilt } from '../player/input';
 
@@ -118,11 +119,15 @@ export function watchContextLoss(canvas: HTMLCanvasElement) {
   let timer = 0;
   canvas.addEventListener('webglcontextlost', (e) => {
     e.preventDefault();
+    diagNote('WEBGL CONTEXT LOST');
     // not handed back in a moment: reload and come back to this chapter (ui/resume.ts);
     // a second loss soon after a reload shows the stub instead
     timer = window.setTimeout(() => (saveResume() ? location.reload() : showStub('lost')), 1200);
   });
-  canvas.addEventListener('webglcontextrestored', () => window.clearTimeout(timer));
+  canvas.addEventListener('webglcontextrestored', () => {
+    diagNote('webgl context restored');
+    window.clearTimeout(timer);
+  });
 }
 
 /** The page's own address, to open on a computer (without the ?anyway). */

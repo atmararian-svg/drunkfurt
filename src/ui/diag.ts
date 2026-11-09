@@ -11,6 +11,7 @@ export const DIAG = (() => {
   }
 })();
 
+const KEY = 'drunkfurt:diag';
 const t0 = performance.now();
 const at = () => ((performance.now() - t0) / 1000).toFixed(2);
 const events: string[] = [];
@@ -18,10 +19,21 @@ const slowCalls: { ms: number; line: string }[] = [];
 const totals = new Map<string, { n: number; ms: number; max: number }>();
 let worstFrame = 0;
 
+let lastSave = 0;
 export function diagNote(what: string) {
   if (!DIAG) return;
   events.push(`${at()}s ${what}`);
   if (events.length > 400) events.shift();
+  // kept at once (not only every second): a tab that dies a moment later still has it
+  const now = performance.now();
+  if (now - lastSave > 200) {
+    lastSave = now;
+    try {
+      localStorage.setItem(KEY, report());
+    } catch {
+      // (storage full or off)
+    }
+  }
 }
 
 function keepSlow(ms: number, line: string) {
@@ -78,7 +90,6 @@ export function diagFrame(ms: number, label: string) {
 }
 
 let gpuName: string | null = null;
-const KEY = 'drunkfurt:diag';
 
 function report() {
   const tot = [...totals.entries()]

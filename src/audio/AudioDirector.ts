@@ -1,3 +1,4 @@
+import { diagNote } from '../ui/diag';
 import revEngineUrl from '../assets/audio/aggressive-supercar-engine.mp3?url';
 import doorOpenUrl from '../assets/audio/door-open.mp3?url';
 import engineDefaultUrl from '../assets/audio/engine-default.mp3?url';
@@ -151,8 +152,9 @@ class AudioDirector {
     const body = ctx.createGain();
     body.connect(this.master);
     this.buses.set('body', body);
-    void this.preload();
-    void this.preloadVoices();
+    diagNote(`audio on (${ctx.sampleRate} Hz)`);
+    void this.preload().then(() => diagNote(`audio: ${this.buffers.size} sounds decoded`));
+    void this.preloadVoices().then(() => diagNote(`audio: ${this.voiceBuffers.size} voices decoded`));
   }
 
   // -------------------------------------------------------------------------
