@@ -129,7 +129,8 @@ export function pixelReveal(dir: RevealDirection, opts: { outgoing?: HTMLElement
   }
   const cssW = window.innerWidth;
   const cssH = window.innerHeight;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  // (the 3D picture it copies is drawn at 1.25 at most: more would only cost memory and time)
+  const dpr = Math.min(1.25, window.devicePixelRatio || 1);
   overlay.width = Math.round(cssW * dpr);
   overlay.height = Math.round(cssH * dpr);
   const cols = Math.max(1, Math.round(cssW / P.from));

@@ -185,7 +185,14 @@ export function openLetter(onClosed: () => void, spot?: { x: number; y: number; 
     scale: Math.max(0.05, Math.min(0.6, (spot?.size ?? 60) / (fit().h * 0.36))),
   };
 
+  let drawn = -Infinity;
   const draw = (now: number) => {
+    // (at most 60 a second, as the rest of the page: render/frameRate.ts)
+    if (now - drawn < 12) {
+      raf = requestAnimationFrame(draw);
+      return;
+    }
+    drawn = now;
     // (inspection only, in development: `hold` fixes the opening at a point of its curve)
     const held = import.meta.env.DEV ? LETTER_REVEAL.hold : undefined;
     const u = held !== undefined ? held : reduced ? 1 : Math.min(1, (now - t0) / ms);

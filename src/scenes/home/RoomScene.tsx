@@ -35,6 +35,7 @@ import { CHAPTERS } from '../../core/chapters';
 import { SCREEN_LINKS, WHITE_AT, WHITE_FROM, flyAt, monitor, overAbout, pick, resetMonitor, solidAt } from './monitor';
 import { buildWallScreens } from './roomScreens';
 import { TOUCH } from '../../ui/touch';
+import { decodeAll, splitChars } from '../../ui/decode';
 import { GAME } from '../../game/mode';
 import { anchors } from '../../game/talk';
 
@@ -43,11 +44,13 @@ import { anchors } from '../../game/talk';
  * white tab): CLICK TO READ on it, CLICK TO CLOSE while you read. Empty text hides it. None on touch.
  */
 let readLabel: HTMLDivElement | null = null;
+/** What the label says now ('' hidden): a new text decodes in, letter by letter, as the page's other labels do. */
+let readText = '';
 function readCursor(text: string, x: number, y: number) {
   if (TOUCH) return;
   if (!text) {
     if (readLabel) readLabel.style.opacity = '0';
-    document.documentElement.classList.remove('is-over-about');
+    readText = '';
     return;
   }
   if (!readLabel) {
@@ -56,10 +59,15 @@ function readCursor(text: string, x: number, y: number) {
     readLabel.setAttribute('aria-hidden', 'true');
     document.body.append(readLabel);
   }
-  if (readLabel.textContent !== text) readLabel.textContent = text;
+  if (readText !== text) {
+    readText = text;
+    readLabel.dataset.text = text;
+    readLabel.textContent = text;
+    splitChars(readLabel);
+    void decodeAll(readLabel, 380);
+  }
   readLabel.style.opacity = '1';
   readLabel.style.transform = `translate(${Math.round(x + 14)}px, ${Math.round(y + 14)}px)`;
-  document.documentElement.classList.add('is-over-about');
 }
 
 /** The wall screen that shows the text about the author. */
@@ -509,7 +517,8 @@ function Room({ active }: { active: boolean }) {
       if (!monitor.armed) ab.reading = false;
       ab.over = !at && monitor.armed && p.active && !ab.reading && overAbout(px, py);
       ab.hover = damp(ab.hover, ab.reading ? 1 : 0, 2.2, dt);
-      readCursor(ab.over || ab.reading ? (ab.reading ? 'CLICK TO CLOSE' : 'CLICK TO READ') : '', px, py);
+      // (and on the big display: where a click takes you)
+      readCursor(ab.over || ab.reading ? (ab.reading ? 'CLICK TO CLOSE' : 'CLICK TO READ') : at ? 'CLICK TO EXPLORE' : '', px, py);
     }
     const l = !monitor.entering ? SCREEN_LINKS[monitor.link] : undefined;
     display.mark.visible = !!l;

@@ -170,6 +170,8 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   READ at the pointer over it; a click turns you to it and draws you in (60 % of the way, the
   view 10° narrower), the pointer free to move; CLICK TO CLOSE, any click or Escape, and you lean
   back. (A hover zoom moved the screen out from under the pointer and let go at once.)
+  The label at the pointer decodes from one word to the next (CLICK TO READ → CLICK TO CLOSE),
+  and the big display has one too: CLICK TO EXPLORE over its picture.
 - **The attacker stands upright** until he sets off (legs straight, feet together:
   `manRig.stand(…, upright)`); his first steps take him out of it.
 - **BAM and POW** are thrown in with each blow (`brush.ts drawHits`): in from their own side
@@ -1108,6 +1110,17 @@ Measured in a headless browser, at 1280 × 720 (video memory for textures, progr
 | city | 159 MB, 123 programs, 14 spots | 112 MB, 69 programs, 9 spots |
 | cave | 166 MB, 118 programs | 80 MB, 28 programs |
 
+- **At most 60 frames a second** (`render/frameRate.ts`): the canvas's own loop is off and App
+  drives it, skipping frames on faster screens. A MacBook Pro's 120 Hz screen had the whole 3D
+  page (the scene twice, for the picture and for the ink, the print and bloom, the shadows every
+  other frame) drawn 120 times a second, and the laptop ran hot. Fewer where the picture is hidden
+  or still: 20 under the preloader (full rate while the hand-over's blocks read it), 30 behind the
+  open letter, 15 during the hand-over to the site, 30 behind the phone's page. The overlay's loop,
+  the letter's sheet and the pointer's trail keep to 60 too.
+- **The pointer's trail is off the page while it has nothing to show**: an empty full-screen layer
+  blended over the page (difference) still cost the page a blend every frame.
+- **The pixel layers over the 3D page** (the chapter transitions, the fight's pixels) are drawn at
+  1.25 at most, as the picture they copy (2 on a retina screen before: 4× the memory and work).
 - **Worlds left behind are unmounted** (only the one you are in and the next stay, plus the one an
   episode plays in) and `FreeOnUnmount` frees their geometries, materials and textures on the
   graphics card. Going back builds a world again from the loaded models.

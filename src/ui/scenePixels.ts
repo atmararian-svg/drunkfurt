@@ -27,7 +27,8 @@ const draw = (src: HTMLCanvasElement) => {
   if (!canvas || !ctx) return;
   const w = window.innerWidth;
   const h = window.innerHeight;
-  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  // (as the 3D picture it copies: 1.25 at most)
+  const dpr = Math.min(1.25, window.devicePixelRatio || 1);
   if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
     canvas.width = Math.round(w * dpr);
     canvas.height = Math.round(h * dpr);

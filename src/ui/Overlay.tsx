@@ -28,6 +28,7 @@ import { holdPointer, releasePointer } from '../game/keys';
 import { walkAction } from '../game/walk';
 import { talkAction, talkLine } from '../game/talk';
 import { mountGameHud } from '../game/hud';
+import { frameGate } from '../render/frameRate';
 
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
 const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
@@ -199,7 +200,7 @@ export function Overlay() {
     // the game's crosshair, its hint and its controls (game/hud.ts)
     const hud = GAME ? mountGameHud(el) : null;
     let hudLast = performance.now();
-    const loop = () => {
+    const step = () => {
       if (hud) {
         const now = performance.now();
         hud.update(Math.min(0.1, (now - hudLast) / 1000));
@@ -334,7 +335,12 @@ export function Overlay() {
         // nothing to show: the layer is taken off the page as well as cleared, so no earlier picture on it can stay up
         hit.style.visibility = hitKey ? 'visible' : 'hidden';
       }
+    };
+    // (at most 60 a second, as the 3D page: render/frameRate.ts)
+    const due = frameGate();
+    const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
+      if (due(now)) step();
     };
     raf = requestAnimationFrame(loop);
     return () => {

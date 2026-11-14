@@ -1,4 +1,5 @@
-import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Canvas, advance, useFrame, useThree } from '@react-three/fiber';
+import { frameGap, frameGate } from './render/frameRate';
 import { Component, ReactNode, Suspense, useEffect, useLayoutEffect, useRef } from 'react';
 import { FogExp2, Group, HalfFloatType, Material, Mesh, NoToneMapping, Object3D, PCFShadowMap, SRGBColorSpace, Scene, Texture, WebGLRenderTarget } from 'three';
 import { story, useStory } from './core/store';
@@ -322,8 +323,27 @@ function ShadowCadence() {
   return null;
 }
 
+/** The first frame's step (ms). */
+const FIRST_STEP_MS = 16;
+
 export function App() {
   const episode = useStory((s) => s.episode);
+
+  // the frames: driven here (the canvas's own loop is off), at most 60 a second, fewer where hidden (render/frameRate.ts)
+  useEffect(() => {
+    const due = frameGate(() => frameGap(BACKDROP));
+    let raf = 0;
+    // (the clock counts from the first frame: its first step is a frame's, not the time the page took to load)
+    let t0 = -1;
+    const tick = (now: number) => {
+      raf = requestAnimationFrame(tick);
+      if (!due(now)) return;
+      if (t0 < 0) t0 = now - FIRST_STEP_MS;
+      advance((now - t0) / 1000, true);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, []);
 
   // chapters change through the chapter transition; chapter 3's assets load once chapter 2 is in
   useEffect(() => (BACKDROP ? undefined : installChapterTransitions()), []);
@@ -427,6 +447,7 @@ export function App() {
     <>
       <div className={BACKDROP ? 'stage stage--backdrop' : 'stage'} aria-hidden={BACKDROP || undefined} role="img" aria-label="DRUNKFURT, Episode 1: arriving at Frankfurt (Main) Hbf at night">
         <Canvas
+          frameloop="never"
           shadows={{ type: PCFShadowMap }}
           dpr={MAX_DPR}
           gl={{ antialias: false, stencil: false, powerPreference: 'high-performance' }}

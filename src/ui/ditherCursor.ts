@@ -73,6 +73,7 @@ export function mountDitherCursor() {
   const canvas = document.createElement('canvas');
   canvas.className = 'dither-cursor';
   canvas.setAttribute('aria-hidden', 'true');
+  canvas.style.visibility = 'hidden';
   document.body.append(canvas);
   const ctx = canvas.getContext('2d')!;
   let W = 0;
@@ -112,12 +113,18 @@ export function mountDitherCursor() {
     if (idle) {
       idle = false;
       last = performance.now();
+      canvas.style.visibility = 'visible';
       raf = requestAnimationFrame(frame);
     }
   };
   const leave = () => (target.on = false);
 
   const frame = (now: number) => {
+    // (at most 60 a second, as the rest of the page: render/frameRate.ts)
+    if (now - last < 12) {
+      raf = requestAnimationFrame(frame);
+      return;
+    }
     const dt = Math.min(0.05, (now - last) / 1000);
     last = now;
     const t = now / 1000;
@@ -142,6 +149,8 @@ export function mountDitherCursor() {
     if (!pts.length) {
       if (!target.on || quiet) {
         idle = true;
+        // an empty layer blended over the page still costs the page a blend every frame: off the page until needed
+        canvas.style.visibility = 'hidden';
         return;
       }
       raf = requestAnimationFrame(frame);
