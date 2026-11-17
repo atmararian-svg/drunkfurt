@@ -696,18 +696,13 @@ body { cursor: pointer; }
   white-space: nowrap;
   padding-top: 0.04em;
 }
-.pl-defs-svg { position: absolute; width: 0; height: 0; overflow: hidden; }
-.pl-drunk {
+.pl-stroke {
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
-  pointer-events: none;
-}
-.pl-stroke {
-  display: block;
-  width: 100%;
   overflow: visible;
+  pointer-events: none;
 }
 @media (prefers-reduced-motion: reduce) {
   .pl-ellipsis i { animation: none; }
