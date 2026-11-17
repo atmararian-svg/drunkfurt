@@ -6,8 +6,9 @@
  *  → aftermath.
  */
 export const BEAT = {
-  noticed: 0.56,
-  strangerMoves: 0.6,
+  // (he sets off well before he reaches you: over 0.6 → 0.735 his 23 m were a run at an ordinary scroll)
+  noticed: 0.47,
+  strangerMoves: 0.5,
   stop: 0.735,
   confront: 0.74,
   cock: 0.8,

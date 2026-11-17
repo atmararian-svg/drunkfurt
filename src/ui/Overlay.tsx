@@ -139,7 +139,7 @@ export function Overlay() {
     /** When the car's thoughts were last started being said (for the typing to keep pace with the voice). */
     let monologueAt = 0;
     const monologueLines = MONOLOGUE.split('\n');
-    // SKIP DIALOGUE (bottom right, or D): while the invitation is said, or the thoughts in the car are typed
+    // SKIP THE SPEECH (bottom right, or D): while the invitation is said, or the thoughts in the car are typed
     const skipBtn = el.querySelector<HTMLButtonElement>('.skip')!;
     const skippable = () => {
       const ask = story.getState().prompt;
@@ -560,12 +560,12 @@ export function Overlay() {
 
       <RevPrompt prompt={prompt} />
 
-      <button type="button" className="skip" tabIndex={-1} aria-label="Skip dialogue">
+      <button type="button" className="skip" tabIndex={-1} aria-label="Skip the speech">
         {TOUCH ? (
           'TAP TO SKIP'
         ) : (
           <>
-            <span className="skip-key">[{ACTION_KEY}]</span> SKIP DIALOGUE
+            <span className="skip-key">[{ACTION_KEY}]</span> SKIP THE SPEECH
           </>
         )}
       </button>

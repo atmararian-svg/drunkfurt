@@ -77,7 +77,7 @@ export function invitationTyped() {
   }, Math.max(LETTER.hold, audio.sayingLeft() + 300));
 }
 
-/** SKIP DIALOGUE: the invitation is taken as said, at once (the overlay shows it whole); the story may go on. */
+/** SKIP THE SPEECH: the invitation is taken as said, at once (the overlay shows it whole); the story may go on. */
 export function skipInvitation() {
   if (!letter.read || letter.invited) return;
   window.clearTimeout(holdTimer);

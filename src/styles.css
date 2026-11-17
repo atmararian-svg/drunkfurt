@@ -696,13 +696,18 @@ body { cursor: pointer; }
   white-space: nowrap;
   padding-top: 0.04em;
 }
-.pl-stroke {
+.pl-defs-svg { position: absolute; width: 0; height: 0; overflow: hidden; }
+.pl-drunk {
   position: absolute;
   left: 0;
   top: 0;
   width: 100%;
-  overflow: visible;
   pointer-events: none;
+}
+.pl-stroke {
+  display: block;
+  width: 100%;
+  overflow: visible;
 }
 @media (prefers-reduced-motion: reduce) {
   .pl-ellipsis i { animation: none; }
@@ -1106,7 +1111,7 @@ body { cursor: pointer; }
 .stub-tab:focus-visible { background: var(--red); color: #fff; outline: none; }
 @media (prefers-reduced-motion: reduce) { .stub-caret { animation: none; } }
 
-/* --- [SPACE] SKIP DIALOGUE (Overlay.tsx): bottom right while the invitation is said or the thoughts are
+/* --- [D] SKIP THE SPEECH (Overlay.tsx): bottom right while the invitation is said or the thoughts are
    typed; the new button's face (sharp corners, JetBrains Mono Medium 12, white), red under the pointer */
 .skip {
   position: fixed;

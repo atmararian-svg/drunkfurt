@@ -187,8 +187,9 @@ class AudioDirector {
    */
   speak(id: VoiceId) {
     const ctx = this.ctx;
-    // (with the sound off his lines are not said at all: nothing then waits on a silent one)
-    if (!ctx || !this.master || !this.enabled) return;
+    // (said with the sound off too, under the muted master: switched back on in the middle of a line, the
+    // line goes on from where it is, in step with its words)
+    if (!ctx || !this.master) return;
     if (this.speaking?.id === id) return;
     this.hush();
     const buffer = this.voiceBuffers.get(id);
@@ -355,7 +356,7 @@ class AudioDirector {
   /** Mutes or unmutes everything (the visitor's sound preference). */
   setEnabled(on: boolean) {
     this.enabled = on;
-    if (!on) this.hush();
+    // (the line being said is not stopped: muted, it goes on, and is heard again as the sound comes back)
     this.level();
   }
 

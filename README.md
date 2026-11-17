@@ -145,13 +145,22 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
 - **The fight**: he goes down instead of cutting to him lying: the first hit knocks the knife
   away and him back a step, the second takes him off his feet backwards onto the pavement over
   0.75 s, gathering speed (`manRig.fall`, `Stranger.tsx`), under the pixels.
-- **SKIP DIALOGUE** (bottom right, the key D; TAP TO SKIP on touch) while the invitation is said
+- **SKIP THE SPEECH** (bottom right, the key D; TAP TO SKIP on touch) while the invitation is said
   after the letter and while the thoughts in the car are typed: the invitation is taken as said;
   the thoughts end and the car goes on to the rev point by itself, as when they end on their own
   (a locked move: neither the key nor a stray scroll stops it on the way; Space, a scroll key,
   used to stop it at once, leaving the car standing).
 - **The invitation is said as soon as the letter is read** (its caption holds from where the letter
   can be picked up), so the skip button and the words come together, no scroll needed.
+- **No hitch after the invitation**: the room of chapter 3 was put together (its model, screens and
+  materials) the moment the story crossed from the street's episode into the getaway's, right after
+  the invitation, as the next world to come. A chapter whose next episode plays on in its own world
+  now builds the one after that too, under the turn into the chapter (`EpisodeWorlds`).
+- **The attacker walks**: he sets off at 0.5 of the street (was 0.6) and his pace is even (picked
+  up over 15 %, slowed over the last 25 %); before, his 23 m to you took 0.135 of the street with
+  the fastest step at the very start, a run at an ordinary scroll (about 2.7 × faster at its peak).
+- **The speeches cut**: chapter 1's last line ("The city is waiting outside…") and chapter 2's
+  first ("Outside, the city was awake…").
 - **No shader error checks in production** (`gl.debug.checkShaderErrors`, on in development only):
   three asked for every new program's log as it was first used, and each question made the page
   wait for the graphics card to finish linking it, one after another (on a retina Mac ~270 ms each:
@@ -236,18 +245,20 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   letter (a staggered, eased reveal with seeded irregularity, each letter rising and fading in
   through a few stand-in glyphs), over which "Drunk" is written in red: the design's Rock Salt
   lettering (Figma "Drunkfurt-2"; the glyph outlines exactly as Figma laid them out, taken from
-  the .fig, so no font is loaded, `src/ui/drunkWord.ts`), uncovered by a pen: the letters'
-  centre lines (the glyphs rasterised, thinned to one-pixel skeletons, traced into lines, the
-  rough edge's spurs pruned, joined in the order a hand writes them, smoothed) drawn on as one
-  continuous line (`stroke-dashoffset`) inside an SVG mask over the glyphs, the pen's speed
-  eased so it never stops or jumps. The order follows the real loading: the title decodes in with chapter 1;
+  the .fig, so no font is loaded, `src/ui/drunkWord.ts`), coming on as a failing street lamp
+  does: out of 26 px pixels growing finer (an SVG filter on its layer), blinking out and back
+  while it is not quite there (often at first, less as it comes on), a last stutter once it is,
+  then steady (`FLICKER`). (A pen drawing it along the letters' centre lines read wrong: the D's
+  bowl came before its stem.) The order follows the real loading: the title decodes in with chapter 1;
   chapter 1 resolves when it is ready and chapter 2 decodes in its place; then chapter 3, and
-  while it loads "Drunk" is written: at the hand's pace up to 80% of the word, then only a
-  slow creep (something always moves) until chapter 3 is really in, when the rest is written
-  quickly; word and chapter 3 finish together (if chapter 3 was in first, its label waits for
+  while it loads "Drunk" comes on: at an even pace up to 80% of the way, then only a slow
+  creep (something always moves) until chapter 3 is really in, when the rest comes quickly; word and chapter 3 finish together (if chapter 3 was in first, its label waits for
   the word). Then READY; the preloader leaves in the transition's blocks (`pixelCover` in
   `pixelReveal.ts`), and only then does the sound choice come in; once it is made, the pixel
   reveal brings chapter 1 in over it.
+- **SOUND comes in at its size** (the intro draws it into a canvas: the canvas's font took no
+  percentage width, `font-stretch: 125%` voided the whole font and it came in at 10 px, then
+  jumped; the width now goes on as its keyword, `expanded`).
 - **Sound choice** (`src/ui/soundChoice.ts`, Figma "Preloader-sound-default / -enable /
   -disable"): ENABLE and DISABLE (the design's slanted lettering as vector outlines, traced
   from its art, `src/ui/soundWords.ts`, filled even-odd) side by side at the top, SOUND along the
@@ -343,7 +354,7 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   turning away about its top left corner while another turns in at the left about its bottom right;
   the label decodes. A click, or the key S, switches the sound: the face, the words (decoding) and
   the icon change, and it stays in its hover state until the pointer leaves.
-- **The same button face** (sharp corners, Medium 12, 30 px, white) for `[D] SKIP DIALOGUE`
+- **The same button face** (sharp corners, Medium 12, 30 px, white) for `[D] SKIP THE SPEECH`
   (the skip key is D, as the story's other actions: S is the sound), the letter's and the cave screen's cursor labels, the
   stub pages' tabs and the 404's.
 - **Readiness is real** (`chapterReadiness`): each world has its own Suspense boundary (the
@@ -1012,7 +1023,7 @@ src/
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
   ui/Overlay.tsx          title cards, captions, ink, prompts
   ui/chapterTuner.ts      the chapter selector: scroll-driven scale, chapter titles, tabs, drag, wheel
-  ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
+  ui/Preloader.tsx        the preloader (real chapter readiness, decoding, Drunk coming on like a lamp)
   ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
   ui/titleCards.ts        the glass chapter cards, in and out
@@ -1167,8 +1178,10 @@ thought is said as it comes up in the box by his face, and the box stays up unti
 another thought comes); the invitation ("Hey, man…", `ME:`) is said as it is typed and the story waits
 for it to be said; the thoughts in the car are typed in step with the recording (each line stands
 until the voice reaches the next, `MONOLOGUE_LINES`) and the story waits for the last word. The voice
-goes straight to the master, past the world's muffling filter, and the ambience ducks under it. With
-the sound off nothing is said (and nothing waits on it); SKIP DIALOGUE stops it; a line from a chapter
+goes straight to the master, past the world's muffling filter, and the ambience ducks under it. The
+lines are said with the sound off too, under the muted master: switched back on in the middle of
+a line, it goes on from where it is, in step with its words (before, switching off stopped the line
+and nothing came back); SKIP THE SPEECH stops it; a line from a chapter
 no longer on screen is stopped. Where the recording says more than the page did, the page now says
 what he says. Line 19 ("Time to get out of Drunkfurt.") has no recording yet.
 

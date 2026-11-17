@@ -117,10 +117,9 @@ export const cityEpisode: EpisodeDef = {
   },
   beats: [0, 0.12, 0.22, 0.31, 0.4, 0.5, 0.62, BEAT.stop, BEAT.cock, BEAT.gate, 0.94, LETTER.gate, 1],
   captions: [
-    { from: 0.14, to: 0.27, place: 'tl', kicker: 'Midnight, give or take', text: 'Outside, the city was awake. Not in a good way.', voice: '06' },
-    { from: 0.3, to: 0.41, place: 'br', text: 'Banks at the end of the street. Everyone else down here.', voice: '07' },
-    { from: 0.46, to: 0.58, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet. Wow.', voice: '08' },
-    { from: 0.63, to: 0.72, place: 'bl', tone: 'yellow', text: 'Speak of the devil. Some people walk somewhere. He was walking at me. Damn.', voice: '09' },
+    { from: 0.29, to: 0.38, place: 'br', text: 'Banks at the end of the street. Everyone else down here.', voice: '07' },
+    { from: 0.4, to: 0.49, place: 'tl', text: 'Twelve minutes in Drunkfurt. Nothing had happened yet. Wow.', voice: '08' },
+    { from: 0.56, to: 0.7, place: 'bl', tone: 'yellow', text: 'Speak of the devil. Some people walk somewhere. He was walking at me. Damn.', voice: '09' },
     // he says it with the knife on you, and keeps saying it while the story waits for you
     { from: 0.79, to: 0.9, place: 'tr', tone: 'speech', kicker: 'ATTACKER:', text: 'Your bag. Give it to me. Now.', voice: 'attacker', when: () => !encounter.outcome },
     { from: 0.92, to: 0.955, place: 'br', tone: 'yellow', text: 'He wanted my bag. He got the sidewalk.', voice: '10', when: () => encounter.outcome === 'blocked' && !letter.open && !letter.read },

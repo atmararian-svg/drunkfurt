@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { CHAPTERS, Readiness, chapterReadiness } from '../core/chapters';
 import { pinScroll } from '../core/timeline';
 import { decodeIn, decodeLoop, splitChars } from './decode';
-import { DRUNK_BOX, DRUNK_COLOR, DRUNK_GLYPHS, DRUNK_PEN, DRUNK_SIZE, DRUNK_STROKES } from './drunkWord';
+import { DRUNK_BOX, DRUNK_COLOR, DRUNK_GLYPHS, DRUNK_SIZE } from './drunkWord';
 import { mountDotGrid } from './dotGrid';
 import { audio } from '../audio/AudioDirector';
 import { story } from '../core/store';
@@ -24,11 +24,11 @@ import { diagNote } from './diag';
  *    takes its place;
  *  - centre, "Once upon a time in" with its three dots counting up;
  *  - along the bottom, FRANKFURT, revealed letter by letter, over which
- *    "Drunk" is written in red by hand while chapter 3 loads: the design's
- *    Rock Salt lettering (Figma "Drunkfurt-2"), uncovered by a pen moving
- *    along the letters' centre lines in writing order, as one continuous
- *    line at an eased speed (no stops), holding back the end until chapter 3
- *    is really in.
+ *    "Drunk" comes on in red while chapter 3 loads: the design's Rock Salt
+ *    lettering (Figma "Drunkfurt-2"), out of coarse pixels growing finer,
+ *    blinking out and back like a failing street lamp, at an eased pace
+ *    holding back the end until chapter 3 is really in; a last stutter, then
+ *    steady.
  *
  * The order: the title decodes in with chapter 1; chapter 1 resolves when it
  * is ready and chapter 2 takes its place; then chapter 3, while the word is
@@ -51,6 +51,56 @@ const LATER_CHAPTER_WAIT = 25000; // ms chapters 2 and 3 may hold the page after
  * label waits for the word.
  */
 const WRITE = { pace: 0.52, hold: 0.8, limit: 0.9, creep: 0.03, finish: 450 };
+/**
+ * "Drunk" coming on like a failing lamp: `block` px at first, sharp at the end; the chance of a blink each
+ * time (from `max` at the start to `min` as it is nearly there, `after` once it is), how long it stays on
+ * and off (ms: least, plus up to), how dark it goes off (`dim`), and how long the stutter lasts once it
+ * is all there (`tail`, ms).
+ */
+const FLICKER = { block: 26, max: 0.5, min: 0.12, after: 0.3, on: [70, 260], off: [35, 90], dim: 0.12, tail: 650 } as const;
+
+/** A pixelating filter for the word's layer (the region generous: the glyphs overhang the box they sit in). */
+function drunkPixels(defs: SVGDefsElement) {
+  const NS = 'http://www.w3.org/2000/svg';
+  const f = document.createElementNS(NS, 'filter');
+  f.setAttribute('id', 'pl-drunk-px');
+  f.setAttribute('x', '-0.2');
+  f.setAttribute('y', '-2');
+  f.setAttribute('width', '1.4');
+  f.setAttribute('height', '5');
+  f.setAttribute('color-interpolation-filters', 'sRGB');
+  const flood = document.createElementNS(NS, 'feFlood');
+  flood.setAttribute('width', '1');
+  flood.setAttribute('height', '1');
+  const cell = document.createElementNS(NS, 'feComposite');
+  const tile = document.createElementNS(NS, 'feTile');
+  tile.setAttribute('result', 'grid');
+  const pick = document.createElementNS(NS, 'feComposite');
+  pick.setAttribute('in', 'SourceGraphic');
+  pick.setAttribute('in2', 'grid');
+  pick.setAttribute('operator', 'in');
+  const grow = document.createElementNS(NS, 'feMorphology');
+  grow.setAttribute('operator', 'dilate');
+  f.append(flood, cell, tile, pick, grow);
+  defs.append(f);
+  let lastBlock = -1;
+  return (el: HTMLElement, block: number) => {
+    const b = Math.max(1, Math.round(block));
+    if (b === lastBlock) return;
+    lastBlock = b;
+    if (b <= 1) {
+      el.style.filter = '';
+      return;
+    }
+    const half = Math.floor(b / 2);
+    flood.setAttribute('x', String(half));
+    flood.setAttribute('y', String(half));
+    cell.setAttribute('width', String(b));
+    cell.setAttribute('height', String(b));
+    grow.setAttribute('radius', String(b / 2));
+    el.style.filter = 'url(#pl-drunk-px)';
+  };
+}
 
 export function Preloader() {
   const [gone, setGone] = useState(false);
@@ -64,7 +114,7 @@ export function Preloader() {
     const status = q<HTMLElement>('.pl-status');
     const list = q<HTMLElement>('.pl-chapters');
     const word = q<HTMLElement>('.pl-word');
-    const strokes = Array.from(el.querySelectorAll<SVGPathElement>('.pl-pen path'));
+    const drunk = q<HTMLElement>('.pl-drunk');
     const stops: (() => void)[] = [];
     const timers: number[] = [];
     let raf = 0;
@@ -85,38 +135,45 @@ export function Preloader() {
     // --- the print screen: a grid of dots that orbit the pointer (the supplied DotGridBackground, dotGrid.ts)
     const unmountDots = mountDotGrid(q<HTMLCanvasElement>('.pl-dots'));
 
-    // --- the writing: the pen's strokes as one continuous line, drawn on along their length
-    const lengths = strokes.map((p) => p.getTotalLength());
-    const total = lengths.reduce((a, b) => a + b, 0);
-    // (a stroke not yet begun is hidden outright: its round cap would otherwise show the glyph under it, a
-    // blot at each stroke's start before the pen got there)
-    strokes.forEach((p, i) => {
-      p.style.strokeDasharray = `${lengths[i]} ${lengths[i] + 1}`;
-      p.style.strokeDashoffset = `${lengths[i]}`;
-      p.style.visibility = 'hidden';
-    });
-    const inked = q<SVGGElement>('.pl-ink');
-    let written = 0; // 0..1 along all the pen's strokes
-    let speed = 0; // the pen's speed now (of the whole word per second), eased, so it never jumps
-    let writing = false; // chapter 3 is loading (or in): the hand is at work
-    let finishBy = 0; // chapter 3 is in: the time (ms) the word should be complete by
+    // --- "Drunk" comes on as a failing street lamp does: out of coarse pixels that grow finer as it comes,
+    // blinking out and back while it is not quite there, a last stutter once it is, then steady. Its pace
+    // is the loading's (`written`, 0..1): it is sharp exactly when chapter 3 is in.
+    const pixelate = drunkPixels(q<SVGDefsElement>('.pl-defs'));
+    let written = 0; // 0..1: how far it has come on
+    let speed = 0; // its pace now (of the whole word per second), eased, so it never jumps
+    let writing = false; // chapter 3 is loading (or in): it is coming on
+    let finishBy = 0; // chapter 3 is in: the time (ms) the word should be sharp by
+    let doneAt = 0; // when it came fully on (for the last stutter)
+    let lit = true; // the lamp's state between blinks
+    let nextBlink = 0;
     let last = performance.now();
-    const drawWriting = () => {
-      let along = written * total;
-      strokes.forEach((p, i) => {
-        const l = lengths[i];
-        const k = Math.max(0, Math.min(l, along));
-        p.style.strokeDashoffset = `${l - k}`;
-        p.style.visibility = k > 0.5 ? 'visible' : 'hidden';
-        along -= l;
-      });
-      // written: the whole word, every edge of it (the pen's centre lines leave the odd ragged tip uncovered)
-      if (written >= 1) inked.removeAttribute('mask');
+    drunk.style.opacity = '0';
+    const drawWriting = (now: number) => {
+      const k = written;
+      const settled = doneAt > 0 && now - doneAt > FLICKER.tail;
+      if (settled) {
+        drunk.style.opacity = '1';
+        pixelate(drunk, 1);
+        return false;
+      }
+      // the blinks: often while it is coming on, a few more just after, none once it has settled
+      if (now >= nextBlink) {
+        const chance = doneAt ? FLICKER.after : FLICKER.min + (FLICKER.max - FLICKER.min) * (1 - k);
+        lit = !(Math.random() < chance);
+        nextBlink = now + (lit ? FLICKER.on[0] + Math.random() * FLICKER.on[1] : FLICKER.off[0] + Math.random() * FLICKER.off[1]);
+      }
+      const body = Math.min(1, k * 2.5);
+      drunk.style.opacity = (lit ? body : body * FLICKER.dim).toFixed(3);
+      // the blocks: coarse at first, sharp when it is all there
+      const e = k * k * (3 - 2 * k);
+      pixelate(drunk, doneAt ? 1 : 1 + (FLICKER.block - 1) * Math.pow(1 - e, 1.4));
+      return true;
     };
+    let drawing = true;
     const frame = (now: number) => {
       const dt = Math.min(0.25, (now - last) / 1000);
       last = now;
-      if (writing && written < 1) {
+      if (writing && (written < 1 || drawing)) {
         let want: number;
         if (finishBy) {
           // chapter 3 is in: what is left, done by the moment set for it (never slower than the hand's pace)
@@ -129,7 +186,8 @@ export function Preloader() {
         }
         speed += (want - speed) * (1 - Math.exp(-dt * 7));
         written = Math.min(1, written + speed * dt);
-        drawWriting();
+        if (written >= 1 && !doneAt) doneAt = now;
+        drawing = drawWriting(now);
       }
       raf = requestAnimationFrame(frame);
     };
@@ -308,23 +366,22 @@ export function Preloader() {
       <div className="pl-mark">
         <span className="pl-word" data-text="FRANKFURT" />
         {/* "Drunk" (Figma Preloader-Final), placed as there over FRANKFURT (whose frame, 1872 × 178, is the
-            viewBox): the glyphs, uncovered by a pen drawn along their centre lines (drunkWord.ts) */}
-        <svg className="pl-stroke" viewBox="0 0 1872 178" preserveAspectRatio="xMinYMin meet" aria-hidden>
-          <g transform={`translate(${DRUNK_BOX.x - 24} ${DRUNK_BOX.y - 886})`}>
-            <mask id="pl-pen" maskUnits="userSpaceOnUse" x={-40} y={-40} width={DRUNK_BOX.w + 80} height={DRUNK_BOX.h + 80}>
-              <g className="pl-pen">
-                {DRUNK_STROKES.map((d, i) => (
-                  <path key={i} d={d} fill="none" stroke="#fff" strokeWidth={DRUNK_PEN} strokeLinecap="round" strokeLinejoin="round" />
+            viewBox): the glyphs, coming on out of pixels with a failing lamp's blinks (FLICKER) */}
+        {/* (the word's pixel filter lives outside the layer it filters: a filter inside its own element is ignored) */}
+        <svg className="pl-defs-svg" width="0" height="0" aria-hidden>
+          <defs className="pl-defs" />
+        </svg>
+        <div className="pl-drunk">
+          <svg className="pl-stroke" viewBox="0 0 1872 178" preserveAspectRatio="xMinYMin meet" aria-hidden>
+            <g transform={`translate(${DRUNK_BOX.x - 24} ${DRUNK_BOX.y - 886})`}>
+              <g className="pl-ink" fill={DRUNK_COLOR}>
+                {DRUNK_GLYPHS.map((g, i) => (
+                  <path key={i} d={g.d} transform={`translate(${g.x} ${g.y}) scale(${DRUNK_SIZE} ${-DRUNK_SIZE})`} />
                 ))}
               </g>
-            </mask>
-            <g className="pl-ink" mask="url(#pl-pen)" fill={DRUNK_COLOR}>
-              {DRUNK_GLYPHS.map((g, i) => (
-                <path key={i} d={g.d} transform={`translate(${g.x} ${g.y}) scale(${DRUNK_SIZE} ${-DRUNK_SIZE})`} />
-              ))}
             </g>
-          </g>
-        </svg>
+          </svg>
+        </div>
       </div>
       {/* the sound choice (soundChoice.ts), after the loading */}
       <div className="pl-sound" />

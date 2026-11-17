@@ -80,7 +80,7 @@ export function thoughtsTyped(erase: () => Promise<void>) {
   }, Math.max(THOUGHTS.hold, audio.sayingLeft() + 300));
 }
 
-/** SKIP DIALOGUE: the thoughts are over at once (the overlay clears them), and the story goes on to the rev point. */
+/** SKIP THE SPEECH: the thoughts are over at once (the overlay clears them), and the story goes on to the rev point. */
 export function skipThoughts() {
   if (thoughts.done) return;
   window.clearTimeout(holdTimer);

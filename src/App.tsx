@@ -67,7 +67,11 @@ function EpisodeWorlds() {
   const host = EPISODES[activeId as EpisodeId]?.sharesWorld;
   // the world you are in and the next (and the world an episode plays in): one left behind is
   // unmounted and its video memory freed (going back builds it again from the loaded models)
-  const near = episode === 'outro' ? list.slice(-1) : list.slice(i, i + 2);
+  // (when the next episode plays on in this one's world, as the getaway on the street, the one after it too:
+  // built here, under the turn into this chapter, not as the story crosses into that next episode in the
+  // middle of a scene: the room being put together there was the hitch right after the invitation)
+  const reach = list[i + 1]?.sharesWorld === list[i]?.id ? 3 : 2;
+  const near = episode === 'outro' ? list.slice(-1) : list.slice(i, i + reach);
   const mounted = list.filter((e) => near.includes(e) || e.id === host);
   const shown = (id: EpisodeId) => id === activeId || id === host;
   return (

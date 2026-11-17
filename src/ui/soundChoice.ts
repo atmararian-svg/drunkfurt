@@ -274,6 +274,13 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
     return moving;
   };
 
+  /** A CSS width (a percentage) as the canvas's keyword for it. */
+  const stretchKeyword = (v: string) => {
+    const n = parseFloat(v);
+    if (!Number.isFinite(n)) return v || 'normal';
+    const steps: [number, string][] = [[50, 'ultra-condensed'], [62.5, 'extra-condensed'], [75, 'condensed'], [87.5, 'semi-condensed'], [100, 'normal'], [112.5, 'semi-expanded'], [125, 'expanded'], [150, 'extra-expanded'], [200, 'ultra-expanded']];
+    return steps.reduce((a, b) => (Math.abs(b[0] - n) < Math.abs(a[0] - n) ? b : a))[1];
+  };
   // SOUND during the intro: its letters drawn into a canvas exactly where they stand, then pixelated
   const introSharp = document.createElement('canvas');
   let introReady = false;
@@ -286,7 +293,10 @@ export function mountSoundChoice(host: HTMLElement): SoundChoice {
       const c = introSharp.getContext('2d')!;
       c.clearRect(0, 0, W, H);
       const cs = getComputedStyle(letters[0]);
-      c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontStretch} ${cs.fontSize} ${cs.fontFamily}`;
+      // (a canvas's font takes no percentage width: '125%' in it voided the whole font, and SOUND came in at
+      // the canvas's default 10 px, then jumped to its size; the width goes on its own, as a keyword)
+      c.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+      c.fontStretch = stretchKeyword(cs.fontStretch) as CanvasFontStretch;
       c.fillStyle = '#fff';
       c.textBaseline = 'alphabetic';
       letters.forEach((s) => {
