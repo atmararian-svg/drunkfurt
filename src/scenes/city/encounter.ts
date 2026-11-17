@@ -46,7 +46,7 @@ export const encounter = {
 const gate: Gate = { episode: 'city', at: BEAT.gate, open: false };
 gates.push(gate);
 /** Once fought, the fight is behind you: the scroll cannot be taken back into it (only the chapter selector goes back). */
-const fought: Floor = { episode: 'city', at: BEAT.aftermath + 0.045, on: false };
+const fought: Floor = { episode: 'city', at: BEAT.settled, on: false };
 floors.push(fought);
 
 /**
@@ -198,7 +198,7 @@ function decide(o: 'blocked' | 'knockedOut') {
   story.setState({ prompt: null });
   // play the outcome: from the gate through the aftermath's first frames, at the sequence's own speed
   const from = BEAT.gate;
-  const to = BEAT.aftermath + 0.045;
+  const to = BEAT.settled;
   const seconds = sequenceSeconds(o) * ((to - from) / (BEAT.aftermath - from));
   lastT = -1;
   // (locked: played through as it comes, not rewound by a hand on the scroll)

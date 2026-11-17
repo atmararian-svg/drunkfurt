@@ -17,6 +17,8 @@ export const BEAT = {
   /** The camera cuts away here (under the ink of the fight). */
   cut: 0.85,
   aftermath: 0.905,
+  /** The fight's own playback ends here (encounter.ts): the camera holds the aftermath's frame until then. */
+  settled: 0.95,
 } as const;
 
 /**

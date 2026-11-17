@@ -152,6 +152,9 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   used to stop it at once, leaving the car standing).
 - **The invitation is said as soon as the letter is read** (its caption holds from where the letter
   can be picked up), so the skip button and the words come together, no scroll needed.
+- **No jolt after the fight**: its playback ended at 0.95 of the street, half way through the
+  camera's next move (0.905 → 1), at its fastest: a jolt, then a look further down. The aftermath's
+  frame is now held to 0.95 (`BEAT.settled`), so the playback ends on a still camera.
 - **No hitch after the invitation**: the room of chapter 3 was put together (its model, screens and
   materials) the moment the story crossed from the street's episode into the getaway's, right after
   the invitation, as the next world to come. A chapter whose next episode plays on in its own world
@@ -245,14 +248,18 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   letter (a staggered, eased reveal with seeded irregularity, each letter rising and fading in
   through a few stand-in glyphs), over which "Drunk" is written in red: the design's Rock Salt
   lettering (Figma "Drunkfurt-2"; the glyph outlines exactly as Figma laid them out, taken from
-  the .fig, so no font is loaded, `src/ui/drunkWord.ts`), coming on as a failing street lamp
-  does: out of 26 px pixels growing finer (an SVG filter on its layer), blinking out and back
-  while it is not quite there (often at first, less as it comes on), a last stutter once it is,
-  then steady (`FLICKER`). (A pen drawing it along the letters' centre lines read wrong: the D's
-  bowl came before its stem.) The order follows the real loading: the title decodes in with chapter 1;
+  the .fig, so no font is loaded, `src/ui/drunkWord.ts`), uncovered by a pen: the letters'
+  centre lines (the glyphs rasterised, thinned to skeletons, traced, smoothed) in the order and
+  direction a hand writes them: the D's stem from the top down, then the lead-in at its top left
+  over the top and round the bowl (the rough edge's spur out of its top cut); the r's stem, then
+  its arc and tail into the u; the u; the n's stem in one go, then from it the diagonal down and
+  up; the k's stem, arm and leg. Drawn on (`stroke-dashoffset`) inside an SVG mask over the
+  glyphs, a 40 px pen (a wider one uncovered the D's bowl as its stem began), lifted between
+  strokes for a moment (`AIR`), the pace eased so it never jumps. The order follows the real loading: the title decodes in with chapter 1;
   chapter 1 resolves when it is ready and chapter 2 decodes in its place; then chapter 3, and
-  while it loads "Drunk" comes on: at an even pace up to 80% of the way, then only a slow
-  creep (something always moves) until chapter 3 is really in, when the rest comes quickly; word and chapter 3 finish together (if chapter 3 was in first, its label waits for
+  while it loads "Drunk" is written: at the hand's pace up to 80% of the word, then only a
+  slow creep (something always moves) until chapter 3 is really in, when the rest is written
+  quickly; word and chapter 3 finish together (if chapter 3 was in first, its label waits for
   the word). Then READY; the preloader leaves in the transition's blocks (`pixelCover` in
   `pixelReveal.ts`), and only then does the sound choice come in; once it is made, the pixel
   reveal brings chapter 1 in over it.
@@ -1023,7 +1030,7 @@ src/
     FrameGrab.tsx         a copy of the frame on screen, for the chapter transition
   ui/Overlay.tsx          title cards, captions, ink, prompts
   ui/chapterTuner.ts      the chapter selector: scroll-driven scale, chapter titles, tabs, drag, wheel
-  ui/Preloader.tsx        the preloader (real chapter readiness, decoding, Drunk coming on like a lamp)
+  ui/Preloader.tsx        the preloader (real chapter readiness, decoding, the handwritten Drunk)
   ui/chapterTransition.ts chapter changes: copy, reset, cut, pixel reveal, title card
   ui/pixelReveal.ts       the pixel reveal (after the supplied ImagePixelLoader code)
   ui/titleCards.ts        the glass chapter cards, in and out

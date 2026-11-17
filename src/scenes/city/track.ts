@@ -23,5 +23,8 @@ export const cityTrack = new CameraTrack([
   // after the fight: where you stood, a little lower, looking down at him on his back and the
   // letter between you. Episode 3 starts from exactly this frame (car/episode.ts), so nothing jumps.
   { t: BEAT.aftermath, pos: [6.35, 1.55, -33.75], yaw: deg(-3), pitch: deg(-27), fov: 46 },
+  // (held until the fight's playback ends: it stopped half way through the next move, the camera at its
+  // fastest, a jolt and then a look further down; now the playback ends on a still frame)
+  { t: BEAT.settled, pos: [6.35, 1.55, -33.75], yaw: deg(-3), pitch: deg(-27), fov: 46 },
   { t: 1.0, pos: [6.35, 1.52, -33.8], yaw: deg(-4), pitch: deg(-28), fov: 45 },
 ]);
