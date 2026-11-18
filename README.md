@@ -250,8 +250,10 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   lettering (Figma "Drunkfurt-2"; the glyph outlines exactly as Figma laid them out, taken from
   the .fig, so no font is loaded, `src/ui/drunkWord.ts`), uncovered by a pen: the letters'
   centre lines (the glyphs rasterised, thinned to skeletons, traced, smoothed) in the order and
-  direction a hand writes them: the D's stem from the top down, then the lead-in at its top left
-  over the top and round the bowl (the rough edge's spur out of its top cut); the r's stem, then
+  direction a hand writes them: the D's stem from the top down to just above its foot (a flat
+  pen end there, so it does not reach into the bowl's bottom), then the lead-in at its top left
+  over the top, round the bowl and along the bottom back into the stem (the bottom's curl is the
+  bowl's; the rough edge's spur out of its top cut); the r's stem, then
   its arc and tail into the u; the u; the n's stem in one go, then from it the diagonal down and
   up; the k's stem, arm and leg. Drawn on (`stroke-dashoffset`) inside an SVG mask over the
   glyphs, a 40 px pen (a wider one uncovered the D's bowl as its stem began), lifted between

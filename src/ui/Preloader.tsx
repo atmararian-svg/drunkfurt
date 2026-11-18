@@ -312,13 +312,14 @@ export function Preloader() {
       <div className="pl-mark">
         <span className="pl-word" data-text="FRANKFURT" />
         {/* "Drunk" (Figma Preloader-Final), placed as there over FRANKFURT (whose frame, 1872 × 178, is the
-            viewBox): the glyphs, uncovered by a pen drawn along their centre lines (drunkWord.ts) */}
+            viewBox): the glyphs, uncovered by a pen drawn along their centre lines (drunkWord.ts); the D's
+            stem with a flat end, so its foot does not reach into the bowl's bottom */}
         <svg className="pl-stroke" viewBox="0 0 1872 178" preserveAspectRatio="xMinYMin meet" aria-hidden>
           <g transform={`translate(${DRUNK_BOX.x - 24} ${DRUNK_BOX.y - 886})`}>
             <mask id="pl-pen" maskUnits="userSpaceOnUse" x={-40} y={-40} width={DRUNK_BOX.w + 80} height={DRUNK_BOX.h + 80}>
               <g className="pl-pen">
                 {DRUNK_STROKES.map((d, i) => (
-                  <path key={i} d={d} fill="none" stroke="#fff" strokeWidth={DRUNK_PEN} strokeLinecap="round" strokeLinejoin="round" />
+                  <path key={i} d={d} fill="none" stroke="#fff" strokeWidth={DRUNK_PEN} strokeLinecap={i === 0 ? 'butt' : 'round'} strokeLinejoin="round" />
                 ))}
               </g>
             </mask>
