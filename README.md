@@ -360,6 +360,7 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   WebGL context on this page has hung it before). At rest the logo is drawn whole and sharp; it
   breaks into points (every px in the header, every 2 px on the phone) as the pointer or a finger
   comes near, and is whole again once all are home: the loop then stops, nothing runs at rest.
+  The pointer's trail keeps off the logo and 60 px round it, so the points are seen.
 - **The phone page's tilt permission** is asked only from a tap outside the white panel: COPY LINK
   and VISIT PORTFOLIO no longer bring up the system's motion dialogue.
 - **The sound switch**: `[S] SOUND ON|OFF` (the label says what a click does) and a 30 px square

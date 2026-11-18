@@ -54,7 +54,18 @@ const overShown = (x: number, y: number) =>
     if (!el || el.style.visibility === 'hidden' || el.style.opacity === '0') return false;
     const r = el.getBoundingClientRect();
     return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom;
-  });
+  }) || overLogo(x, y);
+/**
+ * …and the header's logo, with the reach of its points around it (ui/logoParticles.ts): the pointer
+ * there pushes the logo's points, and the trail over them hid that.
+ */
+const LOGO_MARGIN = 60;
+const overLogo = (x: number, y: number) => {
+  const el = document.querySelector<HTMLElement>('.head-logo');
+  if (!el || el.offsetParent === null || getComputedStyle(el).visibility === 'hidden') return false;
+  const r = el.getBoundingClientRect();
+  return x >= r.left - LOGO_MARGIN && x <= r.right + LOGO_MARGIN && y >= r.top - LOGO_MARGIN && y <= r.bottom + LOGO_MARGIN;
+};
 /** Pure white: with the difference blend it is an exact negative of the page under it. */
 const INK = '255, 255, 255';
 /** Glyphs from empty to full (the brief's Floyd–Steinberg set, inverted). */
