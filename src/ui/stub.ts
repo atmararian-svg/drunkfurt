@@ -4,6 +4,7 @@ import { saveResume } from './resume';
 import { decodeAll, splitChars } from './decode';
 import { pixelFilter, presence } from './textBoxes';
 import { diagNote } from './diag';
+import { mountLogoParticles } from './logoParticles';
 import logoSvg from '../assets/drunkfurt-logo.svg?raw';
 import { onTiltOn, requestTilt, tiltNeedsTap, tryTilt } from '../player/input';
 
@@ -185,6 +186,8 @@ function showPhoneStub() {
       </div>
     </section>`;
   root.querySelector('svg')?.setAttribute('aria-hidden', 'true');
+  // the logo as points the finger pushes away (ui/logoParticles.ts)
+  mountLogoParticles(root.querySelector<HTMLElement>('.mstub-logo')!, logoSvg);
   const texts = [...root.querySelectorAll<HTMLElement>('[data-text]')];
   for (const t of texts) {
     t.textContent = t.dataset.text ?? '';
@@ -233,9 +236,14 @@ function showPhoneStub() {
   if (!tryTilt() && tiltNeedsTap()) {
     const hint = document.createElement('p');
     hint.className = 'mstub-tilt';
-    hint.textContent = 'TAP, THEN TILT YOUR PHONE TO LOOK AROUND';
+    hint.textContent = 'TAP THE PAGE, THEN TILT YOUR PHONE TO LOOK AROUND';
     root.querySelector('.mstub-time')?.after(hint);
-    const ask = () => requestTilt();
+    // (not from a tap on the white panel or its buttons: copying the link or opening the portfolio must not
+    // bring up the system's motion-permission dialogue; only a tap elsewhere on the page asks)
+    const ask = (e: Event) => {
+      if ((e.target as Element | null)?.closest?.('.mstub-panel')) return;
+      requestTilt();
+    };
     document.addEventListener('touchend', ask);
     document.addEventListener('click', ask);
     onTiltOn(() => {

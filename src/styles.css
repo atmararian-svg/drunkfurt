@@ -370,6 +370,9 @@ body { cursor: pointer; }
   color: #fff;
 }
 .head-logo svg { display: block; width: 100%; height: 100%; }
+/* the logo as points (ui/logoParticles.ts): the canvas over the drawing, which steps back once the points are in */
+.logo-dots { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
+.has-dots > svg { visibility: hidden; }
 /* the fight (ACTION, the defence, the hits, the rev prompt): the words and the mark make way; the sound switch stays */
 .head-line, .head-logo { transition: opacity 0.35s var(--ease), visibility 0s linear 0s; }
 .site-head.is-away .head-line, .site-head.is-away .head-logo { opacity: 0; visibility: hidden; transition: opacity 0.35s var(--ease), visibility 0s linear 0.35s; }
@@ -1284,6 +1287,8 @@ body { cursor: pointer; }
   line-height: 0;
 }
 .mstub-logo svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45)); }
+.mstub-logo { position: relative; }
+.mstub-logo .logo-dots { filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45)); }
 .mstub-panel {
   width: min(100%, 520px);
   padding: 10px 4px 4px;

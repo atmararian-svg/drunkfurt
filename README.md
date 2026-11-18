@@ -353,6 +353,15 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   middle (`ui/headerArt.ts`, the design's vectors), the sound switch on the right. While the
   story asks you to act and the fight plays (ACTION, PRESS D TO DEFEND, the pixelated hits, PRESS
   D TO REV) the line and the logo fade out (`.site-head.is-away`); the sound switch stays.
+- **The logo as points** (`ui/logoParticles.ts`, the header's and the phone page's): after the supplied
+  LogoParticleDistortion, its physics kept (the pointer pushes the points away by -r²/d², damping
+  0.82, at most its max move from home, pulled back each frame), scaled from its 800 px logo to
+  this one, and the way back 40 % quicker (0.014, was 0.01). On a 2D canvas, not WebGL (a second
+  WebGL context on this page has hung it before). At rest the logo is drawn whole and sharp; it
+  breaks into points (every px in the header, every 2 px on the phone) as the pointer or a finger
+  comes near, and is whole again once all are home: the loop then stops, nothing runs at rest.
+- **The phone page's tilt permission** is asked only from a tap outside the white panel: COPY LINK
+  and VISIT PORTFOLIO no longer bring up the system's motion dialogue.
 - **The sound switch**: `[S] SOUND ON|OFF` (the label says what a click does) and a 30 px square
   with the sound's state (the speaker crossed out, or with waves), 2 px apart, sharp corners,
   JetBrains Mono Medium 12 −5 %. SOUND ON (while the sound is off) is white with near-black; SOUND

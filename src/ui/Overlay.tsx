@@ -29,6 +29,7 @@ import { walkAction } from '../game/walk';
 import { talkAction, talkLine } from '../game/talk';
 import { mountGameHud } from '../game/hud';
 import { frameGate } from '../render/frameRate';
+import { mountLogoParticles } from './logoParticles';
 
 /** Once you defend: the street breaks into coarse pixels, blurs and darkens, which hides the fight (block px, blur 0 … 1, dark 0 … 1). */
 const HIDE = { block: 26, blur: 0.85, dark: 0.8 };
@@ -486,6 +487,9 @@ export function Overlay() {
   const soundShown = useRef('');
   const toggleSoundRef = useRef(() => undefined as void);
   const headRef = useRef<HTMLElement>(null);
+  // the logo as points the pointer pushes away (ui/logoParticles.ts)
+  const logoRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => (logoRef.current ? mountLogoParticles(logoRef.current, LOGO_SVG) : undefined), []);
   useEffect(() => {
     const el = soundText.current!;
     // (the label says what a click does: SOUND OFF while it plays, SOUND ON while it is off)
@@ -579,7 +583,7 @@ export function Overlay() {
           <br />
           and I’m here to save them.
         </p>
-        <span className="head-logo" role="img" aria-label="DRUNKFURT" dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
+        <span className="head-logo" ref={logoRef} role="img" aria-label="DRUNKFURT" dangerouslySetInnerHTML={{ __html: LOGO_SVG }} />
         {/*
           the sound switch: [S] and what a click does, and a square with the sound's state; the pointer on it
           slides the label right and the square round to the left (theperformancelab.ca's buttons), the label
