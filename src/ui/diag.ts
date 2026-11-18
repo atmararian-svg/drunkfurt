@@ -61,6 +61,7 @@ function wrapGl() {
       proto[n] = function (this: unknown) {
         // eslint-disable-next-line prefer-rest-params
         const args = arguments as unknown as unknown[];
+        // (an arguments object, not an array: describeTex needs a real one)
         const s = performance.now();
         const r = (f as (...a: unknown[]) => unknown).apply(this, args);
         const ms = performance.now() - s;
@@ -69,7 +70,7 @@ function wrapGl() {
         t.n++;
         t.ms += ms;
         if (ms > t.max) t.max = ms;
-        if (ms > 30) keepSlow(ms, `${at()}s gl.${n} ${ms.toFixed(0)} ms${n.startsWith('tex') ? ` (${describeTex(args)})` : ''}`);
+        if (ms > 30) keepSlow(ms, `${at()}s gl.${n} ${ms.toFixed(0)} ms${n.startsWith('tex') ? ` (${describeTex(Array.from(args))})` : ''}`);
         return r;
       };
     }
