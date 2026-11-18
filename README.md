@@ -152,6 +152,18 @@ The same story on a touch screen (`ui/touch.ts`: no hovering pointer), checked a
   used to stop it at once, leaving the car standing).
 - **The invitation is said as soon as the letter is read** (its caption holds from where the letter
   can be picked up), so the skip button and the words come together, no scroll needed.
+- **Worlds warmed before they are seen** (`render/WorldWarm.tsx`): on a device that had never shown the
+  page, every shader was compiled from nothing, three times over at the worst moments (under the
+  preloader all the mounted worlds drawn at once with all their lights, so for none of them; again as
+  the station came in after the sound choice; the street's at the turn into chapter 2, the warm-up
+  ahead having been held back until 9 s after the chapter's card). Each world is now warmed as soon as
+  it is in: its textures uploaded (`initTexture`) and its shaders compiled with its own lights and fog
+  for the linear target and the screen (`compileAsync`, compiled by the card in the background), and it
+  is not drawn until then (shown anyway after 15 s, or at once if a chapter's turn reaches it first).
+  The preloader waits for the worlds loaded (at most 12 s) before READY; worlds still to come wait 3 s
+  after they are mounted; nothing is warmed while the page reads its own picture back.
+- **The move into the big screen at full rate**: the hand-over's 15 frames a second began at the click
+  and the 1.8 s move ran at them; now only once the screen's colour covers the page (`site-sent`).
 - **No jolt after the fight**: its playback ended at 0.95 of the street, half way through the
   camera's next move (0.905 → 1), at its fastest: a jolt, then a look further down. The aftermath's
   frame is now held to 0.95 (`BEAT.settled`), so the playback ends on a still camera.
@@ -361,6 +373,9 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   breaks into points (every px in the header, every 2 px on the phone) as the pointer or a finger
   comes near, and is whole again once all are home: the loop then stops, nothing runs at rest.
   The pointer's trail keeps off the logo and 60 px round it, so the points are seen.
+  Sharp at the screen's own density (up to 3; its picture made at the canvas's size: a phone drew it
+  at 2, from a small picture, stretched); finer points (the logo's width over 230); a lifted finger
+  lets go of the pull at once, so the phone's logo is whole again in a moment.
 - **The phone page's tilt permission** is asked only from a tap outside the white panel: COPY LINK
   and VISIT PORTFOLIO no longer bring up the system's motion dialogue.
 - **The sound switch**: `[S] SOUND ON|OFF` (the label says what a click does) and a 30 px square

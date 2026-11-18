@@ -12,6 +12,7 @@ import { showTitleCard } from './titleCards';
 import { takeResume } from './resume';
 import { goToChapter } from './chapterTransition';
 import { diagNote } from './diag';
+import { worldsWarm } from '../render/WorldWarm';
 
 /**
  * The preloader (Figma "Drunkfurt": Preloader-Start → Preloader-Final), a
@@ -42,6 +43,7 @@ import { diagNote } from './diag';
 const PAGE_BG = '#070707';
 const MIN_ACTIVE = 650; // ms a chapter label decodes before it may resolve, so it can be read
 const LATER_CHAPTER_WAIT = 25000; // ms chapters 2 and 3 may hold the page after chapter 1 is in
+const WARM_WAIT_MS = 12000; // ms the shaders of the worlds loaded may hold the page before READY
 /**
  * The hand writing "Drunk" while chapter 3 loads (fractions of the word, per second):
  * at `pace` (the whole word in about 1.9 s) up to `hold`, then only a slow creep
@@ -233,6 +235,9 @@ export function Preloader() {
     void (async () => {
       try {
         await Promise.all([sequence(), title]);
+        // the worlds loaded so far compiled for the card before anything is shown (render/WorldWarm.tsx): the
+        // freezes of a first visit, after the sound choice and at the turn into chapter 2, were their compiles
+        await worldsWarm(WARM_WAIT_MS);
         if (!alive) return;
         status.dataset.text = 'READY';
         status.replaceChildren();

@@ -30,7 +30,7 @@ const PHYS = {
  * so the field reads as the logo. At rest the logo is drawn whole, sharp; it breaks into its points as
  * the pointer comes, and is whole again once they are all home.
  */
-const SAMPLES = 170;
+const SAMPLES = 230;
 const DOT_OVER = 1.15;
 
 export function mountLogoParticles(host: HTMLElement, svg: string, colour = '#fff') {
@@ -60,13 +60,14 @@ export function mountLogoParticles(host: HTMLElement, svg: string, colour = '#ff
   const build = () => {
     const r = host.getBoundingClientRect();
     if (!image || r.width < 2 || r.height < 2) return false;
-    dpr = Math.min(2, window.devicePixelRatio || 1);
+    // (the screen's own density, up to 3: a phone's logo drawn at 2 and stretched read as pixels)
+    dpr = Math.min(3, window.devicePixelRatio || 1);
     W = r.width;
     H = r.height;
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     k = W / REF_LOGO;
-    STEP = Math.max(1, Math.round(W / SAMPLES));
+    STEP = Math.max(1, W / SAMPLES);
     DOT = STEP * DOT_OVER;
     const cols = Math.max(1, Math.floor(W / STEP));
     const rows = Math.max(1, Math.floor(H / STEP));
@@ -86,12 +87,23 @@ export function mountLogoParticles(host: HTMLElement, svg: string, colour = '#ff
     return true;
   };
 
-  /** At rest: the logo itself, sharp. */
+  /** At rest: the logo itself, sharp (its picture made at the canvas's own size, `sharp`). */
+  let sharp: HTMLImageElement | null = null;
   const drawWhole = () => {
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.clearRect(0, 0, W, H);
-    if (image) ctx.drawImage(image, 0, 0, W, H);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const src = sharp ?? image;
+    if (src) ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
   };
+  /** The drawing as a picture of exactly w × h px (a browser may make an SVG image at its own size and stretch it). */
+  const picture = (w: number, h: number) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const im = new Image();
+      im.onload = () => resolve(im);
+      im.onerror = reject;
+      const sized = white.replace(/<svg\b([^>]*)>/, (_m, attrs: string) => `<svg${attrs.replace(/\s(width|height)="[^"]*"/g, '')} width="${w}" height="${h}">`);
+      im.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(sized)}`;
+    });
   const draw = () => {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, W, H);
@@ -194,11 +206,25 @@ export function mountLogoParticles(host: HTMLElement, svg: string, colour = '#ff
     const t = e.touches[0];
     if (t) near(t.clientX, t.clientY);
   };
+  // (the finger lifted: the points stop being pushed almost at once and gather back, the logo sharp again
+  // in a moment, rather than held in points for the pull's 300 frames)
+  const onTouchEnd = () => {
+    pull = Math.min(pull, 12);
+  };
 
   const ready = () => {
     if (!alive || !build()) return;
-    host.classList.add('has-dots');
-    drawWhole();
+    const w = canvas.width;
+    const h = canvas.height;
+    picture(w, h).then(
+      (im) => {
+        if (!alive || canvas.width !== w || canvas.height !== h) return;
+        sharp = im;
+        host.classList.add('has-dots');
+        if (!raf) drawWhole();
+      },
+      () => undefined,
+    );
   };
   const img = new Image();
   img.decoding = 'async';
@@ -207,7 +233,8 @@ export function mountLogoParticles(host: HTMLElement, svg: string, colour = '#ff
     ready();
   };
   // white, whatever the drawing's own colour (the header's logo is in currentColor)
-  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg.replace(/currentColor/g, '#fff'))}`;
+  const white = svg.replace(/currentColor/g, '#fff');
+  img.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(white)}`;
   host.append(canvas);
   const ro = new ResizeObserver(() => {
     if (!image) return;
@@ -221,6 +248,8 @@ export function mountLogoParticles(host: HTMLElement, svg: string, colour = '#ff
   if (TOUCH) {
     window.addEventListener('touchstart', onTouch, { passive: true });
     window.addEventListener('touchmove', onTouch, { passive: true });
+    window.addEventListener('touchend', onTouchEnd, { passive: true });
+    window.addEventListener('touchcancel', onTouchEnd, { passive: true });
   }
   return () => {
     alive = false;
@@ -229,6 +258,8 @@ export function mountLogoParticles(host: HTMLElement, svg: string, colour = '#ff
     window.removeEventListener('pointermove', onMove);
     window.removeEventListener('touchstart', onTouch);
     window.removeEventListener('touchmove', onTouch);
+    window.removeEventListener('touchend', onTouchEnd);
+    window.removeEventListener('touchcancel', onTouchEnd);
     canvas.remove();
     host.classList.remove('has-dots');
   };

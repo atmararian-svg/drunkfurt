@@ -73,10 +73,10 @@ export function StationScene({ active = true }: { active?: boolean }) {
   const { gl, scene, camera } = useThree();
   const leaf = useRef<Group>(null);
 
-  // Compile shaders up front, then fade in.
+  // the story may begin a few frames in (its shaders are compiled ahead, render/WorldWarm.tsx: a
+  // compile of the whole scene here, every mounted world with all their lights, blocked the page)
   useEffect(() => {
     let cancelled = false;
-    gl.compile(scene, camera);
     let frames = 0;
     const tick = () => {
       if (cancelled) return;

@@ -16,7 +16,9 @@ export function frameGap(backdrop = false) {
   if (backdrop) return 1000 / 30;
   // (the hand-over into chapter 1 reads the picture every frame: full rate while its blocks are up)
   if (html.contains('is-preloading') && !document.querySelector('.pixel-reveal')) return 1000 / 20;
-  if (html.contains('site-handoff')) return 1000 / 15;
+  // (once the screen's colour covers the page and the browser is on its way to the site: not during the
+  // move into the screen, which is the page's own animation and runs at full rate)
+  if (html.contains('site-sent')) return 1000 / 15;
   // (the letter open: the street is a dimmed, still picture behind the sheet)
   if (html.contains('is-reading')) return 1000 / 30;
   return FULL;

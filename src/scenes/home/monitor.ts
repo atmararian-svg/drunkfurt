@@ -180,6 +180,8 @@ export function enterSite(link = -1) {
   sendTimer = window.setTimeout(() => {
     if (!monitor.entering || monitor.sent) return;
     monitor.sent = true;
+    // (only now is the 3D page hidden under the colour: its frames may slow down, render/frameRate.ts)
+    document.documentElement.classList.add('site-sent');
     // the view is the colour by now (the screen fills it); the same colour over the page holds it while the browser goes
     holdColour(monitor.solid);
     navigateTo(monitor.url, backToRoom);
@@ -190,7 +192,7 @@ export function enterSite(link = -1) {
 export function backToRoom() {
   window.clearTimeout(sendTimer);
   closeHandoff();
-  document.documentElement.classList.remove('site-handoff');
+  document.documentElement.classList.remove('site-handoff', 'site-sent');
   Object.assign(monitor.fly, { from: flyAt(), to: 0, start: performance.now(), seconds: BACK_SECONDS });
   window.setTimeout(() => {
     monitor.entering = false;
@@ -204,7 +206,7 @@ export function backToRoom() {
 export function resetMonitor() {
   window.clearTimeout(sendTimer);
   closeHandoff(true);
-  document.documentElement.classList.remove('site-handoff');
+  document.documentElement.classList.remove('site-handoff', 'site-sent');
   Object.assign(monitor.fly, { from: 0, to: 0, start: 0, seconds: 1 });
   monitor.entering = false;
   monitor.sent = false;

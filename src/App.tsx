@@ -1,7 +1,7 @@
 import { Canvas, advance, useFrame, useThree } from '@react-three/fiber';
 import { frameGap, frameGate } from './render/frameRate';
 import { Component, ReactNode, Suspense, useEffect, useLayoutEffect, useRef } from 'react';
-import { FogExp2, Group, HalfFloatType, Material, Mesh, NoToneMapping, Object3D, PCFShadowMap, SRGBColorSpace, Scene, Texture, WebGLRenderTarget } from 'three';
+import { Material, Mesh, NoToneMapping, Object3D, PCFShadowMap, SRGBColorSpace, Texture } from 'three';
 import { story, useStory } from './core/store';
 import { EpisodeId, TOTAL_LENGTH, autoplay, globalProgress, chapterTurn, gates, locate, readScroll, scriptOwnsScroll, scrollToProgress, stopAutoplay, timeline } from './core/timeline';
 import { EPISODES, builtEpisodes } from './episodes';
@@ -10,7 +10,7 @@ import { encounter, encounterAt } from './scenes/city/encounter';
 import { letter } from './scenes/city/letter';
 import { getaway } from './scenes/car/getaway';
 import { LETTER_REVEAL, openLetter } from './ui/letterReveal';
-import { Stylizer, stylize } from './render/Stylizer';
+import { Stylizer } from './render/Stylizer';
 import { FrameGrab } from './render/FrameGrab';
 import { chapterOf, chapterReadiness } from './core/chapters';
 import { preloadRoom } from './scenes/home/RoomScene';
@@ -20,7 +20,7 @@ import { watchContextLoss } from './ui/stub';
 import { Preloader } from './ui/Preloader';
 import { GAME } from './game/mode';
 import { DIAG, diagFrame, diagNote } from './ui/diag';
-import { sinceTitleCard, titleCardOn, titleCardPlayed } from './ui/titleCards';
+import { WorldWarm } from './render/WorldWarm';
 
 /**
  * Marks a chapter ready once its world has rendered: placed inside the
@@ -58,8 +58,6 @@ class WorldBoundary extends Component<{ chapter: 1 | 2 | 3; children: ReactNode 
  */
 function EpisodeWorlds() {
   const episode = useStory((s) => s.episode);
-  // under the loading veil every mounted world draws once, so all shaders compile up front
-  const loading = useStory((s) => s.phase === 'loading');
   const list = builtEpisodes();
   const i = Math.max(0, list.findIndex((e) => e.id === episode));
   const activeId = episode === 'outro' ? list[list.length - 1].id : episode;
@@ -80,12 +78,13 @@ function EpisodeWorlds() {
         // each world loads on its own (the station does not wait for the street's models), and says when it is ready
         const chapter = chapterOf(e.id).number;
         return (
-          <group key={e.id} visible={loading || shown(e.id)}>
+          // (its visibility is WorldWarm's: shown once its shaders are compiled)
+          <group key={e.id}>
             <WorldBoundary chapter={chapter}>
               <Suspense fallback={null}>
                 <e.World active={shown(e.id)} />
                 {/* (only the worlds still to come: one left behind is not compiled again) */}
-                <Prewarm ahead={!loading && !shown(e.id) && list.indexOf(e) > i} />
+                <WorldWarm id={e.id} shown={shown(e.id)} />
                 <FreeOnUnmount />
                 {BACKDROP && <BackdropShown />}
                 {e.id !== 'car' && e.id !== 'home' && <ChapterReady chapter={chapter} />}
@@ -155,118 +154,6 @@ function BackdropDrift() {
     timeline.target = globalProgress('home', BACKDROP_AT + BACKDROP_SWAY * Math.sin((t * Math.PI * 2) / 26));
   });
   return null;
-}
-
-/** For a world's shaders compiled ahead of time: a linear target (for passes that draw into one), and a fog of the kind every world uses. */
-const PREWARM_RT = new WebGLRenderTarget(1, 1, { type: HalfFloatType });
-const PREWARM_FOG = new FogExp2('#000000', 0.01);
-
-/**
- * Compiles a world's shaders while another is on screen, so the chapter turn into it does not
- * stall on them. A shader depends on the lights it is drawn with: under the loading veil every
- * mounted world draws at once, all their lights together, so those shaders do not fit any one
- * world, and they were compiled again, all of them, at the turn (the long stall). Here the world
- * is compiled on its own, with its own lights and its fog, for both colour spaces a frame draws it
- * in (to the screen's and into a linear target), after the print treatment has patched its
- * materials.
- *
- * A little at a time: one object per kind of shader it needs (its material and the variant the
- * object asks for: skinned, instanced, receiving shadows, its vertex data), and only one at a
- * time: the next is asked for once the graphics card has finished the last (with the
- * KHR_parallel_shader_compile extension, asked without waiting), or else a third of a second
- * later. Never during a transition (the opening pixels, a chapter turn) or the preloader.
- * Issuing a compile costs nothing here, but the card compiles them one after another, and a
- * page that then reads its picture back (the pixel transitions do, every frame) waits for all of
- * them: issued all at once, as before, a hundred of them froze the page on a real GPU.
- */
-function Prewarm({ ahead }: { ahead: boolean }) {
-  const { gl, camera } = useThree();
-  const marker = useRef<Object3D>(null);
-  const done = useRef(false);
-  useEffect(() => {
-    if (!ahead || done.current) return;
-    const parallel = gl.extensions.has('KHR_parallel_shader_compile');
-    let timer = 0;
-    let queue: Mesh[] | null = null;
-    let pass = 0;
-    let waiting: { isReady(): boolean } | null = null;
-    let next = 0;
-    const later = (ms: number) => (timer = window.setTimeout(step, ms));
-    // (and not while a tip is up: the first one comes as the page settles, and the two would fall together)
-    // (nor before the chapter's title card has come and gone: the page is just handed over, the card is
-    // sliding in over a live 3D frame, and compiling as well tipped a retina Mac into a hang)
-    const busy = () =>
-      titleCardOn() ||
-      !titleCardPlayed() ||
-      sinceTitleCard() < 9000 ||
-      document.querySelector<HTMLElement>('.tip')?.style.visibility === 'visible' ||
-      chapterTurn.busy || document.hidden || !!document.querySelector('.pixel-reveal, .chapter-out') || document.documentElement.classList.contains('is-preloading');
-    const step = () => {
-      const root = marker.current?.parent as (Group & { fog?: FogExp2 | null }) | undefined;
-      if (!root || busy()) return later(500);
-      // the last one still being compiled by the card: wait for it
-      if (waiting && parallel && !waiting.isReady()) return later(50);
-      if (!parallel && performance.now() < next) return later(next - performance.now());
-      waiting = null;
-      if (!queue) {
-        stylize(root, gl.getPixelRatio());
-        // one object for each kind of shader the world needs
-        const seen = new Set<string>();
-        queue = [];
-        root.traverse((o) => {
-          const m = o as Mesh & { isSkinnedMesh?: boolean; isInstancedMesh?: boolean; instanceColor?: unknown };
-          if (!m.isMesh) return;
-          const g = m.geometry;
-          const variant = `${m.isSkinnedMesh ? 's' : ''}${m.isInstancedMesh ? 'i' : ''}${m.instanceColor ? 'c' : ''}${m.receiveShadow ? 'r' : ''}${g.getAttribute('tangent') ? 't' : ''}${g.getAttribute('color') ? 'v' : ''}${g.getAttribute('uv1') ? '1' : ''}${g.morphAttributes.position ? 'm' : ''}`;
-          const mats = (Array.isArray(m.material) ? m.material : [m.material]) as Material[];
-          const key = mats.map((x) => x.uuid).join('+') + variant;
-          if (seen.has(key)) return;
-          seen.add(key);
-          queue!.push(m);
-        });
-      }
-      const o = queue.pop();
-      if (o) {
-        const wasVisible = root.visible;
-        const prevTarget = gl.getRenderTarget();
-        const before = gl.info.programs?.length ?? 0;
-        try {
-          root.visible = true;
-          root.fog = PREWARM_FOG;
-          gl.setRenderTarget(pass === 0 ? null : PREWARM_RT);
-          const c0 = performance.now();
-          gl.compile(o, camera, root as unknown as Scene);
-          if (DIAG) diagNote(`prewarm compile ${o.name || o.type} ${(performance.now() - c0).toFixed(0)} ms (programs ${gl.info.programs?.length})`);
-          // a new program made: wait for it before the next (an existing one: go straight on)
-          if ((gl.info.programs?.length ?? 0) > before) {
-            const mat = (Array.isArray(o.material) ? o.material[0] : o.material) as Material;
-            waiting = (gl.properties.get(mat) as { currentProgram?: { isReady(): boolean } }).currentProgram ?? null;
-            next = performance.now() + 330;
-          }
-        } catch (err) {
-          console.warn('[prewarm]', err);
-          queue.length = 0;
-          pass = 1;
-        } finally {
-          gl.setRenderTarget(prevTarget);
-          root.fog = null;
-          root.visible = wasVisible;
-        }
-      }
-      if (queue.length) return later(waiting ? 50 : 0);
-      if (pass === 0) {
-        // the same again, for the linear target
-        pass = 1;
-        queue = null;
-        return later(0);
-      }
-      done.current = true;
-    };
-    // a while after the world is ready, once the page has settled
-    later(5000);
-    return () => window.clearTimeout(timer);
-  }, [ahead, gl, camera]);
-  return <object3D ref={marker} />;
 }
 
 /**
