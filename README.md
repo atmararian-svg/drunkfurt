@@ -32,6 +32,18 @@ npm run build:game # the game build into dist-game/ (its own zip, its own domain
 jumps to the next composed beat. Moving the mouse lets you look around a few degrees; the
 camera always returns to the composed frame.
 
+## The error page
+
+`src/ui/errorPage.ts`, from Figma "Drunkfurt-error-page" (frame error-page, 1920 × 1080, scaled with the
+page's width): OOOPS in perspective at the top left (the design's vectors, `ui/errorArt.ts`), what
+happened in the middle of the page both ways (JetBrains Mono 12: SOMETHING WENT WRONG. / SOME DRUNK GUY
+TRIPPED OVER THE CABLE AND PULLED THE NIGHT OUT OF THE WALL. / IT HAPPENS IN DRUNKFURT. NOTHING
+PERSONAL. TRY AGAIN., decoding in), and at the bottom right an arrow, PRESS [R] (the R on the page's
+red) / TO RESTART (TAP TO RESTART on a phone; the block is the button). R or a click starts the story
+again from the top (not the chapter a reload after a lost context returns to). Shown when the graphics
+card gives out for good (a lost context a reload did not bring back), when chapter 1 cannot be loaded,
+and when anything throws inside the page (a boundary round the app). `?error` shows it on its own.
+
 ## The game build (walk instead of scroll)
 
 `npm run build:game` builds the same story as a first-person game into `dist-game/` (Vite's mode
@@ -376,6 +388,12 @@ the getaway play on one street, without a cut). Titles and metadata are the Figm
   Sharp at the screen's own density (up to 3; its picture made at the canvas's size: a phone drew it
   at 2, from a small picture, stretched); finer points (the logo's width over 230); a lifted finger
   lets go of the pull at once, so the phone's logo is whole again in a moment.
+- **The phone page's logo is liquid** (`ui/liquidLogo.ts`, after the supplied LiquidLogo: its shader
+  and behaviour, defaults as given): a finger drawn over it leaves wakes that swirl and fade, and with
+  none on it a pseudo-pointer wanders over it. Its own small WebGL context at the logo's size and the
+  screen's density (the reference drew its source at 3 × that), buffers made once, 30 frames a second
+  while it only wanders, 60 under a finger, none while the page is hidden. The header's logo keeps its
+  points.
 - **The phone page's tilt permission** is asked only from a tap outside the white panel: COPY LINK
   and VISIT PORTFOLIO no longer bring up the system's motion dialogue.
 - **The sound switch**: `[S] SOUND ON|OFF` (the label says what a click does) and a 30 px square

@@ -1288,7 +1288,16 @@ body { cursor: pointer; }
 }
 .mstub-logo svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45)); }
 .mstub-logo { position: relative; }
-.mstub-logo .logo-dots { filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45)); }
+.mstub-logo .logo-liquid {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  filter: drop-shadow(0 6px 24px rgba(0, 0, 0, 0.45));
+}
+.has-liquid > svg { visibility: hidden; }
 .mstub-panel {
   width: min(100%, 520px);
   padding: 10px 4px 4px;
@@ -1378,3 +1387,78 @@ html.game.pointer-held, html.game.pointer-held body { cursor: none; }
 .game-help span { margin: 0 4px; opacity: 0.4; }
 .game-click { top: calc(50% - 44px); color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7); }
 .game-hint.is-on, .game-help.is-on, .game-click.is-on { opacity: 1; }
+
+/* --- the error page (ui/errorPage.ts; Figma "Drunkfurt-error-page", frame error-page 1920 × 1080) --- */
+.err {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: #181818;
+  color: #fff;
+  overflow: hidden;
+}
+.has-error .stage, .has-error .tuner, .has-error .site-head { visibility: hidden; }
+/* OOOPS: 1004 of 1920 across, 24 px in from the corner */
+.err-oops {
+  position: absolute;
+  left: 1.25vw;
+  top: 1.25vw;
+  width: clamp(280px, 52.3vw, 1004px);
+}
+.err-oops svg { display: block; width: 100%; height: auto; }
+/* what happened: in the middle of the page, both ways */
+.err-msg {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 4px;
+  padding: 0 24px;
+  text-align: center;
+  pointer-events: none;
+}
+.err-msg p {
+  margin: 0;
+  max-width: 440px;
+  font: 400 12px/16px var(--label);
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+/* PRESS [R] TO RESTART: Arial Black 80 in the design, set in the page's own heavy face; the arrow before it */
+.err-restart {
+  position: absolute;
+  right: 1.56vw;
+  bottom: 1.25vw;
+  display: grid;
+  grid-template-columns: auto auto;
+  column-gap: 0.6em;
+  align-items: start;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #fff;
+  font: 900 clamp(34px, 4.17vw, 80px) / 1 var(--headline);
+  font-stretch: 100%;
+  letter-spacing: -0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+.err-arrow { grid-column: 1; grid-row: 1; width: 0.81em; height: 0.81em; margin-top: 0.05em; }
+.err-arrow svg { display: block; width: 100%; height: 100%; transition: transform 0.35s var(--ease); }
+.err-press { grid-column: 2; grid-row: 1; justify-self: end; white-space: nowrap; padding-top: 0.06em; }
+.err-to { grid-column: 1 / 3; grid-row: 2; white-space: nowrap; padding-top: 0.04em; }
+.err-key {
+  display: inline-block;
+  margin-left: 0.12em;
+  padding: 0.1em 0.12em 0.04em;
+  border-radius: 0.075em;
+  background: var(--red);
+  letter-spacing: 0;
+}
+.err-restart:hover .err-arrow svg, .err-restart:focus-visible .err-arrow svg { transform: translateX(0.12em); }
+.err-restart:focus-visible { outline: 2px dashed var(--red); outline-offset: 8px; }
+@media (max-aspect-ratio: 1/1) {
+  .err-oops { width: calc(100vw - 40px); left: 20px; top: 20px; }
+  .err-restart { right: 20px; bottom: 24px; }
+}

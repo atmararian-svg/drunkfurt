@@ -13,6 +13,7 @@ import { takeResume } from './resume';
 import { goToChapter } from './chapterTransition';
 import { diagNote } from './diag';
 import { worldsWarm } from '../render/WorldWarm';
+import { showErrorPage } from './errorPage';
 
 /**
  * The preloader (Figma "Drunkfurt": Preloader-Start → Preloader-Final), a
@@ -226,6 +227,7 @@ export function Preloader() {
             status.replaceChildren();
             splitChars(status);
             status.classList.add('is-error');
+            showErrorPage('chapter 1 could not be loaded');
             throw new Error('chapter 1 failed');
           }
         }

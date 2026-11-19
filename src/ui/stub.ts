@@ -4,7 +4,8 @@ import { saveResume } from './resume';
 import { decodeAll, splitChars } from './decode';
 import { pixelFilter, presence } from './textBoxes';
 import { diagNote } from './diag';
-import { mountLogoParticles } from './logoParticles';
+import { mountLiquidLogo } from './liquidLogo';
+import { showErrorPage } from './errorPage';
 import logoSvg from '../assets/drunkfurt-logo.svg?raw';
 import { onTiltOn, requestTilt, tiltNeedsTap, tryTilt } from '../player/input';
 
@@ -123,7 +124,7 @@ export function watchContextLoss(canvas: HTMLCanvasElement) {
     diagNote('WEBGL CONTEXT LOST');
     // not handed back in a moment: reload and come back to this chapter (ui/resume.ts);
     // a second loss soon after a reload shows the stub instead
-    timer = window.setTimeout(() => (saveResume() ? location.reload() : showStub('lost')), 1200);
+    timer = window.setTimeout(() => (saveResume() ? location.reload() : showErrorPage('the graphics card gave out')), 1200);
   });
   canvas.addEventListener('webglcontextrestored', () => {
     diagNote('webgl context restored');
@@ -186,8 +187,8 @@ function showPhoneStub() {
       </div>
     </section>`;
   root.querySelector('svg')?.setAttribute('aria-hidden', 'true');
-  // the logo as points the finger pushes away (ui/logoParticles.ts)
-  mountLogoParticles(root.querySelector<HTMLElement>('.mstub-logo')!, logoSvg);
+  // the logo, liquid under the finger and wandering on its own (ui/liquidLogo.ts)
+  mountLiquidLogo(root.querySelector<HTMLElement>('.mstub-logo')!, logoSvg);
   const texts = [...root.querySelectorAll<HTMLElement>('[data-text]')];
   for (const t of texts) {
     t.textContent = t.dataset.text ?? '';
